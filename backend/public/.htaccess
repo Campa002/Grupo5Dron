@@ -1,0 +1,57 @@
+# ============================================================
+# .htaccess — Grupo 5: Control de Sistemas y Dron
+# Carpeta pública del backend PHP
+# ============================================================
+
+# Activar motor de reescritura
+RewriteEngine On
+
+# Forzar HTTPS (descomentar en producción)
+# RewriteCond %{HTTPS} !=on
+# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Denegar acceso a archivos sensibles
+<FilesMatch "\.(php|sql|log|env|example)$">
+    # Permitir solo los PHP públicos
+</FilesMatch>
+
+# No listar directorios
+Options -Indexes
+
+# Charset por defecto
+AddDefaultCharset UTF-8
+
+# Tipos MIME adicionales
+AddType application/manifest+json .json
+AddType application/javascript .js
+AddType text/css .css
+
+# Cabeceras de seguridad
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "DENY"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Cache para recursos estáticos (1 semana)
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType application/manifest+json "access plus 1 day"
+</IfModule>
+
+# Compresión gzip
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+</IfModule>
+
+# Reescritura: las rutas de la API se manejan directamente
+# Todo lo demás va al index.php (SPA)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteRule ^ index.php [L]

@@ -1,0 +1,33 @@
+# Configuración con datos reales (nunca subir)
+backend/config/config.php
+firmware/src/config.h
+firmware/include/config.h
+
+# Dependencias
+node_modules/
+vendor/
+
+# Capacitor / Android build
+capacitor/android/
+capacitor/.gradle/
+capacitor/build/
+*.apk
+
+# PlatformIO
+firmware/.pio/
+firmware/.vscode/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log

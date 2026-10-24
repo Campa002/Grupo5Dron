@@ -1,0 +1,138 @@
+/**
+ * Configuración del Firmware — Grupo 5: Control de Sistemas y Dron
+ * EEST N° 1 de Vicente López "Eduardo Ader" — 7° 2°
+ * 
+ * INSTRUCCIONES:
+ * 1. Copiá este archivo como "config.h" en esta misma carpeta (firmware/src/).
+ * 2. Completá los datos de red WiFi, URL de la API y token de dispositivo.
+ * 3. NUNCA subas config.h al repositorio git (está incluido en .gitignore).
+ */
+
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#include <Arduino.h>
+
+// ============================================================
+// 1. ASIGNACIÓN DE PINES (GPIO)
+// ============================================================
+
+// LED Emisor Infrarrojo (Transistor NPN o MOSFET sugerido)
+// ⚠️ NO usar GPIO35 (es solo entrada) ni GPIO2 (pin de boot/strapping).
+#define PIN_IR_LED         4
+
+// Receptor Infrarrojo (Módulo VS1838B o similar a 38 kHz)
+#define PIN_IR_RECV        15
+
+// Control de Relé 1 (220V - Iluminación o Cargas del Aula)
+#define PIN_RELAY_1        26
+
+// Control de Relé 2 (Opcional - Tomas o Circuitos Auxiliares)
+#define PIN_RELAY_2        27
+
+// LED indicador de estado en placa (habitualmente GPIO2 en DevKit v1)
+#define PIN_LED_ESTADO     2
+
+// ============================================================
+// 2. CONFIGURACIÓN DEL MÓDULO DE RELÉ
+// ============================================================
+// La mayoría de los módulos de relé de 1/2/4 canales para Arduino/ESP32
+// con optoacoplador son ACTIVO-BAJO (LOW = Relé cerrado/activado,
+// HIGH = Relé abierto/apagado).
+// Si tu módulo es activo-alto, invertí estos valores:
+#define RELAY_ACTIVE_LEVEL   LOW
+#define RELAY_INACTIVE_LEVEL HIGH
+
+// ============================================================
+// 3. CONECTIVIDAD WI-FI
+// ============================================================
+#define WIFI_SSID          "TU_RED_WIFI"
+#define WIFI_PASSWORD      "TU_CLAVE_WIFI"
+
+// Tiempo máximo de espera para conexión inicial antes de reintentar (ms)
+#define WIFI_TIMEOUT_MS    15000
+
+// Intervalo de verificación y reconexión automática (ms)
+#define WIFI_RECONNECT_INTERVAL_MS 5000
+
+// ============================================================
+// 4. API REST & AUTENTICACIÓN
+// ============================================================
+// URL completa al endpoint de esp32.php (debe usar HTTPS en producción)
+// Ej: "https://tudominio.com/api/esp32.php" o "http://192.168.1.100:8088/api/esp32.php"
+#define API_URL            "https://tu-dominio.com/api/esp32.php"
+
+// Token secreto del dispositivo (debe coincidir con esp32_token en config.php del backend)
+#define ESP32_TOKEN        "CAMBIAR_TOKEN_ESP32_SECRETO"
+
+// Identificador único de este ESP32 en la base de datos
+#define DISPOSITIVO_ID     "esp32-principal"
+
+// Versión del Firmware reportada en el heartbeat
+#define FIRMWARE_VERSION   "1.0.0"
+
+// ============================================================
+// 5. SEGURIDAD HTTPS (WiFiClientSecure)
+// ============================================================
+// Para entornos de prueba o desarrollo local sin certificado SSL válido,
+// poner en true para usar client.setInsecure().
+// ⚠️ ADVERTENCIA: CLIENT_INSECURE_MODE en true NO valida el certificado del
+// servidor, permitiendo ataques Man-in-the-Middle en redes públicas.
+// En producción, poner en false e incluir el certificado raíz (ROOT_CA_CERT).
+#define CLIENT_INSECURE_MODE true
+
+// Certificado raíz CA (PEM) para validar el servidor en producción.
+// Reemplazar por el certificado de la CA (ej: Let's Encrypt ISRG Root X1).
+static const char ROOT_CA_CERT[] PROGMEM = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
+TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh
+cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMTUwNjA0MTEwNDM4
+WhcNMzUwNjA0MTEwNDM4WjBPMQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJu
+ZXQgU2VjdXJpdHkgUmVzZWFyY2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBY
+MTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAK3oJHP0FDfzm54rVygc
+h77ct984kIxuPOZXoHj3dcKi/vVqbvYATyjb3miGbESTtrFj/RQSa78f0uoxmyF+
+0TM8ukj13Xnfs7j/EvEhmkvBioZxaUpmZmyPfjxwv60pIgbz5MDmgK7iS4+3mX6U
+A5/TR5d8S5JbECey88R456bgcHQLnTIevNWUR61CR2tqyPoUCl48aePJnxUmVDpd
+76wNOZNN59LB0NynuqtifQVNJZ79pQt7BH3FgGlvCGOHUVCgnvnKJR45dd69WmWl
+kWZ3zdIwBCmrQvMpLF2WNFFD5g0guhHdTHwcTMB3Kro26C1vpzMYOn80ZwDzZ28U
+INL36KGurrWTSTTrSmP+/ukXhNF6W5HYZNOCW69+UMv2nfL6xFdXrfNPnq2bad14
+A657XdlsxMrIbjdkfKBU303fzEncTB688LcPObxjptGEYnyfOD50peQsfbfNwtgo
+IzXYEVNJKD2b06jVYoJbo//5P5201yDVUhvAuD101S70ccwV7b05UBrAZBgcvk30
+OkSbsF58AWDUCh9XVICY50E9TyXHmVC5ogg+ VL7erPxwizMr/isBGvCdFlU9703P
+pEIBGPQUYzhH3OSNPptBK28CREnE23L7VGZ616fqGVgUxkW2SXEVchNe54485UJW
+Ast6xWompAh0photLH1W988iAc45RkW19MPDHn96BQdXAgMBAAGjQjBAMA4GA1Ud
+DwEB/wQEAwIBBjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBR5tFnme7bl5AFJ
+Cn5+IlJkKnVPOzANBgkqhkiG9w0BAQsFAAOCAgEAVR9YqbyhurdtUSUxGtPGsCDw
+HFCW3qdMWn9cdFYQzR9Yl58DfGTlfFg4JlNsQUMmgNWL8ji5GqyW57xWYCReCuOM
+temCLcU0oFYNPSpZsSilCH2wKZwfYKio374+rBU3qmRlUhKeQkm6awLhqwRetZ5s
+4ybwsdW2JYdk5mq8Jwk2jRq6U0CpWt107FHTVgCcx2EB0L2HydOa95RHGrLJfSSc
+eKIJ070U6ZGwSODnFJ222nf425LQ8L97BQQBZXlPaqC540F305Sh4Po62vLPCz3W
+55iZ85jgimyp+xqRXPfo2HUm9xvWgOtRhvmlDXvi/fZolVnRkWZupU/I50PcuqwDM
+DQT42/8Ow6UqqyFSk3gsFbG26zBrtmaILIEdpMeo8pr51P9n6SmPnkLjTYGNTLTu
+dnnzZKAQJYMbldSo6L6s8/6ZeJYl4PK8mExaddpxO18SveCHdDBGUEU2T842Sg61
+b54dA6qwvwwd8++A4VMrkWmkKn1064tnvLxsI50x1HNIAQC8CLMDfnu27yR8oxwd
+d435HLuidmG4KPXx83KSQuIB48V+Gl8hCNxRXg3xnNS5W2DT63KG0yttl77uMDGI
+6DCU329mWkhTXa7bJW54ndqwNBVuNiqPwPQttT847C027ewH12H600nUqpgownGu
+------END CERTIFICATE-----
+)EOF";
+
+// ============================================================
+// 6. TIEMPOS Y TEMPORIZACIÓN (ms)
+// ============================================================
+// Intervalo de consulta a la cola de comandos pendientes (default: 2s)
+#define POLLING_INTERVAL_MS        2000
+
+// Intervalo de reporte de latido (en línea)
+#define HEARTBEAT_INTERVAL_MS      10000
+
+// Timeout para peticiones HTTP/HTTPS (ms) - Corto para no trabar el loop
+#define HTTP_TIMEOUT_MS            3000
+
+// Tiempo que permanece activo el receptor en modo aprendizaje (ms)
+#define APRENDIZAJE_TIMEOUT_MS     15000
+
+// Velocidad del puerto serial para depuración
+#define SERIAL_BAUD_RATE           115200
+
+#endif // CONFIG_H
