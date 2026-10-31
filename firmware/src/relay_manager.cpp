@@ -16,14 +16,18 @@ void RelayManager::iniciar() {
 
     // IMPORTANTE: Escribir el estado inactivo ANTES de configurar como OUTPUT
     // para evitar cualquier pulso espurio que cierre el relé durante el arranque.
+    // Canal 1 (GPIO 25): Relé principal del aula (220V)
     digitalWrite(PIN_RELAY_1, RELAY_INACTIVE_LEVEL);
     pinMode(PIN_RELAY_1, OUTPUT);
     digitalWrite(PIN_RELAY_1, RELAY_INACTIVE_LEVEL);
     estadoCanal1 = false;
 
+    // Canal 2: Deshabilitado (sin pin asignado)
+    #if defined(PIN_RELAY_2) && (PIN_RELAY_2 >= 0)
     digitalWrite(PIN_RELAY_2, RELAY_INACTIVE_LEVEL);
     pinMode(PIN_RELAY_2, OUTPUT);
     digitalWrite(PIN_RELAY_2, RELAY_INACTIVE_LEVEL);
+    #endif
     estadoCanal2 = false;
 
     Serial.printf("[Relé] Canal 1 (GPIO %d): APAGADO (Estado por defecto al inicio)\n", PIN_RELAY_1);
@@ -34,7 +38,9 @@ void RelayManager::iniciar() {
 
 int RelayManager::obtenerPin(int canal) {
     if (canal == 1) return PIN_RELAY_1;
+    #if defined(PIN_RELAY_2) && (PIN_RELAY_2 >= 0)
     if (canal == 2) return PIN_RELAY_2;
+    #endif
     return -1;
 }
 

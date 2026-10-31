@@ -1,0 +1,33 @@
+<!-- Vista de diagnóstico de sensores — Grupo 5: Control de Sistemas y Dron -->
+<div class="sensores-pagina">
+    <div class="flex justify-between items-center mb-md flex-wrap gap-sm">
+        <div>
+            <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">
+                📡 Diagnóstico de Sensores
+            </h2>
+            <p class="texto-sm texto-secundario">
+                Verificación de los sensores del dispositivo necesarios para operar el dron.
+            </p>
+        </div>
+        <button id="btn-diagnosticar-sensores" class="btn btn--primario">
+            🔍 Ejecutar diagnóstico
+        </button>
+    </div>
+
+    <!-- Aviso de privacidad -->
+    <div class="tarjeta tarjeta--acento mb-md" style="padding: var(--espacio-sm) var(--espacio-md);">
+        <p class="texto-xs texto-secundario">
+            ℹ️ El diagnóstico verifica la disponibilidad de los sensores sin transmitir datos personales.
+            La solicitud de permisos (GPS, cámara) se realiza sólo si ya fueron otorgados previamente;
+            en caso contrario, sólo se reporta el estado como "pendiente".
+        </p>
+    </div>
+
+    <!-- Panel de resultados (se llena dinámicamente desde app.js) -->
+    <div id="panel-resultados-sensores">
+        <div class="cargando">
+            <div class="cargando__spinner"></div>
+            <p>Iniciando diagnóstico...</p>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,63 @@
+<div class="pagina-prueba-tello">
+    <div class="flex justify-between items-center mb-md flex-wrap gap-sm">
+        <div>
+            <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">📡 Prueba y Diagnóstico DJI Tello</h2>
+            <p class="texto-sm texto-secundario">Valida la conexión UDP con el dron antes de iniciar vuelo</p>
+        </div>
+        <a href="#/dron" class="btn btn--secundario">← Volver a Cabina</a>
+    </div>
+
+    <!-- Advertencia de seguridad -->
+    <div class="alerta alerta--info mb-md">
+        <span>⚠️ <strong>Aviso de Seguridad:</strong> Asegurate de que el celular esté conectado a la red Wi-Fi del Tello (SSID <code>TELLO-XXXXXX</code>, IP <code>192.168.10.1</code>) y de contar con espacio libre y seguro.</span>
+    </div>
+
+    <!-- Estado de enlace -->
+    <div class="tarjeta mb-md">
+        <h3 class="texto-sm font-semibold texto-secundario mb-sm">🌐 Estado del Enlace</h3>
+        <div class="flex gap-md flex-wrap items-center">
+            <div>
+                <span class="texto-xs texto-secundario block">IP Destino:</span>
+                <input type="text" id="tello-ip-prueba" class="campo-formulario__entrada" style="width:160px;" value="192.168.10.1">
+            </div>
+            <div>
+                <span class="texto-xs texto-secundario block">Puerto Comando:</span>
+                <input type="number" id="tello-puerto-prueba" class="campo-formulario__entrada" style="width:100px;" value="8889">
+            </div>
+            <div>
+                <span class="texto-xs texto-secundario block">Entorno:</span>
+                <span id="tello-entorno-badge" class="badge">Detectando...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Acciones de prueba -->
+    <div class="tarjeta mb-md">
+        <h3 class="texto-sm font-semibold texto-secundario mb-sm">🧪 Comandos de Validación</h3>
+        <div class="flex gap-sm flex-wrap mb-sm">
+            <button id="btn-tello-cmd" class="btn btn--primario">
+                1️⃣ Enviar "command" (Iniciar SDK)
+            </button>
+            <button id="btn-tello-bat" class="btn btn--secundario">
+                2️⃣ Consultar Batería ("battery?")
+            </button>
+            <button id="btn-tello-streamon" class="btn btn--secundario">
+                3️⃣ Activar Video ("streamon")
+            </button>
+        </div>
+        <div class="flex gap-sm items-center">
+            <input type="text" id="tello-cmd-custom" class="campo-formulario__entrada" placeholder="Comando personalizado (ej: time?)" style="flex:1;">
+            <button id="btn-tello-custom" class="btn btn--secundario">Enviar</button>
+        </div>
+    </div>
+
+    <!-- Consola de respuestas -->
+    <div class="tarjeta mb-md">
+        <div class="flex justify-between items-center mb-xs">
+            <h3 class="texto-sm font-semibold texto-secundario">📟 Registro de Respuestas UDP</h3>
+            <button id="btn-limpiar-log-tello" class="btn btn--secundario texto-xs" style="padding: 2px 8px;">Limpiar</button>
+        </div>
+        <pre id="tello-log-salida" style="background:#0a0e14; color:#38ef7d; font-family:monospace; font-size:12px; padding:12px; border-radius:8px; min-height:160px; max-height:260px; overflow-y:auto; white-space:pre-wrap;">Esperando comandos de prueba...</pre>
+    </div>
+</div>
+

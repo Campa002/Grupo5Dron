@@ -42,6 +42,27 @@ void WifiManager::intentarConexion() {
         Serial.printf("[WiFi] Intensidad de señal (RSSI): %d dBm\n", WiFi.RSSI());
         Serial.printf("[WiFi] Puerta de enlace: %s\n", WiFi.gatewayIP().toString().c_str());
         estadoAnteriorConectado = true;
+
+        // Sincronización horaria NTP requerida para validación de fechas en certificados HTTPS (TLS)
+        Serial.println("[NTP] Sincronizando fecha y hora con servidores de tiempo...");
+        configTime(-3 * 3600, 0, "pool.ntp.org", "time.google.com");
+        time_t now = time(nullptr);
+        unsigned long ntpInicio = millis();
+        while (now < 1672531199 && (millis() - ntpInicio) < 6000) { // Esperar año >= 2023
+            delay(300);
+            now = time(nullptr);
+            Serial.print("#");
+        }
+        Serial.println();
+        if (now >= 1672531199) {
+            struct tm timeinfo;
+            localtime_r(&now, &timeinfo);
+            char bufferFecha[64];
+            strftime(bufferFecha, sizeof(bufferFecha), "%d/%m/%Y %H:%M:%S", &timeinfo);
+            Serial.printf("[NTP] ✓ Hora sincronizada para HTTPS: %s (UTC-3)\n", bufferFecha);
+        } else {
+            Serial.println("[NTP] ⚠️ Timeout de sincronización NTP. Si VERIFY_SSL está activo, verificar conexión a internet.");
+        }
     } else {
         Serial.println("[WiFi] ⚠️ Tiempo de espera agotado. Se continuará reintentando en segundo plano.");
         estadoAnteriorConectado = false;

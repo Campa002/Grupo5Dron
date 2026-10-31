@@ -1,0 +1,68 @@
+<div class="aula-pagina">
+    <div class="flex justify-between items-center mb-md flex-wrap gap-sm">
+        <div>
+            <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">
+                🎛️ Control del Aula
+            </h2>
+            <p class="texto-sm texto-secundario">
+                Comandos IR y relé para equipamiento del salón
+            </p>
+        </div>
+        <div class="flex items-center gap-sm">
+            <button class="btn btn--secundario" onclick="Aula.cargarDispositivos()" title="Recargar dispositivos">
+                🔄 Actualizar
+            </button>
+        </div>
+    </div>
+
+    <!-- Barra de estado ESP32 -->
+    <div class="tarjeta mb-md" style="padding: var(--espacio-md);">
+        <div class="flex justify-between items-center flex-wrap gap-sm">
+            <div class="flex items-center gap-sm">
+                <span class="texto-sm" style="font-weight: 600;">ESP32 Aula:</span>
+                <div id="info-esp32" class="flex items-center gap-sm">
+                    <span class="badge badge--error">🔴 Verificando...</span>
+                </div>
+            </div>
+            <div class="texto-xs texto-secundario">
+                Polling automático cada 5s
+            </div>
+        </div>
+    </div>
+
+    <!-- Control directo de Relé (Canal 1 - GPIO26 / Canal 2 - GPIO27) -->
+    <div class="tarjeta mb-md">
+        <div class="flex justify-between items-center mb-sm">
+            <div class="tarjeta__titulo" style="margin-bottom: 0;">⚡ Relé de Potencia 220V</div>
+            <span class="badge badge--advertencia">Requiere Supervisión Docente</span>
+        </div>
+        <p class="texto-xs texto-secundario mb-md">
+            Control de corte/alimentación general para circuitos de iluminación o tomas auxiliares.
+        </p>
+        <div class="flex flex-wrap gap-sm">
+            <button class="btn btn--exito" onclick="Aula.enviarComandoRele('encender', 1)">
+                🟢 Encender Canal 1
+            </button>
+            <button class="btn btn--peligro" onclick="Aula.enviarComandoRele('apagar', 1)">
+                🔴 Apagar Canal 1
+            </button>
+            <button class="btn btn--secundario solo-docente" onclick="Aula.enviarComandoRele('encender', 2)">
+                🟢 Encender Canal 2
+            </button>
+            <button class="btn btn--secundario solo-docente" onclick="Aula.enviarComandoRele('apagar', 2)">
+                🔴 Apagar Canal 2
+            </button>
+        </div>
+    </div>
+
+    <!-- Listado dinámico de dispositivos del aula -->
+    <h3 class="texto-base texto-secundario mb-sm" style="text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">
+        Dispositivos infrarrojos configurados
+    </h3>
+    <div id="lista-dispositivos">
+        <div class="cargando">
+            <div class="cargando__spinner"></div>
+            <p>Cargando dispositivos...</p>
+        </div>
+    </div>
+</div>

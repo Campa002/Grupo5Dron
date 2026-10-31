@@ -17,18 +17,19 @@
 // 1. ASIGNACIÓN DE PINES (GPIO)
 // ============================================================
 
-// LED Emisor Infrarrojo (Transistor NPN o MOSFET sugerido)
-// ⚠️ NO usar GPIO35 (es solo entrada) ni GPIO2 (pin de boot/strapping).
-#define PIN_IR_LED         4
+// LED Emisor Infrarrojo KY-005 (GPIO 19 con resistencia de 100-220 ohm en serie)
+// Mejora de alcance opcional: transistor NPN (2N2222 o BC337) con resistencia de 1 kΩ en la base
+// alimentando el LED IR a 5V/VIN para mayor corriente y alcance.
+#define PIN_IR_LED         19 // Emisor IR KY-005 (GPIO 19)
 
 // Receptor Infrarrojo (Módulo VS1838B o similar a 38 kHz)
-#define PIN_IR_RECV        15
+#define PIN_IR_RECV        4  // Receptor IR KY-022 (GPIO 4, 3V3)
 
 // Control de Relé 1 (220V - Iluminación o Cargas del Aula)
-#define PIN_RELAY_1        26
+#define PIN_RELAY_1        25 // Relé Canal 1 (GPIO 25, 220V Aula)
 
 // Control de Relé 2 (Opcional - Tomas o Circuitos Auxiliares)
-#define PIN_RELAY_2        27
+#define PIN_RELAY_2        -1 // Relé 2 deshabilitado (sin pin asignado)
 
 // LED indicador de estado en placa (habitualmente GPIO2 en DevKit v1)
 #define PIN_LED_ESTADO     2
@@ -72,17 +73,33 @@
 #define FIRMWARE_VERSION   "1.0.0"
 
 // ============================================================
-// 5. SEGURIDAD HTTPS (WiFiClientSecure)
+// 5. SEGURIDAD HTTPS (WiFiClientSecure) & CERTIFICADOS RAÍZ
 // ============================================================
 // Para entornos de prueba o desarrollo local sin certificado SSL válido,
 // poner en true para usar client.setInsecure().
 // ⚠️ ADVERTENCIA: CLIENT_INSECURE_MODE en true NO valida el certificado del
 // servidor, permitiendo ataques Man-in-the-Middle en redes públicas.
-// En producción, poner en false e incluir el certificado raíz (ROOT_CA_CERT).
+// En producción, poner en false e incluir el certificado raíz CA (ROOT_CA_CERT).
+//
+// 📌 GUÍA: ¿QUÉ CERTIFICADO RAÍZ USAR SEGÚN EL PROVEEDOR DE HOSTING?
+//  1. Let's Encrypt (cPanel AutoSSL o Certbot):
+//     - Certificado Raíz: "ISRG Root X1" (incluido por defecto abajo). Válido hasta 2035.
+//  2. cPanel (Sectigo / Comodo AutoSSL):
+//     - Certificado Raíz: "USERTrust RSA Certification Authority" o "AAA Certificate Services".
+//  3. Google Trust Services (cPanel moderno):
+//     - Certificado Raíz: "GTS Root R1" o "GTS Root R2".
+//  4. Cloudflare (Proxy SSL Flexible / Full):
+//     - Certificado Raíz: "Cloudflare Origin CA" o "DigiCert Global Root CA".
+//
+// CÓMO OBTENER EL CERTIFICADO EXACTO DE TU HOSTING:
+//  1. Abrí la URL de tu API en Chrome o Edge (ej: https://tuhosting.com/api/esp32.php).
+//  2. Hacé clic en el ícono del candado junto a la URL -> "La conexión es segura" -> "Certificado".
+//  3. Andá a la pestaña "Ruta de certificación" y seleccioná el nodo superior (el Certificado Raíz).
+//  4. Exportalo en formato "X.509 codificado base 64 (.CER / .PEM)" y pegá su contenido abajo.
+//
 #define CLIENT_INSECURE_MODE true
 
 // Certificado raíz CA (PEM) para validar el servidor en producción.
-// Reemplazar por el certificado de la CA (ej: Let's Encrypt ISRG Root X1).
 static const char ROOT_CA_CERT[] PROGMEM = R"EOF(
 -----BEGIN CERTIFICATE-----
 MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
@@ -99,7 +116,7 @@ kWZ3zdIwBCmrQvMpLF2WNFFD5g0guhHdTHwcTMB3Kro26C1vpzMYOn80ZwDzZ28U
 INL36KGurrWTSTTrSmP+/ukXhNF6W5HYZNOCW69+UMv2nfL6xFdXrfNPnq2bad14
 A657XdlsxMrIbjdkfKBU303fzEncTB688LcPObxjptGEYnyfOD50peQsfbfNwtgo
 IzXYEVNJKD2b06jVYoJbo//5P5201yDVUhvAuD101S70ccwV7b05UBrAZBgcvk30
-OkSbsF58AWDUCh9XVICY50E9TyXHmVC5ogg+ VL7erPxwizMr/isBGvCdFlU9703P
+OkSbsF58AWDUCh9XVICY50E9TyXHmVC5ogg+VL7erPxwizMr/isBGvCdFlU9703P
 pEIBGPQUYzhH3OSNPptBK28CREnE23L7VGZ616fqGVgUxkW2SXEVchNe54485UJW
 Ast6xWompAh0photLH1W988iAc45RkW19MPDHn96BQdXAgMBAAGjQjBAMA4GA1Ud
 DwEB/wQEAwIBBjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBR5tFnme7bl5AFJ
@@ -114,7 +131,7 @@ dnnzZKAQJYMbldSo6L6s8/6ZeJYl4PK8mExaddpxO18SveCHdDBGUEU2T842Sg61
 b54dA6qwvwwd8++A4VMrkWmkKn1064tnvLxsI50x1HNIAQC8CLMDfnu27yR8oxwd
 d435HLuidmG4KPXx83KSQuIB48V+Gl8hCNxRXg3xnNS5W2DT63KG0yttl77uMDGI
 6DCU329mWkhTXa7bJW54ndqwNBVuNiqPwPQttT847C027ewH12H600nUqpgownGu
-------END CERTIFICATE-----
+-----END CERTIFICATE-----
 )EOF";
 
 // ============================================================

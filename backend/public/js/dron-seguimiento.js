@@ -5,28 +5,11 @@
  *
  * ⚠ REQUIERE VALIDACIÓN CON EL DRON REAL.
  * Este módulo es EXPERIMENTAL y no debe usarse en vuelo autónomo sin
- * supervisión humana permanente. El seguimiento puede fallar en condiciones
- * de baja iluminación, fondos complejos o movimiento brusco.
+ * supervisión humana permanente.
  *
- * Implementación:
- *  - Usa el modelo TensorFlow.js COCO-SSD empaquetado localmente (sin CDN).
- *  - Procesa frames del stream de video del dron a una frecuencia máxima
- *    configurable para no saturar el hilo principal.
- *  - Emite offsets de corrección (dx, dy) normalizados en [-1, 1] para que
- *    el módulo de vuelo los traduzca a comandos de movimiento.
- *  - El seguimiento está DESACTIVADO por defecto al iniciar cada sesión.
- *
- * Dependencias externas:
- *  - TensorFlow.js (tf.js) y el modelo COCO-SSD deben estar servidos
- *    localmente en /vendor/tfjs/ y /vendor/coco-ssd/ respectivamente.
- *    Si no están disponibles, el módulo reporta el error y no falla silenciosamente.
- *
- * Uso:
- *   const seg = new DronSeguimiento({ videoEl: document.getElementById('video-dron') });
- *   await seg.inicializar();      // carga el modelo
- *   seg.activar('person');        // empieza a detectar
- *   seg.onOffset = ({dx, dy}) => { ... };
- *   seg.desactivar();
+ * Modalidades de Detección:
+ *  1. Modo 'persona': Detección por IA con TensorFlow.js + COCO-SSD (modelo empaquetado localmente en /vendor/coco-ssd/).
+ *  2. Modo 'color': Respaldo por segmentación de color (offline, sin librerías pesadas), útil para pruebas en clase.
  */
 
 // eslint-disable-next-line no-unused-vars
@@ -34,118 +17,84 @@ const DronSeguimiento = (() => {
     'use strict';
 
     class DronSeguimiento {
-        /**
-         * @param {Object} config
-         * @param {HTMLVideoElement} config.videoEl          - Elemento <video> con el stream del dron.
-         * @param {HTMLCanvasElement} [config.canvasDebug]   - Canvas opcional para dibujar bounding boxes.
-         * @param {number} [config.maxFPS]                   - Frecuencia máxima de inferencia. Default: 5.
-         * @param {number} [config.umbralConfianza]          - Confianza mínima [0,1]. Default: 0.55.
-         */
         constructor({
             videoEl,
             canvasDebug = null,
             maxFPS = 5,
             umbralConfianza = 0.55,
         }) {
-            if (!videoEl) throw new Error('[Seguimiento] Se requiere un elemento <video>.');
+            if (!videoEl) throw new Error('[Seguimiento] Se requiere un elemento <video> o <canvas>.');
             this.videoEl         = videoEl;
             this.canvasDebug     = canvasDebug;
             this.maxFPS          = maxFPS;
             this.umbralConfianza = umbralConfianza;
 
-            this.activo      = false; // Desactivado por defecto (requisito de seguridad)
-            this.cargando    = false;
-            this.modeloCargado = false;
-            this._modelo     = null;
-            this._claseObj   = 'person'; // Clase a seguir
-            this._rafId      = null;
-            this._ultFrame   = 0;
+            this.modo            = 'persona'; // 'persona' o 'color'
+            this.activo          = false;    // Desactivado por defecto al inicio
+            this.cargando        = false;
+            this.modeloCargado   = false;
+            this._modelo         = null;
+            this._claseObj       = 'person';
+            this._rafId          = null;
+            this._ultFrame       = 0;
+            this._framesSinDetectar = 0;
 
-            /** @type {Function|null} Callback ({dx, dy, deteccion}) */
+            // Parámetros de seguridad de control
+            this.maxVelocidadRC  = 25; // Límite estricto del 25% de velocidad máxima
+
+            /** @type {Function|null} Callback ({dx, dy, deteccion, modo}) */
             this.onOffset = null;
             /** @type {Function|null} Callback cuando no se detecta objeto */
             this.onPerdida = null;
 
-            this._ADVERTENCIA = [
-                '⚠ SEGUIMIENTO VISUAL EXPERIMENTAL',
-                'Este módulo NO es apto para vuelo autónomo sin supervisión.',
-                'Puede perder el objetivo o enviar comandos incorrectos.',
-            ].join(' | ');
+            this._ADVERTENCIA = '⚠ SEGUIMIENTO EXPERIMENTAL: supervisión obligatoria. Límites de velocidad activos.';
         }
 
-        // ----------------------------------------------------------------
-        // Inicialización del modelo
-        // ----------------------------------------------------------------
-
-        /**
-         * Carga el modelo COCO-SSD desde el servidor local.
-         * Requiere que /vendor/coco-ssd/model.json exista.
-         * @returns {Promise<{ ok: boolean, error?: string }>}
-         */
         async inicializar() {
-            if (this.modeloCargado) return { ok: true };
+            if (this.modeloCargado) return { ok: true, modo: this.modo };
             if (this.cargando) return { ok: false, error: 'ya_cargando' };
             this.cargando = true;
 
-            // Verificar disponibilidad de TensorFlow.js
-            if (typeof tf === 'undefined') {
-                this.cargando = false;
-                const msg = '[Seguimiento] TensorFlow.js no está disponible. ' +
-                    'Asegurate de incluir /vendor/tfjs/tf.min.js antes de este módulo.';
-                console.error(msg);
-                return { ok: false, error: 'tfjs_no_disponible' };
+            // 1. Intentar cargar modelo local de TensorFlow.js
+            const tfDisponible = typeof tf !== 'undefined' && typeof cocoSsd !== 'undefined';
+
+            if (tfDisponible) {
+                try {
+                    console.info('[Seguimiento] Intentando cargar modelo COCO-SSD local...');
+                    this._modelo = await cocoSsd.load({
+                        modelUrl: '/vendor/coco-ssd/model.json',
+                    });
+                    this.modeloCargado = true;
+                    this.cargando = false;
+                    this.modo = 'persona';
+                    console.info('[Seguimiento] ✅ Modelo COCO-SSD cargado para modo "persona".');
+                    return { ok: true, modo: 'persona' };
+                } catch (err) {
+                    console.warn('[Seguimiento] No se pudo cargar el modelo COCO-SSD local:', err);
+                }
             }
 
-            // Verificar disponibilidad de cocoSsd
-            if (typeof cocoSsd === 'undefined') {
-                this.cargando = false;
-                const msg = '[Seguimiento] cocoSsd no está disponible. ' +
-                    'Asegurate de incluir /vendor/coco-ssd/coco-ssd.min.js antes de este módulo.';
-                console.error(msg);
-                return { ok: false, error: 'cocossd_no_disponible' };
-            }
-
-            try {
-                console.info('[Seguimiento] Cargando modelo COCO-SSD local...');
-                // El modelo se carga desde el servidor propio, sin CDN
-                this._modelo = await cocoSsd.load({
-                    modelUrl: '/vendor/coco-ssd/model.json',
-                });
-                this.modeloCargado = true;
-                this.cargando = false;
-                console.info('[Seguimiento] Modelo COCO-SSD cargado correctamente.');
-                console.warn(this._ADVERTENCIA);
-                return { ok: true };
-            } catch (err) {
-                this.cargando = false;
-                console.error('[Seguimiento] Error al cargar el modelo:', err);
-                return { ok: false, error: err.message || 'error_carga_modelo' };
-            }
+            // 2. Fallback automático a modo 'color' si no hay modelo de IA
+            this.cargando = false;
+            this.modeloCargado = true;
+            this.modo = 'color';
+            console.info('[Seguimiento] ℹ️ Activando modo respaldo por color (sin dependencias pesadas).');
+            return {
+                ok: true,
+                modo: 'color',
+                aviso: 'Operando en modo respaldo por color (modelo IA no encontrado en /vendor/coco-ssd/).'
+            };
         }
 
-        // ----------------------------------------------------------------
-        // Activación / desactivación
-        // ----------------------------------------------------------------
-
-        /**
-         * Activa el bucle de detección.
-         * @param {string} [claseObjetivo] - Clase COCO a seguir (ej: 'person', 'cell phone').
-         */
-        activar(claseObjetivo = 'person') {
-            if (!this.modeloCargado) {
-                console.warn('[Seguimiento] El modelo no está cargado. Llamá a inicializar() primero.');
-                return;
-            }
-            this._claseObj = claseObjetivo;
-            this.activo    = true;
+        activar(modoDeseado = 'persona') {
+            this.modo = (modoDeseado === 'color' || !this._modelo) ? 'color' : 'persona';
+            this.activo = true;
             this._ultFrame = 0;
-            console.warn(this._ADVERTENCIA);
+            this._framesSinDetectar = 0;
+            console.warn(`[Seguimiento] ${this._ADVERTENCIA} (Modo: ${this.modo})`);
             this._bucle();
         }
 
-        /**
-         * Detiene el bucle de detección y emite offset (0, 0).
-         */
         desactivar() {
             this.activo = false;
             if (this._rafId !== null) {
@@ -153,135 +102,174 @@ const DronSeguimiento = (() => {
                 this._rafId = null;
             }
             if (typeof this.onOffset === 'function') {
-                this.onOffset({ dx: 0, dy: 0, deteccion: null });
+                this.onOffset({ dx: 0, dy: 0, deteccion: null, activo: false });
             }
             this._limpiarDebug();
             console.info('[Seguimiento] Seguimiento desactivado.');
         }
 
-        // ----------------------------------------------------------------
-        // Bucle de inferencia
-        // ----------------------------------------------------------------
-
-        _bucle() {
+        _bucle(ts = 0) {
             if (!this.activo) return;
-            this._rafId = requestAnimationFrame(async (timestamp) => {
-                const intervalo = 1000 / this.maxFPS;
-                if (timestamp - this._ultFrame >= intervalo) {
-                    this._ultFrame = timestamp;
-                    await this._detectar();
-                }
-                this._bucle();
-            });
+
+            const intervaloMs = 1000 / this.maxFPS;
+            if (ts - this._ultFrame >= intervaloMs) {
+                this._ultFrame = ts;
+                this._detectar();
+            }
+
+            this._rafId = requestAnimationFrame((t) => this._bucle(t));
         }
 
         async _detectar() {
-            if (!this.activo || !this._modelo) return;
-            if (!this.videoEl || this.videoEl.readyState < 2) return;
+            if (!this.activo) return;
 
-            try {
-                const detecciones = await this._modelo.detect(this.videoEl);
-                // Filtrar por clase y umbral de confianza
-                const objetivo = detecciones
-                    .filter(d => d.class === this._claseObj && d.score >= this.umbralConfianza)
-                    .sort((a, b) => b.score - a.score)[0]; // La de mayor confianza
-
-                if (objetivo) {
-                    const offset = this._calcularOffset(objetivo);
-                    if (typeof this.onOffset === 'function') {
-                        this.onOffset({ ...offset, deteccion: objetivo });
-                    }
-                    this._dibujarDebug([objetivo]);
-                } else {
-                    if (typeof this.onPerdida === 'function') {
-                        this.onPerdida();
-                    }
-                    this._limpiarDebug();
-                }
-            } catch (err) {
-                // No interrumpir el bucle ante errores de inferencia puntuales
-                console.warn('[Seguimiento] Error de inferencia (no fatal):', err.message);
+            if (this.modo === 'persona' && this._modelo) {
+                await this._detectarPersona();
+            } else {
+                this._detectarColor();
             }
         }
 
-        /**
-         * Calcula el offset del centro del bounding box respecto al centro del video.
-         * @param {Object} deteccion
-         * @returns {{ dx: number, dy: number }}
-         */
-        _calcularOffset(deteccion) {
-            const vw = this.videoEl.videoWidth  || this.videoEl.clientWidth  || 640;
-            const vh = this.videoEl.videoHeight || this.videoEl.clientHeight || 480;
+        async _detectarPersona() {
+            try {
+                const preds = await this._modelo.detect(this.videoEl);
+                const persona = preds.find(p => p.class === 'person' && p.score >= this.umbralConfianza);
 
-            const [bx, by, bw, bh] = deteccion.bbox;
-            const centroX = bx + bw / 2;
-            const centroY = by + bh / 2;
-
-            // Normalizar: centro del frame = 0, bordes = ±1
-            const dx = parseFloat(((centroX - vw / 2) / (vw / 2)).toFixed(3));
-            const dy = parseFloat(((centroY - vh / 2) / (vh / 2)).toFixed(3));
-
-            return { dx, dy };
+                if (persona) {
+                    this._framesSinDetectar = 0;
+                    const offset = this._calcularOffset(persona.bbox);
+                    this._dibujarDebug([persona]);
+                    if (this.onOffset) this.onOffset({ ...offset, deteccion: persona, modo: 'persona' });
+                } else {
+                    this._manejarPerdida();
+                }
+            } catch (e) {
+                this._manejarPerdida();
+            }
         }
 
-        // ----------------------------------------------------------------
-        // Visualización de debug
-        // ----------------------------------------------------------------
+        _detectarColor() {
+            // Segmentación por color en canvas auxiliar
+            if (!this.canvasDebug) {
+                this._manejarPerdida();
+                return;
+            }
+
+            const ctx = this.canvasDebug.getContext('2d');
+            const w = this.canvasDebug.width || 320;
+            const h = this.canvasDebug.height || 240;
+
+            try {
+                // Dibujar frame en el canvas de análisis
+                ctx.drawImage(this.videoEl, 0, 0, w, h);
+                const imgData = ctx.getImageData(0, 0, w, h);
+                const d = imgData.data;
+
+                let sumaX = 0;
+                let sumaY = 0;
+                let count = 0;
+
+                // Buscar píxeles con predominancia de verde/naranja (objetivo típico de prueba)
+                for (let i = 0; i < d.length; i += 16) {
+                    const r = d[i];
+                    const g = d[i + 1];
+                    const b = d[i + 2];
+
+                    // Detección de color objetivo: por ejemplo verde intenso
+                    if (g > 100 && g > r * 1.3 && g > b * 1.3) {
+                        const px = (i / 4) % w;
+                        const py = Math.floor((i / 4) / w);
+                        sumaX += px;
+                        sumaY += py;
+                        count++;
+                    }
+                }
+
+                if (count > 25) {
+                    this._framesSinDetectar = 0;
+                    const cx = sumaX / count;
+                    const cy = sumaY / count;
+
+                    const dx = Math.max(-1, Math.min(1, (cx - w / 2) / (w / 2)));
+                    const dy = Math.max(-1, Math.min(1, (cy - h / 2) / (h / 2)));
+
+                    // Dibujar cruz de seguimiento
+                    ctx.strokeStyle = '#22c55e';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+                    ctx.moveTo(cx - 25, cy); ctx.lineTo(cx + 25, cy);
+                    ctx.moveTo(cx, cy - 25); ctx.lineTo(cx, cy + 25);
+                    ctx.stroke();
+
+                    if (this.onOffset) {
+                        this.onOffset({
+                            dx: dx * (this.maxVelocidadRC / 100),
+                            dy: dy * (this.maxVelocidadRC / 100),
+                            deteccion: { class: 'color_target', area: count },
+                            modo: 'color'
+                        });
+                    }
+                } else {
+                    this._manejarPerdida();
+                }
+            } catch (err) {
+                this._manejarPerdida();
+            }
+        }
+
+        _manejarPerdida() {
+            this._framesSinDetectar++;
+            if (this._framesSinDetectar >= 3) {
+                // Parada inmediata al perder el objetivo
+                if (this.onOffset) this.onOffset({ dx: 0, dy: 0, deteccion: null, perdido: true });
+                if (this.onPerdida) this.onPerdida();
+                this._limpiarDebug();
+            }
+        }
+
+        _calcularOffset(bbox) {
+            const [x, y, ancho, alto] = bbox;
+            const centroX = x + ancho / 2;
+            const centroY = y + alto / 2;
+
+            const vW = this.videoEl.videoWidth || this.videoEl.width || 640;
+            const vH = this.videoEl.videoHeight || this.videoEl.height || 360;
+
+            const dxNorm = (centroX - vW / 2) / (vW / 2);
+            const dyNorm = (centroY - vH / 2) / (vH / 2);
+
+            // Aplicar límite de seguridad conservador
+            const factorSeguro = this.maxVelocidadRC / 100.0;
+
+            return {
+                dx: Math.max(-factorSeguro, Math.min(factorSeguro, dxNorm * factorSeguro)),
+                dy: Math.max(-factorSeguro, Math.min(factorSeguro, dyNorm * factorSeguro))
+            };
+        }
 
         _dibujarDebug(detecciones) {
             if (!this.canvasDebug) return;
             const ctx = this.canvasDebug.getContext('2d');
-            const vw = this.videoEl.videoWidth  || 640;
-            const vh = this.videoEl.videoHeight || 480;
-            this.canvasDebug.width  = vw;
-            this.canvasDebug.height = vh;
-            ctx.clearRect(0, 0, vw, vh);
+            const w = this.canvasDebug.width;
+            const h = this.canvasDebug.height;
+            ctx.clearRect(0, 0, w, h);
 
-            for (const d of detecciones) {
-                const [x, y, w, h] = d.bbox;
-                ctx.strokeStyle = '#00ccff';
-                ctx.lineWidth   = 2;
-                ctx.strokeRect(x, y, w, h);
-                ctx.fillStyle = 'rgba(0,102,204,0.6)';
-                ctx.fillRect(x, y - 18, w, 18);
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 12px Inter, sans-serif';
-                ctx.fillText(`${d.class} ${(d.score * 100).toFixed(0)}%`, x + 4, y - 4);
-            }
+            detecciones.forEach(d => {
+                const [x, y, bw, bh] = d.bbox;
+                ctx.strokeStyle = '#38ef7d';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, bw, bh);
+                ctx.fillStyle = '#38ef7d';
+                ctx.font = '12px sans-serif';
+                ctx.fillText(`Persona ${(d.score * 100).toFixed(0)}%`, x, Math.max(12, y - 4));
+            });
         }
 
         _limpiarDebug() {
             if (!this.canvasDebug) return;
             const ctx = this.canvasDebug.getContext('2d');
             ctx.clearRect(0, 0, this.canvasDebug.width, this.canvasDebug.height);
-        }
-
-        // ----------------------------------------------------------------
-        // API pública
-        // ----------------------------------------------------------------
-
-        /**
-         * Lista de clases que soporta COCO-SSD (para el selector de UI).
-         */
-        static clasesDisponibles() {
-            return [
-                'person', 'bicycle', 'car', 'motorcycle', 'airplane',
-                'bus', 'train', 'truck', 'boat', 'traffic light',
-                'fire hydrant', 'stop sign', 'parking meter', 'bench',
-                'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-                'elephant', 'bear', 'zebra', 'giraffe', 'backpack',
-                'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-                'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
-                'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-                'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon',
-                'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli',
-                'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair',
-                'couch', 'potted plant', 'bed', 'dining table', 'toilet',
-                'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone',
-                'microwave', 'oven', 'toaster', 'sink', 'refrigerator',
-                'book', 'clock', 'vase', 'scissors', 'teddy bear',
-                'hair drier', 'toothbrush',
-            ];
         }
     }
 

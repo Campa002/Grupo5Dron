@@ -9,14 +9,14 @@ Este directorio contiene el código fuente en C++ para el microcontrolador ESP32
 
 | Componente | Pin ESP32 | Modo | Descripción / Circuito |
 | :--- | :---: | :---: | :--- |
-| **LED Emisor IR** | **GPIO 4** | OUTPUT | Conectar mediante transistor NPN (2N2222 o BC547) con resistencia de base de 1 kΩ y resistencia limitadora de 10-22 Ω hacia 5V/3.3V. *(⚠️ No usar GPIO35 por ser solo entrada).* |
-| **Receptor IR** | **GPIO 15** | INPUT | Módulo VS1838B (o similar a 38 kHz). Pin de señal a GPIO15, VCC a 3.3V o 5V y GND a tierra común. |
-| **Relé Canal 1** | **GPIO 26** | OUTPUT | Control de corte/encendido general de 220V (Iluminación o tomas del aula). |
-| **Relé Canal 2** | **GPIO 27** | OUTPUT | Canal auxiliar opcional para segundo circuito. |
-| **LED Estado** | **GPIO 2** | OUTPUT | LED onboard de la placa ESP32 (parpadeo de heartbeat / señalización). |
+| **LED Emisor IR (KY-005)** | **GPIO 19** | OUTPUT | Señal en GPIO 19 con resistencia de 100-220 Ω en serie. *(Mejora opcional: transistor NPN 2N2222/BC337 con R=1 kΩ en base hacia 5V para máxima potencia).* |
+| **Receptor IR (KY-022)** | **GPIO 19** | INPUT | Módulo KY-022 receptor a 38 kHz. Señal a GPIO 19, VCC a 3.3V y GND a tierra común. |
+| **Relé Canal 1** | **GPIO 25** | OUTPUT | Módulo relé 1 canal con optoacoplador y jumper de nivel, alimentado a VIN/5V. Señal en GPIO 25. Corte de 220V del aula. |
+| **Relé Canal 2** | *Sin asignar* | — | Deshabilitado por diseño de hardware en protoboard actual. |
+| **LED Estado** | **GPIO 2** | OUTPUT | LED azul onboard del ESP32 (indicador de estado WiFi / API). Nunca conectar el relé aquí. |
 
 > [!WARNING]
-> **Corrección de Pines Crítica:** El relé **NUNCA** debe conectarse a **GPIO 2** ni a **GPIO 0**, ya que son pines de *strapping* (arranque) del microcontrolador. Un módulo de relé conectado a GPIO 2 puede forzar el pin a un estado indebido durante el encendido e impedir el arranque del ESP32. Por este motivo, se utilizan **GPIO 26** y **GPIO 27**.
+> **Corrección de Pines Crítica:** El relé **NUNCA** debe conectarse a **GPIO 2** ni a **GPIO 0**, ya que son pines de *strapping* (arranque) del microcontrolador. Un módulo de relé conectado a GPIO 2 puede forzar el pin a un estado indebido durante el encendido e impedir el arranque del ESP32. Por este motivo, se utilizan **GPIO 25** y **GPIO 27**.
 
 ### Lógica de Control de Relé: Activo-Bajo vs Activo-Alto
 La mayoría de los módulos de relé comerciales para Arduino/ESP32 con optoacoplador funcionan con **lógica activo-bajo** (`LOW` activa el relé, `HIGH` lo apaga).
@@ -77,6 +77,6 @@ Si querés verificar el funcionamiento eléctrico de los componentes (relés, LE
 3. Te aparecerá un menú interactivo:
    * `1`: Conmuta el Relé 1 por 2 segundos y lo apaga.
    * `2`: Conmuta el Relé 2 por 2 segundos y lo apaga.
-   * `3`: Emite 5 códigos de prueba infrarrojos NEC en GPIO 4.
-   * `4`: Pone el receptor IR en modo escucha en tiempo real para decodificar cualquier control remoto apuntado al sensor en GPIO 15.
+   * `3`: Emite 5 códigos de prueba infrarrojos NEC en GPIO 19.
+   * `4`: Pone el receptor IR en modo escucha en tiempo real para decodificar cualquier control remoto apuntado al sensor en GPIO 4.
    * `5`: Realiza una prueba integral secuencial de todos los periféricos.

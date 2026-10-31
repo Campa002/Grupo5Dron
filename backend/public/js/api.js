@@ -21,22 +21,28 @@ const API = (() => {
     // Para configurar la URL desde la app, llamar:
     //   API.setBaseUrl('https://tuhosting.com/api')
     //
-    const HOSTING_URL_DEFECTO = 'https://REEMPLAZAR-CON-TU-HOSTING.com/api';
-
     function _resolverBaseUrl() {
-        // En Capacitor (APK) el origen no tiene dominio real
         const enCapacitor = window.location.protocol === 'capacitor:' ||
-            window.location.hostname === 'localhost' && window.location.protocol !== 'http:' && window.location.protocol !== 'https:';
+            window.location.protocol === 'file:' ||
+            (window.location.hostname === 'localhost' && window.location.port !== '80' && window.location.port !== '8080' && window.location.protocol !== 'http:' && window.location.protocol !== 'https:');
 
         if (enCapacitor) {
-            const guardada = localStorage.getItem('grupo5dron_api_url');
-            return guardada || HOSTING_URL_DEFECTO;
+            return localStorage.getItem('grupo5dron_api_url') || (window.CAPACITOR_API_URL || '');
         }
-        // En web: relativo al mismo servidor
         return window.location.origin + '/api';
     }
 
     let _baseUrl = _resolverBaseUrl();
+
+    function setBaseUrl(nuevaUrl) {
+        if (!nuevaUrl) return;
+        _baseUrl = nuevaUrl.replace(/\/+$/, '');
+        localStorage.setItem('grupo5dron_api_url', _baseUrl);
+    }
+
+    function getBaseUrl() {
+        return _baseUrl;
+    }
 
     /**
      * Obtiene el token JWT almacenado.
@@ -238,5 +244,7 @@ const API = (() => {
         perfilesDron,
         configuracion,
         usuarios,
+        setBaseUrl,
+        getBaseUrl,
     };
 })();

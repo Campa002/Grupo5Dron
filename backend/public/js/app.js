@@ -130,7 +130,7 @@ const App = (() => {
         const hash = window.location.hash || '#/inicio';
         const ruta = hash.replace(/^#\/?/, '').split('?')[0].trim() || 'inicio';
 
-        const rutasValidas = ['login', 'inicio', 'aula', 'dron', 'sensores', 'config-dron', 'admin', 'acerca'];
+        const rutasValidas = ['login', 'inicio', 'aula', 'dron', 'sensores', 'config-dron', 'admin', 'acerca', 'prueba-tello'];
         const destino = rutasValidas.includes(ruta) ? ruta : 'inicio';
 
         // 1. Control de autenticación
@@ -266,6 +266,14 @@ const App = (() => {
             case 'acerca':
                 // Vista estática informativa
                 break;
+
+            case 'prueba-tello': {
+                const contenedorPrueba = document.getElementById('app-contenido');
+                if (contenedorPrueba) {
+                    inicializarPaginaPruebaTello(contenedorPrueba);
+                }
+                break;
+            }
         }
     }
 
@@ -432,6 +440,92 @@ const App = (() => {
     /**
      * Inicialización global de la aplicación.
      */
+        /**
+     * Inicializa la vista de prueba y diagnóstico directo con DJI Tello.
+     */
+    function inicializarPaginaPruebaTello(contenedor) {
+        const badge = contenedor.querySelector('#tello-entorno-badge');
+        const logBox = contenedor.querySelector('#tello-log-salida');
+        const ipInput = contenedor.querySelector('#tello-ip-prueba');
+        const puertoInput = contenedor.querySelector('#tello-puerto-prueba');
+        const cmdInput = contenedor.querySelector('#tello-cmd-custom');
+        const btnCmd = contenedor.querySelector('#btn-tello-cmd');
+        const btnBat = contenedor.querySelector('#btn-tello-bat');
+        const btnStream = contenedor.querySelector('#btn-tello-streamon');
+        const btnCustom = contenedor.querySelector('#btn-tello-custom');
+        const btnLimpiar = contenedor.querySelector('#btn-limpiar-log-tello');
+
+        const tieneNativo = !!(window.Capacitor?.Plugins?.DronNative);
+
+        if (badge) {
+            if (tieneNativo) {
+                badge.textContent = '🟢 Plugin Nativo Capacitor Activo';
+                badge.style.color = 'var(--color-exito)';
+            } else {
+                badge.textContent = '🟡 Modo Emulador (Sin Dron Real)';
+                badge.style.color = 'var(--color-advertencia)';
+            }
+        }
+
+        function agregarLog(tipo, msg) {
+            if (!logBox) return;
+            const hora = new Date().toLocaleTimeString();
+            const prefijo = tipo === 'tx' ? '📤 [TX]' : tipo === 'rx' ? '📥 [RX]' : 'ℹ️ [INFO]';
+            logBox.textContent += `\n[${hora}] ${prefijo} ${msg}`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        async function enviarPrueba(cmd) {
+            cmd = (cmd || '').trim();
+            if (!cmd) return;
+            const ip = ipInput?.value?.trim() || '192.168.10.1';
+            const puerto = parseInt(puertoInput?.value, 10) || 8889;
+
+            agregarLog('tx', `Comando: "${cmd}" -> ${ip}:${puerto}`);
+
+            if (tieneNativo) {
+                const plugin = window.Capacitor.Plugins.DronNative;
+                try {
+                    let resp = 'ok';
+                    if (plugin.enviarComando) {
+                        const r = await plugin.enviarComando({ host: ip, puerto: puerto, mensaje: cmd, timeoutMs: 5000 });
+                        resp = r?.respuesta || 'ok';
+                    } else if (plugin.sendUdpPacket) {
+                        await plugin.sendUdpPacket({ ip: ip, port: puerto, message: cmd });
+                    }
+                    agregarLog('rx', `Respuesta: "${resp}"`);
+                } catch (err) {
+                    agregarLog('rx', `❌ Error: ${err.message || err}`);
+                }
+            } else {
+                await new Promise(r => setTimeout(r, 400));
+                let respSim = 'ok';
+                if (cmd === 'battery?') respSim = '85 (batería simulada al 85%)';
+                agregarLog('rx', `[Simulado] Respuesta: "${respSim}"`);
+            }
+        }
+
+        btnCmd?.addEventListener('click', () => enviarPrueba('command'));
+        btnBat?.addEventListener('click', () => enviarPrueba('battery?'));
+        btnStream?.addEventListener('click', () => enviarPrueba('streamon'));
+        btnCustom?.addEventListener('click', () => {
+            enviarPrueba(cmdInput?.value);
+            if (cmdInput) cmdInput.value = '';
+        });
+        btnLimpiar?.addEventListener('click', () => {
+            if (logBox) logBox.textContent = 'Consola limpia. Listo para nuevas pruebas.';
+        });
+
+        // Escuchar telemetría nativa si está activa
+        if (tieneNativo) {
+            try {
+                window.Capacitor.Plugins.DronNative.addListener('telemetria', (data) => {
+                    agregarLog('rx', `Telemetría recibida: ${data.raw || data.mensaje}`);
+                });
+            } catch (e) {}
+        }
+    }
+
     async function iniciar() {
         // Enlazar eventos del menú lateral
         const btnMenu = document.getElementById('btn-menu');

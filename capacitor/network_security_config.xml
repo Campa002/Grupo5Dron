@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 
+      Seguridad de red acotada:
+      SOLO se permite tráfico HTTP cleartext hacia la IP local del DJI Tello (192.168.10.1).
+      Todo el tráfico restante hacia la API del servidor debe ser HTTPS estricto.
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.10.1</domain>
+    </domain-config>
+
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
+

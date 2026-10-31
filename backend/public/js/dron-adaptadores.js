@@ -15,7 +15,21 @@ const DronAdaptadores = (() => {
      * @param {string|Object} plantilla
      * @returns {Object}
      */
-    function normalizarPlantilla(plantilla) {
+        function normalizarPerfil(perfil) {
+        if (!perfil) return {};
+        const clon = { ...perfil };
+        clon.ip = clon.ip || clon.ip_dron || '192.168.10.1';
+        clon.ip_dron = clon.ip;
+        clon.puerto_comando = parseInt(clon.puerto_comando || clon.puerto_cmd || 8889, 10);
+        clon.puerto_cmd = clon.puerto_comando;
+        clon.puerto_estado = parseInt(clon.puerto_estado || clon.puerto_telemetria || 8890, 10);
+        clon.puerto_video = parseInt(clon.puerto_video !== undefined && clon.puerto_video !== null ? clon.puerto_video : 11111, 10);
+        clon.tipo_adaptador = (clon.tipo_adaptador || clon.tipo_protocolo || 'simulador').toLowerCase();
+        clon.tipo_protocolo = clon.tipo_adaptador;
+        return clon;
+    }
+
+function normalizarPlantilla(plantilla) {
         if (!plantilla) return {};
         if (typeof plantilla === 'string') {
             try {
@@ -33,7 +47,7 @@ const DronAdaptadores = (() => {
     // ============================================================
     class DroneAdapter {
         constructor(perfil) {
-            this.perfil = perfil || {};
+            this.perfil = normalizarPerfil(perfil);
             this.plantilla = normalizarPlantilla(this.perfil.plantilla_comandos);
             this.conectado = false;
             this.enVuelo = false;
@@ -67,6 +81,36 @@ const DronAdaptadores = (() => {
             this.notificarTelemetria();
         }
 
+                async enviarComando(cmd, timeoutMs = 4000) {
+            await new Promise(r => setTimeout(r, 300));
+            cmd = (cmd || '').trim().toLowerCase();
+            if (cmd === 'command') return 'ok';
+            if (cmd === 'battery?') return String(Math.round(this.telemetria.bateria));
+            if (cmd === 'streamon') return 'ok';
+            if (cmd === 'streamoff') return 'ok';
+            if (cmd.startsWith('forward') || cmd.startsWith('back') || cmd.startsWith('left') || cmd.startsWith('right')) {
+                return 'ok';
+            }
+            if (cmd.startsWith('up')) {
+                const parts = cmd.split(' ');
+                const delta = (parseInt(parts[1], 10) || 20) / 100.0;
+                this.telemetria.altura = Math.min(15.0, this.telemetria.altura + delta);
+                this.notificarTelemetria();
+                return 'ok';
+            }
+            if (cmd.startsWith('down')) {
+                const parts = cmd.split(' ');
+                const delta = (parseInt(parts[1], 10) || 20) / 100.0;
+                this.telemetria.altura = Math.max(0.3, this.telemetria.altura - delta);
+                this.notificarTelemetria();
+                return 'ok';
+            }
+            if (cmd.startsWith('cw') || cmd.startsWith('ccw')) {
+                return 'ok';
+            }
+            return 'ok';
+        }
+
         async despegar() {
             throw new Error('Método despegar() no implementado');
         }
@@ -90,6 +134,44 @@ const DronAdaptadores = (() => {
          * @param {number} yaw
          * @param {number} throttle
          */
+                async enviarComando(cmd, timeoutMs = 8000) {
+            console.log(`[Adapter] Ejecutando comando: "${cmd}"`);
+            return 'ok';
+        }
+
+        async moverPaso(direccion, cm = 30) {
+            cm = Math.max(20, Math.min(500, parseInt(cm, 10) || 30));
+            const mapa = {
+                'adelante': 'forward', 'forward': 'forward',
+                'atras': 'back', 'back': 'back',
+                'izquierda': 'left', 'left': 'left',
+                'derecha': 'right', 'right': 'right'
+            };
+            const dir = mapa[direccion] || 'forward';
+            return await this.enviarComando(`${dir} ${cm}`);
+        }
+
+        async girarPaso(grados = 90) {
+            grados = parseInt(grados, 10) || 90;
+            const sentido = grados >= 0 ? 'cw' : 'ccw';
+            const deg = Math.max(1, Math.min(360, Math.abs(grados)));
+            return await this.enviarComando(`${sentido} ${deg}`);
+        }
+
+        async subirPaso(cm = 30) {
+            cm = Math.max(20, Math.min(500, parseInt(cm, 10) || 30));
+            return await this.enviarComando(`up ${cm}`);
+        }
+
+        async bajarPaso(cm = 30) {
+            cm = Math.max(20, Math.min(500, parseInt(cm, 10) || 30));
+            return await this.enviarComando(`down ${cm}`);
+        }
+
+        async consultarBateria() {
+            return await this.enviarComando('battery?');
+        }
+
         mover(roll, pitch, yaw, throttle) {
             this.valoresRC.roll     = Math.max(-100, Math.min(100, Math.round(roll     * 100)));
             this.valoresRC.pitch    = Math.max(-100, Math.min(100, Math.round(pitch    * 100)));
@@ -259,64 +341,148 @@ const DronAdaptadores = (() => {
     // ============================================================
     // 3. ADAPTADOR: DJI Tello (UDP SDK Oficial)
     // ============================================================
-    class TelloAdapter extends DroneAdapter {
+        class TelloAdapter extends DroneAdapter {
         constructor(perfil) {
             super(perfil);
-            this.ip = perfil.ip || '192.168.10.1';
-            this.puertoComando = perfil.puerto_comando || 8889;
-            this.puertoEstado = 8890;
-            this.puertoVideo = perfil.puerto_video || 11111;
+            this.ip = this.perfil.ip || '192.168.10.1';
+            this.puertoComando = this.perfil.puerto_comando || 8889;
+            this.puertoEstado = this.perfil.puerto_estado || 8890;
+            this.puertoVideo = this.perfil.puerto_video || 11111;
+            this.intervaloKeepAlive = null;
+            this.esModoEmulado = false;
         }
 
         tienePluginNativo() {
             return !!(window.Capacitor?.Plugins?.DronNative);
         }
 
-        async enviarUdp(comando) {
+        async enviarComando(cmd, timeoutMs = 8000) {
             if (this.tienePluginNativo()) {
                 const plugin = window.Capacitor.Plugins.DronNative;
-                return await plugin.sendUdpPacket({
-                    ip: this.ip,
-                    port: this.puertoComando,
-                    message: comando,
-                });
+                try {
+                    // Invocar enviarComando nativo con timeout y respuesta
+                    if (plugin.enviarComando) {
+                        const res = await plugin.enviarComando({
+                            host: this.ip,
+                            puerto: this.puertoComando,
+                            mensaje: cmd,
+                            timeoutMs: timeoutMs
+                        });
+                        return res?.respuesta || 'ok';
+                    } else if (plugin.sendUdpPacket) {
+                        await plugin.sendUdpPacket({
+                            ip: this.ip,
+                            port: this.puertoComando,
+                            message: cmd
+                        });
+                        return 'ok';
+                    }
+                } catch (e) {
+                    console.error('[Tello Native Error]', e);
+                    throw e;
+                }
             } else {
-                console.log(`[Tello Web-Emulado] UDP -> ${this.ip}:${this.puertoComando} : "${comando}"`);
-                return { success: true, emulado: true };
+                console.warn(`[Tello Web-Simulador] ${this.ip}:${this.puertoComando} -> "${cmd}"`);
+                await new Promise(r => setTimeout(r, 200));
+                if (cmd === 'battery?') return '85';
+                return 'ok';
             }
+        }
+
+        async enviarUdp(comando) {
+            return await this.enviarComando(comando, 3000);
         }
 
         async conectar() {
             console.log(`[Tello] Conectando a DJI Tello en ${this.ip}:${this.puertoComando}...`);
 
-            // 1. Inicializar modo SDK
-            await this.enviarUdp('command');
-            this.conectado = true;
-            this.telemetria.estado = 'conectado (modo comando)';
-            this.notificarTelemetria();
-
-            // 2. Iniciar escucha de telemetría UDP (puerto 8890) si hay soporte nativo
-            if (this.tienePluginNativo()) {
-                const plugin = window.Capacitor.Plugins.DronNative;
-                await plugin.startUdpListener({ port: this.puertoEstado });
-                plugin.addListener('telloState', (data) => {
-                    this.procesarStringEstado(data.raw);
-                });
+            if (!this.tienePluginNativo()) {
+                this.esModoEmulado = true;
+                this.telemetria.estado = 'MODO SIMULADOR: el dron real NO está conectado';
+                this.notificarTelemetria();
+                if (window.App?.mostrarToast) {
+                    window.App.mostrarToast('MODO SIMULADOR: el dron real NO está conectado (falta plugin nativo)', 'advertencia', 6000);
+                }
+            } else {
+                this.esModoEmulado = false;
             }
 
-            // 3. Iniciar bucle de control analógico a 15 Hz
+            // 1. Vincular proceso a la red Wi-Fi si existe la función nativa
+            if (this.tienePluginNativo() && window.Capacitor.Plugins.DronNative.vincularRedWifi) {
+                try {
+                    await window.Capacitor.Plugins.DronNative.vincularRedWifi();
+                } catch (e) {
+                    console.warn('[Tello] No se pudo vincular la red WiFi:', e);
+                }
+            }
+
+            // 2. Inicializar modo SDK
+            try {
+                const resp = await this.enviarComando('command', 4000);
+                console.log('[Tello] Respuesta modo command:', resp);
+            } catch (err) {
+                console.warn('[Tello] Sin respuesta a "command":', err);
+            }
+
+            // 3. Iniciar video stream
+            try {
+                await this.enviarComando('streamon', 3000);
+            } catch (err) {
+                console.warn('[Tello] streamon error:', err);
+            }
+
+            this.conectado = true;
+            if (!this.esModoEmulado) {
+                this.telemetria.estado = 'conectado (Tello)';
+            }
+            this.notificarTelemetria();
+
+            // 4. Iniciar escucha de telemetría y video nativo
+            if (this.tienePluginNativo()) {
+                const plugin = window.Capacitor.Plugins.DronNative;
+                try {
+                    if (plugin.iniciarEscucha) {
+                        await plugin.iniciarEscucha({ puerto: this.puertoEstado });
+                    } else if (plugin.startUdpListener) {
+                        await plugin.startUdpListener({ port: this.puertoEstado });
+                    }
+                    plugin.addListener('telemetria', (data) => {
+                        this.procesarStringEstado(data.raw || data.mensaje);
+                    });
+                    plugin.addListener('telloState', (data) => {
+                        this.procesarStringEstado(data.raw || data.message);
+                    });
+                } catch (e) {
+                    console.error('[Tello Listener Error]', e);
+                }
+            }
+
+            // 5. Iniciar bucle RC continuo (15 Hz)
             this.iniciarBucleRC((rc) => {
                 const cmd = `rc ${rc.roll} ${rc.pitch} ${rc.throttle} ${rc.yaw}`;
-                this.enviarUdp(cmd);
+                if (this.tienePluginNativo() && window.Capacitor.Plugins.DronNative.sendUdpPacket) {
+                    window.Capacitor.Plugins.DronNative.sendUdpPacket({
+                        ip: this.ip,
+                        port: this.puertoComando,
+                        message: cmd
+                    });
+                } else {
+                    // En modo emulado no spamear console
+                }
             });
+
+            // 6. Keep-alive cada 8 segundos (Tello aterriza si no recibe comandos en ~15s)
+            this.intervaloKeepAlive = setInterval(() => {
+                if (this.conectado && !this.enVuelo) {
+                    this.enviarComando('command', 2000).catch(() => {});
+                }
+            }, 8000);
 
             return true;
         }
 
         procesarStringEstado(str) {
             if (!str) return;
-            // Tello envía formato clave:valor;
-            // Ej: "pitch:0;roll:0;yaw:0;vgx:0;vgy:0;vgz:0;templ:55;temph:58;tof:10;h:0;bat:88;baro:155.5;\r\n"
             const partes = str.split(';');
             for (const parte of partes) {
                 const [k, v] = parte.split(':');
@@ -324,7 +490,7 @@ const DronAdaptadores = (() => {
                 const clave = k.trim();
                 const valor = parseFloat(v.trim());
                 if (clave === 'bat') this.telemetria.bateria = valor;
-                if (clave === 'h')   this.telemetria.altura = valor / 100.0; // cm a m
+                if (clave === 'h')   this.telemetria.altura = valor / 100.0;
                 if (clave === 'pitch') this.telemetria.pitch = valor;
                 if (clave === 'roll')  this.telemetria.roll = valor;
                 if (clave === 'yaw')   this.telemetria.yaw = valor;
@@ -333,19 +499,26 @@ const DronAdaptadores = (() => {
         }
 
         async desconectar() {
+            if (this.intervaloKeepAlive) {
+                clearInterval(this.intervaloKeepAlive);
+                this.intervaloKeepAlive = null;
+            }
             if (this.tienePluginNativo()) {
                 try {
-                    await window.Capacitor.Plugins.DronNative.stopUdpListener({ port: this.puertoEstado });
-                } catch (e) {
-                    // Ignorar error al cerrar socket
-                }
+                    const plugin = window.Capacitor.Plugins.DronNative;
+                    if (plugin.detenerEscucha) {
+                        await plugin.detenerEscucha({ puerto: this.puertoEstado });
+                    } else if (plugin.stopUdpListener) {
+                        await plugin.stopUdpListener({ port: this.puertoEstado });
+                    }
+                } catch (e) {}
             }
             await super.desconectar();
         }
 
         async despegar() {
-            console.log('[Tello] Enviando orden de despegue...');
-            await this.enviarUdp('takeoff');
+            console.log('[Tello] Despegando...');
+            await this.enviarComando('takeoff', 10000);
             this.enVuelo = true;
             this.telemetria.estado = 'en vuelo';
             this.notificarTelemetria();
@@ -353,8 +526,8 @@ const DronAdaptadores = (() => {
         }
 
         async aterrizar() {
-            console.log('[Tello] Enviando orden de aterrizaje...');
-            await this.enviarUdp('land');
+            console.log('[Tello] Aterrizando...');
+            await this.enviarComando('land', 10000);
             this.enVuelo = false;
             this.telemetria.estado = 'aterrizando';
             this.notificarTelemetria();
@@ -362,18 +535,10 @@ const DronAdaptadores = (() => {
         }
 
         async detenerEmergencia() {
-            console.warn('[Tello] 🛑 ENVIANDO COMANDO DE EMERGENCIA!');
-            await this.enviarUdp('emergency');
+            console.warn('[Tello] 🛑 EMERGENCIA Tello!');
+            await this.enviarComando('emergency', 3000);
             await super.detenerEmergencia();
             return true;
-        }
-
-        obtenerVideoUrl() {
-            // Nota técnica documentada:
-            // Tello transmite video crudo H.264 sobre UDP (puerto 11111) tras enviar "streamon".
-            // En un navegador estándar no es posible decodificar H.264 crudo UDP directamente.
-            // Punto de extensión: en el APK de Capacitor se decodifica con SurfaceView / WebCodecs.
-            return 'udp://127.0.0.1:11111 (requiere validación con el dron real en APK nativo)';
         }
     }
 
@@ -528,6 +693,8 @@ const DronAdaptadores = (() => {
     // 6. FACTORY
     // ============================================================
     function crearAdaptador(perfil) {
+        perfil = normalizarPerfil(perfil);
+
         if (!perfil) {
             return new SimulatorDroneAdapter({ nombre: 'Simulador por defecto' });
         }
@@ -552,6 +719,7 @@ const DronAdaptadores = (() => {
 
     return {
         crearAdaptador,
+        normalizarPerfil,
         DroneAdapter,
         SimulatorDroneAdapter,
         TelloAdapter,

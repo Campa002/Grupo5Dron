@@ -71,6 +71,7 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
                 <li><a href="#/aula" class="menu-lateral__enlace" data-pagina="aula">🎛️ Control del Aula</a></li>
                 <li><a href="#/dron" class="menu-lateral__enlace" data-pagina="dron">🚁 Control del Dron</a></li>
                 <li><a href="#/sensores" class="menu-lateral__enlace" data-pagina="sensores">📡 Diagnóstico Sensores</a></li>
+                <li><a href="#/prueba-tello" class="menu-lateral__enlace" data-pagina="prueba-tello">📡 Prueba Tello</a></li>
                 <li class="menu-lateral__separador"></li>
                 <li><a href="#/admin" class="menu-lateral__enlace menu-lateral__enlace--admin" data-pagina="admin">⚙️ Administración</a></li>
                 <li><a href="#/config-dron" class="menu-lateral__enlace" data-pagina="config-dron">🔧 Config. Dron</a></li>
@@ -102,7 +103,11 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
     <script src="/js/dron-adaptadores.js"></script>
     <script src="/js/dron-joystick.js"></script>
     <script src="/js/dron-giroscopio.js"></script>
+    <!-- ML Local para Seguimiento Visual Autónomo (COCO-SSD) -->
+    <script src="/vendor/tfjs/tf.min.js"></script>
+    <script src="/vendor/coco-ssd/coco-ssd.min.js"></script>
     <script src="/js/dron-seguimiento.js"></script>
+    <script src="/js/dron-video.js"></script>
     <script src="/js/config-dron.js"></script>
     <script src="/js/sensores.js"></script>
     <script src="/js/dron.js"></script>

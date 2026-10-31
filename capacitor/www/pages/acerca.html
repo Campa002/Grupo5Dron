@@ -1,0 +1,98 @@
+<div class="acerca-pagina">
+    <div class="mb-lg">
+        <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">
+            ℹ️ Acerca del Proyecto
+        </h2>
+        <p class="texto-sm texto-secundario">
+            Control de Sistemas del Aula y Vuelo de Dron WiFi
+        </p>
+    </div>
+
+    <!-- Ficha institucional -->
+    <div class="tarjeta mb-md tarjeta--acento">
+        <div class="flex items-center gap-md mb-md">
+            <span style="font-size: 3rem;">🏫</span>
+            <div>
+                <h3 style="font-size: var(--tamano-lg); font-weight: 700; color: var(--color-texto);">
+                    EEST N° 1 de Vicente López "Eduardo Ader"
+                </h3>
+                <p class="texto-sm texto-secundario">
+                    Educación Técnica Pública — 7° año 2° división
+                </p>
+            </div>
+        </div>
+
+        <div class="campo mb-sm">
+            <span class="campo__label">Materia</span>
+            <div class="texto-sm" style="font-weight: 600;">Proyecto de Desarrollo de Software para Plataformas Móviles</div>
+        </div>
+
+        <div class="campo mb-sm">
+            <span class="campo__label">Equipo de Desarrollo</span>
+            <div class="texto-base" style="font-weight: 700; color: var(--color-acento);">Grupo 5: Control de Sistemas y Dron</div>
+        </div>
+
+        <div class="campo">
+            <span class="campo__label">Profesores a cargo</span>
+            <div class="texto-sm">
+                • <strong>Prof. Eduardo Piris</strong><br>
+                • <strong>Prof. Figueroa</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Integrantes -->
+    <div class="tarjeta mb-md">
+        <div class="tarjeta__titulo">👥 Integrantes del Grupo 5</div>
+        <div class="tabla-contenedor">
+            <table class="tabla">
+                <thead>
+                    <tr>
+                        <th>Estudiante</th>
+                        <th>Rol principal</th>
+                        <th>Especialidad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Demian Barreto</strong></td>
+                        <td>Desarrollo Móvil / Sensores</td>
+                        <td>Frontend PWA, Joystick & Giroscopio</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Luciano Campanelli</strong></td>
+                        <td>Backend & Seguridad</td>
+                        <td>API REST PHP, Base de Datos & JWT</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Ramiro Caballero</strong></td>
+                        <td>Firmware & Hardware</td>
+                        <td>ESP32, Infrarrojo & Relé 220V</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Owen Olea</strong></td>
+                        <td>Dron & Telecomunicaciones</td>
+                        <td>Protocolos UDP/HTTP & Capacitor APK</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Arquitectura técnica -->
+    <div class="tarjeta mb-md">
+        <div class="tarjeta__titulo">📐 Arquitectura del Sistema</div>
+        <ul class="texto-sm texto-secundario" style="padding-left: var(--espacio-lg); line-height: 1.8;">
+            <li><strong>Frontend:</strong> PWA SPA en HTML5, CSS vanilla (tema oscuro azul institucional) y JavaScript ES6 modular con Service Worker.</li>
+            <li><strong>Backend:</strong> PHP con arquitectura MVC desacoplada, PDO con consultas preparadas, hashing Bcrypt y token de dispositivo.</li>
+            <li><strong>Base de Datos:</strong> MariaDB / MySQL con 9 tablas relacionales, cola de comandos asíncrona y logs de auditoría.</li>
+            <li><strong>Hardware ESP32:</strong> C++ / Arduino / PlatformIO, polling no bloqueante (1s), LED IR en GPIO4, receptor IR en GPIO15 y relés de 220V en GPIO26 y GPIO27.</li>
+            <li><strong>Módulo Dron:</strong> Adaptadores para DJI Tello, drones HTTP genéricos, enlaces UDP directos y simulador de prueba.</li>
+        </ul>
+    </div>
+
+    <!-- Versión y fecha -->
+    <div class="texto-centro texto-xs texto-secundario mt-lg">
+        Versión 1.0.0 — Ciclo Lectivo 2026 — Villa Adelina, Vicente López, Buenos Aires
+    </div>
+</div>

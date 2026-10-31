@@ -35,7 +35,63 @@ const Dron = (() => {
     let _seguimiento   = null;
 
     let _modoGiro      = false; // Giroscopio activo (OFF por defecto)
-    let _modoSeguimiento = false; // Seguimiento activo (OFF por defecto)
+        let _misionEnEjecucion = false;
+    let _cancelarMisionFlag = false;
+    let _pasoEnEjecucion = false;
+
+    const MISIONES_DEFAULT = [
+        {
+            id: 'cuadrado',
+            nombre: 'Cuadrado 50 cm',
+            descripcion: 'Vuela en patrón cuadrado de 50 cm por lado',
+            pasos: [
+                { accion: 'adelante', valor: 50 },
+                { accion: 'girar', valor: 90 },
+                { accion: 'adelante', valor: 50 },
+                { accion: 'girar', valor: 90 },
+                { accion: 'adelante', valor: 50 },
+                { accion: 'girar', valor: 90 },
+                { accion: 'adelante', valor: 50 },
+                { accion: 'girar', valor: 90 }
+            ]
+        },
+        {
+            id: 'rotar_360',
+            nombre: 'Subir y Giro 360°',
+            descripcion: 'Asciende 50 cm y gira 360 grados para inspección',
+            pasos: [
+                { accion: 'subir', valor: 50 },
+                { accion: 'girar', valor: 180 },
+                { accion: 'girar', valor: 180 },
+                { accion: 'bajar', valor: 50 }
+            ]
+        },
+        {
+            id: 'ida_vuelta',
+            nombre: 'Inspección Ida y Vuelta',
+            descripcion: 'Avanza 1 metro, rota 180° y regresa',
+            pasos: [
+                { accion: 'adelante', valor: 100 },
+                { accion: 'girar', valor: 180 },
+                { accion: 'adelante', valor: 100 },
+                { accion: 'girar', valor: 180 }
+            ]
+        }
+    ];
+
+    function _obtenerMisiones() {
+        try {
+            const raw = localStorage.getItem('grupo5dron_misiones');
+            if (raw) return JSON.parse(raw);
+        } catch (e) {}
+        return MISIONES_DEFAULT;
+    }
+
+    function _guardarMisiones(lista) {
+        localStorage.setItem('grupo5dron_misiones', JSON.stringify(lista));
+    }
+
+let _modoSeguimiento = false; // Seguimiento activo (OFF por defecto)
 
     let _watchdogId    = null;   // setInterval del watchdog de conexión
     let _ultimaRespuesta = 0;    // timestamp de la última telemetría recibida
@@ -100,6 +156,16 @@ const Dron = (() => {
         });
         _giroscopio.restaurarConfiguracion();
 
+        // Instanciar seguimiento visual (DESACTIVADO por defecto)
+        const videoDron = contenedor.querySelector('#video-dron');
+        const canvasSeg = contenedor.querySelector('#canvas-seguimiento');
+        if (typeof DronSeguimiento !== 'undefined' && videoDron) {
+            _seguimiento = new DronSeguimiento({
+                videoEl: videoDron,
+                canvasDebug: canvasSeg,
+            });
+        }
+
         // Agregar eventos a los botones de la cabina
         _agregarEventosCabina(contenedor);
 
@@ -138,16 +204,50 @@ const Dron = (() => {
     // Watchdog de conexión
     // ----------------------------------------------------------------
 
+    const TIMEOUT_TELEMETRIA_FAILSAFE_MS = 3500; // 3.5 segundos sin telemetría UDP 8890
+    let _failsafeActivado = false;
+
     function _iniciarWatchdog() {
         _ultimaRespuesta = Date.now();
+        _failsafeActivado = false;
         _detenerWatchdog();
-        _watchdogId = setInterval(() => {
+        _watchdogId = setInterval(async () => {
             if (!_adaptador || !_adaptador.conectado) return;
             const ahora = Date.now();
-            // Si no hubo telemetría en los últimos 2 segundos → emergencia
-            if (ahora - _ultimaRespuesta > 2000 && _adaptador.enVuelo) {
-                console.warn('[Dron] Watchdog: sin telemetría por 2 s → emergencia');
-                _emergencia('Pérdida de conexión con el dron');
+            const tiempoSinTelemetria = ahora - _ultimaRespuesta;
+
+            // Failsafe de seguridad en vuelo:
+            // Si pasan >3.5 s sin telemetría del puerto 8890 durante el vuelo:
+            // 1. Detener movimiento enviando rc 0 0 0 0
+            // 2. Ejecutar aterrizaje automático (land)
+            // 3. Notificar visiblemente al usuario
+            if (tiempoSinTelemetria > TIMEOUT_TELEMETRIA_FAILSAFE_MS && _adaptador.enVuelo && !_failsafeActivado) {
+                _failsafeActivado = true;
+                console.warn(`[Dron Failsafe] ⚠ Sin telemetría en puerto 8890 por ${(tiempoSinTelemetria/1000).toFixed(1)} s. Ejecutando failsafe...`);
+
+                // Frenar inmediatamente
+                try {
+                    _adaptador.moverRC({ lr: 0, fb: 0, ud: 0, yaw: 0 });
+                    if (_adaptador.enviarComando) {
+                        await _adaptador.enviarComando('rc 0 0 0 0', 1000);
+                    }
+                } catch (e) {}
+
+                // Cancelar misiones o seguimiento activo
+                if (_misionEnEjecucion) _cancelarMision();
+                if (_modoSeguimiento) await _toggleSeguimiento();
+                if (_modoGiro) await _toggleGiroscopio();
+
+                // Ordenar aterrizaje controlado
+                try {
+                    App.mostrarToast('⚠ FAILSAFE ACTIVADO: Pérdida de telemetría (puerto 8890). Frenando y aterrizando dron...', 'peligro', 8000);
+                    await _adaptador.aterrizar();
+                } catch (err) {
+                    console.error('[Dron Failsafe] Error al aterrizar por failsafe:', err);
+                    _emergencia('Failsafe: error al aterrizar sin telemetría');
+                }
+            } else if (tiempoSinTelemetria < TIMEOUT_TELEMETRIA_FAILSAFE_MS) {
+                _failsafeActivado = false;
             }
         }, 500);
     }
@@ -163,7 +263,200 @@ const Dron = (() => {
     // Eventos de la cabina
     // ----------------------------------------------------------------
 
-    function _agregarEventosCabina(contenedor) {
+    
+    // ----------------------------------------------------------------
+    // Control por pasos y Misiones Autónomas
+    // ----------------------------------------------------------------
+
+    async function _ejecutarPaso(tipo, valor) {
+        if (!_adaptador || !_adaptador.enVuelo) {
+            App.mostrarToast('El dron debe estar en vuelo para moverse.', 'advertencia');
+            return;
+        }
+        if (_pasoEnEjecucion || _misionEnEjecucion) {
+            App.mostrarToast('Hay otra maniobra en curso. Espere el "ok".', 'advertencia');
+            return;
+        }
+
+        // Exclusión mutua: pausar giroscopio/seguimiento durante maniobras discretas
+        if (_modoGiro) await _toggleGiroscopio();
+        if (_modoSeguimiento) await _toggleSeguimiento();
+
+        _pasoEnEjecucion = true;
+        const estadoTxt = _contenedor?.querySelector('#estado-paso-texto');
+        if (estadoTxt) estadoTxt.textContent = `⏳ Ejecutando ${tipo} ${valor}...`;
+
+        try {
+            let res = 'ok';
+            if (tipo === 'adelante') res = await _adaptador.moverPaso('forward', valor);
+            else if (tipo === 'atras') res = await _adaptador.moverPaso('back', valor);
+            else if (tipo === 'izquierda') res = await _adaptador.moverPaso('left', valor);
+            else if (tipo === 'derecha') res = await _adaptador.moverPaso('right', valor);
+            else if (tipo === 'subir') res = await _adaptador.subirPaso(valor);
+            else if (tipo === 'bajar') res = await _adaptador.bajarPaso(valor);
+            else if (tipo === 'girar_der') res = await _adaptador.girarPaso(valor);
+            else if (tipo === 'girar_izq') res = await _adaptador.girarPaso(-valor);
+            else if (tipo === 'freno') {
+                if (_adaptador.enviarComando) await _adaptador.enviarComando('stop');
+                _adaptador.moverRC({ lr: 0, fb: 0, ud: 0, yaw: 0 });
+            }
+
+            if (estadoTxt) estadoTxt.textContent = `✅ Completado (${res})`;
+        } catch (err) {
+            if (estadoTxt) estadoTxt.textContent = `❌ Error: ${err.message || err}`;
+            App.mostrarToast(`Error en paso: ${err.message || err}`, 'error');
+        } finally {
+            _pasoEnEjecucion = false;
+        }
+    }
+
+    function _actualizarSelectMisiones() {
+        const sel = _contenedor?.querySelector('#sel-mision-activa');
+        const info = _contenedor?.querySelector('#info-mision-pasos');
+        if (!sel) return;
+
+        const misiones = _obtenerMisiones();
+        sel.innerHTML = misiones.map(m => `<option value="${m.id}">${m.nombre}</option>`).join('');
+
+        function mostrarDetalle() {
+            const mSel = misiones.find(m => m.id === sel.value) || misiones[0];
+            if (mSel && info) {
+                const pasosStr = mSel.pasos.map((p, idx) => `${idx + 1}. ${p.accion} ${p.valor}`).join(' ➔ ');
+                info.innerHTML = `<strong>${mSel.nombre}:</strong> ${mSel.descripcion || ''}<br><span style="opacity:0.8;">${pasosStr}</span>`;
+            }
+        }
+
+        sel.onchange = mostrarDetalle;
+        mostrarDetalle();
+    }
+
+    async function _ejecutarMision() {
+        if (!_adaptador || !_adaptador.enVuelo) {
+            App.mostrarToast('El dron debe estar despegado para iniciar la misión.', 'advertencia');
+            return;
+        }
+        if (_misionEnEjecucion) return;
+
+        const sel = _contenedor?.querySelector('#sel-mision-activa');
+        const misiones = _obtenerMisiones();
+        const mision = misiones.find(m => m.id === sel?.value);
+        if (!mision || !mision.pasos?.length) {
+            App.mostrarToast('Seleccioná una misión válida.', 'advertencia');
+            return;
+        }
+
+        if (!confirm(`¿Iniciar la misión "${mision.nombre}"?
+
+Verificá contar con espacio libre suficiente.`)) {
+            return;
+        }
+
+        // Exclusión mutua total
+        if (_modoGiro) await _toggleGiroscopio();
+        if (_modoSeguimiento) await _toggleSeguimiento();
+
+        _misionEnEjecucion = true;
+        _cancelarMisionFlag = false;
+
+        const btnEjecutar = _contenedor?.querySelector('#btn-ejecutar-mision');
+        const btnCancelar = _contenedor?.querySelector('#btn-cancelar-mision');
+        const info = _contenedor?.querySelector('#info-mision-pasos');
+
+        if (btnEjecutar) btnEjecutar.style.display = 'none';
+        if (btnCancelar) btnCancelar.style.display = 'inline-block';
+
+        App.mostrarToast(`Iniciando misión: ${mision.nombre}`, 'info');
+
+        for (let i = 0; i < mision.pasos.length; i++) {
+            if (_cancelarMisionFlag) {
+                App.mostrarToast('Misión cancelada por el usuario.', 'advertencia');
+                break;
+            }
+
+            const p = mision.pasos[i];
+            if (info) {
+                info.innerHTML = `⏳ <strong>Ejecutando paso ${i + 1}/${mision.pasos.length}:</strong> ${p.accion} ${p.valor} (Esperando confirmación "ok")...`;
+            }
+
+            try {
+                if (p.accion === 'adelante') await _adaptador.moverPaso('forward', p.valor);
+                else if (p.accion === 'atras') await _adaptador.moverPaso('back', p.valor);
+                else if (p.accion === 'izquierda') await _adaptador.moverPaso('left', p.valor);
+                else if (p.accion === 'derecha') await _adaptador.moverPaso('right', p.valor);
+                else if (p.accion === 'subir') await _adaptador.subirPaso(p.valor);
+                else if (p.accion === 'bajar') await _adaptador.bajarPaso(p.valor);
+                else if (p.accion === 'girar') await _adaptador.girarPaso(p.valor);
+                else if (p.accion === 'esperar') await new Promise(r => setTimeout(r, p.valor * 1000));
+            } catch (err) {
+                App.mostrarToast(`Fallo en paso ${i + 1}: ${err.message || err}`, 'error');
+                break;
+            }
+
+            
+        // Eventos de control por pasos
+        const getDistancia = () => parseInt(contenedor.querySelector('#sel-paso-distancia')?.value, 10) || 30;
+        const getAngulo    = () => parseInt(contenedor.querySelector('#sel-paso-angulo')?.value, 10) || 90;
+
+        contenedor.querySelector('#btn-paso-adelante')?.addEventListener('click', () => _ejecutarPaso('adelante', getDistancia()));
+        contenedor.querySelector('#btn-paso-atras')?.addEventListener('click', () => _ejecutarPaso('atras', getDistancia()));
+        contenedor.querySelector('#btn-paso-izquierda')?.addEventListener('click', () => _ejecutarPaso('izquierda', getDistancia()));
+        contenedor.querySelector('#btn-paso-derecha')?.addEventListener('click', () => _ejecutarPaso('derecha', getDistancia()));
+        contenedor.querySelector('#btn-paso-subir')?.addEventListener('click', () => _ejecutarPaso('subir', getDistancia()));
+        contenedor.querySelector('#btn-paso-bajar')?.addEventListener('click', () => _ejecutarPaso('bajar', getDistancia()));
+        contenedor.querySelector('#btn-paso-girar-der')?.addEventListener('click', () => _ejecutarPaso('girar_der', getAngulo()));
+        contenedor.querySelector('#btn-paso-girar-izq')?.addEventListener('click', () => _ejecutarPaso('girar_izq', getAngulo()));
+        contenedor.querySelector('#btn-paso-frenar')?.addEventListener('click', () => _ejecutarPaso('freno', 0));
+
+        // Eventos de misiones
+        _actualizarSelectMisiones();
+        contenedor.querySelector('#btn-ejecutar-mision')?.addEventListener('click', _ejecutarMision);
+        contenedor.querySelector('#btn-cancelar-mision')?.addEventListener('click', _cancelarMision);
+        contenedor.querySelector('#btn-nueva-mision')?.addEventListener('click', () => {
+            const nom = prompt('Nombre de la nueva misión:', 'Patrulla Aula');
+            if (!nom) return;
+            const pasosStr = prompt('Pasos separados por coma (ej: adelante 50, girar 90, subir 30):', 'adelante 50, girar 90, adelante 50');
+            if (!pasosStr) return;
+            const pasos = [];
+            pasosStr.split(',').forEach(p => {
+                const partes = p.trim().split(/\s+/);
+                if (partes.length >= 2) {
+                    pasos.push({ accion: partes[0].toLowerCase(), valor: parseInt(partes[1], 10) || 30 });
+                }
+            });
+            if (pasos.length) {
+                const lista = _obtenerMisiones();
+                lista.push({ id: 'm_' + Date.now(), nombre: nom, descripcion: 'Misión personalizada', pasos: pasos });
+                _guardarMisiones(lista);
+                _actualizarSelectMisiones();
+                App.mostrarToast('Misión guardada correctamente', 'exito');
+            }
+        });
+
+        // Breve pausa de estabilización entre pasos
+            await new Promise(r => setTimeout(r, 600));
+        }
+
+        _misionEnEjecucion = false;
+        _cancelarMisionFlag = false;
+
+        if (btnEjecutar) btnEjecutar.style.display = 'inline-block';
+        if (btnCancelar) btnCancelar.style.display = 'none';
+        _actualizarSelectMisiones();
+
+        App.mostrarToast(`Misión "${mision.nombre}" finalizada.`, 'exito');
+    }
+
+    function _cancelarMision() {
+        if (!_misionEnEjecucion) return;
+        _cancelarMisionFlag = true;
+        if (_adaptador) {
+            _adaptador.moverRC({ lr: 0, fb: 0, ud: 0, yaw: 0 });
+            if (_adaptador.enviarComando) _adaptador.enviarComando('stop').catch(() => {});
+        }
+        App.mostrarToast('🛑 Cancelando misión de inmediato...', 'peligro');
+    }
+
+function _agregarEventosCabina(contenedor) {
         // Despegar
         contenedor.querySelector('#btn-despegar')
             ?.addEventListener('click', _confirmarDespegue);
@@ -588,6 +881,78 @@ const Dron = (() => {
                 <div id="overlay-video-off"
                     style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#aaa; font-size:1.75rem;">
                     📷 Sin señal de video
+                </div>
+            </div>
+
+            
+            <!-- Aviso de uso seguro obligatorio -->
+            <div class="alerta alerta--info mb-md" style="font-size: var(--tamano-xs);">
+                🛡️ <strong>Aviso de Vuelo Seguro:</strong> Vuelo supervisado obligatorio. Espacio mínimo de 3x3 metros despejado de personas. Por seguridad, todos los modos autónomos inician apagados.
+            </div>
+
+            <!-- Panel: Control por Pasos (Movimiento Discreto) -->
+            <div class="tarjeta mb-md">
+                <div class="flex justify-between items-center mb-sm">
+                    <h3 class="texto-sm font-semibold texto-secundario">🎯 Movimientos por Paso</h3>
+                    <div class="flex gap-xs items-center">
+                        <label class="texto-xs texto-secundario">Distancia:</label>
+                        <select id="sel-paso-distancia" class="campo-formulario__entrada texto-xs" style="padding:2px 6px;">
+                            <option value="20">20 cm</option>
+                            <option value="30" selected>30 cm</option>
+                            <option value="50">50 cm</option>
+                            <option value="100">100 cm</option>
+                        </select>
+                        <label class="texto-xs texto-secundario ml-xs">Giro:</label>
+                        <select id="sel-paso-angulo" class="campo-formulario__entrada texto-xs" style="padding:2px 6px;">
+                            <option value="45">45°</option>
+                            <option value="90" selected>90°</option>
+                            <option value="180">180°</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex justify-center items-center gap-md flex-wrap">
+                    <!-- Cruz de desplazamiento horizontal -->
+                    <div style="display:grid; grid-template-columns: repeat(3, 44px); gap:6px; text-align:center;">
+                        <div></div>
+                        <button id="btn-paso-adelante" class="btn btn--secundario" style="padding:8px 0;" title="Adelante">▲</button>
+                        <div></div>
+                        <button id="btn-paso-izquierda" class="btn btn--secundario" style="padding:8px 0;" title="Izquierda">◄</button>
+                        <button id="btn-paso-frenar" class="btn btn--peligro texto-xs" style="padding:8px 0;" title="Freno">⏹</button>
+                        <button id="btn-paso-derecha" class="btn btn--secundario" style="padding:8px 0;" title="Derecha">►</button>
+                        <div></div>
+                        <button id="btn-paso-atras" class="btn btn--secundario" style="padding:8px 0;" title="Atrás">▼</button>
+                        <div></div>
+                    </div>
+
+                    <!-- Botones de altura y giro -->
+                    <div class="flex flex-column gap-xs" style="min-width:140px;">
+                        <div class="flex gap-xs">
+                            <button id="btn-paso-subir" class="btn btn--secundario flex-1 texto-xs">🔼 Subir</button>
+                            <button id="btn-paso-bajar" class="btn btn--secundario flex-1 texto-xs">🔽 Bajar</button>
+                        </div>
+                        <div class="flex gap-xs">
+                            <button id="btn-paso-girar-izq" class="btn btn--secundario flex-1 texto-xs">↺ Girar ◄</button>
+                            <button id="btn-paso-girar-der" class="btn btn--secundario flex-1 texto-xs">↻ Girar ►</button>
+                        </div>
+                        <span id="estado-paso-texto" class="texto-xs texto-secundario texto-centro">Listo para comandos</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel: Misiones Autónomas Guardables -->
+            <div class="tarjeta mb-md">
+                <div class="flex justify-between items-center mb-sm">
+                    <h3 class="texto-sm font-semibold texto-secundario">📜 Misiones y Secuencias</h3>
+                    <button id="btn-nueva-mision" class="btn btn--secundario texto-xs">+ Nueva Misión</button>
+                </div>
+                <div class="flex gap-sm items-center flex-wrap mb-sm">
+                    <select id="sel-mision-activa" class="campo-formulario__entrada flex-1 texto-sm"></select>
+                    <button id="btn-ejecutar-mision" class="btn btn--primario texto-xs">▶ Iniciar Misión</button>
+                    <button id="btn-cancelar-mision" class="btn btn--peligro texto-xs" style="display:none;">⛔ CANCELAR MISIÓN</button>
+                </div>
+                <div id="info-mision-pasos" class="texto-xs texto-secundario" style="background:rgba(255,255,255,0.03); padding:8px; border-radius:6px;">
+                    Cargando secuencia...
                 </div>
             </div>
 

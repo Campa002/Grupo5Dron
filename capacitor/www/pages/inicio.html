@@ -1,0 +1,72 @@
+<div class="inicio-pagina">
+    <div class="flex justify-between items-center mb-lg flex-wrap gap-sm">
+        <div>
+            <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">
+                👋 Hola, <span id="inicio-nombre-usuario">Usuario</span>
+            </h2>
+            <p class="texto-sm texto-secundario">
+                Panel centralizado — EEST N° 1 "Eduardo Ader"
+            </p>
+        </div>
+        <span id="inicio-rol-usuario" class="badge badge--info">Rol</span>
+    </div>
+
+    <!-- Dos accesos principales grandes -->
+    <div class="mb-lg">
+        <h3 class="texto-sm texto-secundario mb-sm" style="text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">
+            Módulos principales
+        </h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: var(--espacio-md);">
+            <a href="#/aula" class="acceso tarjeta--acento" style="min-height: 12rem; border-width: 2px;">
+                <span class="acceso__icono">🎛️</span>
+                <span class="acceso__titulo" style="font-size: var(--tamano-xl);">Control del Aula</span>
+                <span class="acceso__desc">Control de luces, ventiladores, aire acondicionado, proyector y relé</span>
+            </a>
+            <a href="#/dron" class="acceso tarjeta--acento" style="min-height: 12rem; border-width: 2px;">
+                <span class="acceso__icono">🚁</span>
+                <span class="acceso__titulo" style="font-size: var(--tamano-xl);">Control del Dron</span>
+                <span class="acceso__desc">Cabina de vuelo, joystick doble virtual, giroscopio y telemetría</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Accesos secundarios -->
+    <div class="mb-lg">
+        <h3 class="texto-sm texto-secundario mb-sm" style="text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">
+            Herramientas y configuración
+        </h3>
+        <div class="grilla-accesos">
+            <a href="#/sensores" class="acceso">
+                <span class="acceso__icono" style="font-size: 2.2rem;">📡</span>
+                <span class="acceso__titulo">Diagnóstico Sensores</span>
+                <span class="acceso__desc">Giroscopio y orientación móvil</span>
+            </a>
+            <a href="#/config-dron" class="acceso">
+                <span class="acceso__icono" style="font-size: 2.2rem;">🔧</span>
+                <span class="acceso__titulo">Config. Dron</span>
+                <span class="acceso__desc">Perfiles y protocolos de conexión</span>
+            </a>
+            <a href="#/admin" class="acceso solo-admin">
+                <span class="acceso__icono" style="font-size: 2.2rem;">⚙️</span>
+                <span class="acceso__titulo">Administración</span>
+                <span class="acceso__desc">Dispositivos, usuarios, códigos IR</span>
+            </a>
+            <a href="#/acerca" class="acceso">
+                <span class="acceso__icono" style="font-size: 2.2rem;">ℹ️</span>
+                <span class="acceso__titulo">Acerca de</span>
+                <span class="acceso__desc">Integrantes Grupo 5 y docentes</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Estado del sistema y ESP32 -->
+    <div class="tarjeta">
+        <div class="flex justify-between items-center mb-sm">
+            <div class="tarjeta__titulo" style="margin-bottom: 0;">⚡ Estado del ESP32 del Aula</div>
+            <button class="btn btn--secundario btn--icono" onclick="Aula.actualizarEstadoEsp32 ? Aula.actualizarEstadoEsp32() : location.reload()" title="Actualizar">🔄</button>
+        </div>
+        <div id="inicio-esp32-resumen" class="texto-sm texto-secundario">
+            Consultando estado del microcontrolador...
+        </div>
+    </div>
+</div>

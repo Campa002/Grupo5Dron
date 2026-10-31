@@ -1,0 +1,29 @@
+<div class="admin-pagina">
+    <div class="flex justify-between items-center mb-md flex-wrap gap-sm">
+        <div>
+            <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">
+                ⚙️ Panel de Administración
+            </h2>
+            <p class="texto-sm texto-secundario">
+                Configuración del sistema, equipos, usuarios e historial
+            </p>
+        </div>
+        <span class="badge badge--advertencia">Solo Administradores</span>
+    </div>
+
+    <!-- Pestañas de administración -->
+    <div class="admin-tabs">
+        <button class="admin-tab activo" data-tab="dispositivos">🎛️ Dispositivos</button>
+        <button class="admin-tab" data-tab="historial">📜 Historial</button>
+        <button class="admin-tab" data-tab="usuarios">👥 Usuarios</button>
+        <button class="admin-tab" data-tab="config">⚡ Configuración</button>
+    </div>
+
+    <!-- Contenido dinámico inyectado por admin.js -->
+    <div id="admin-contenido">
+        <div class="cargando">
+            <div class="cargando__spinner"></div>
+            <p>Cargando panel de administración...</p>
+        </div>
+    </div>
+</div>

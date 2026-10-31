@@ -268,6 +268,7 @@ const ConfigDron = (() => {
         // Cerrar
         contenedor.querySelector('#btn-cerrar-modal-perfil')?.addEventListener('click', () => { modal.style.display = 'none'; });
         contenedor.querySelector('#modal-perfil-overlay')?.addEventListener('click', () => { modal.style.display = 'none'; });
+        body.querySelector('#btn-cancelar-perfil')?.addEventListener('click', () => { modal.style.display = 'none'; });
 
         // Guardar
         body.querySelector('#form-perfil')?.addEventListener('submit', async (e) => {
@@ -311,13 +312,13 @@ const ConfigDron = (() => {
                 <div class="campo-formulario">
                     <label class="campo-formulario__etiqueta" for="campo-ip-dron">IP del dron</label>
                     <input id="campo-ip-dron" class="campo-formulario__entrada" name="ip_dron"
-                        type="text" maxlength="45" value="${_esc(p.ip_dron || '')}" placeholder="Ej: 192.168.10.1">
+                        type="text" maxlength="45" value="${_esc(p.ip_dron || p.ip || '')}" placeholder="Ej: 192.168.10.1">
                 </div>
                 <div class="flex gap-sm">
                     <div class="campo-formulario" style="flex:1;">
                         <label class="campo-formulario__etiqueta" for="campo-puerto-cmd">Puerto CMD</label>
                         <input id="campo-puerto-cmd" class="campo-formulario__entrada" name="puerto_cmd"
-                            type="number" min="1" max="65535" value="${p.puerto_cmd || ''}" placeholder="8889">
+                            type="number" min="1" max="65535" value="${p.puerto_cmd || p.puerto_comando || ''}" placeholder="8889">
                     </div>
                     <div class="campo-formulario" style="flex:1;">
                         <label class="campo-formulario__etiqueta" for="campo-puerto-estado">Puerto Estado</label>
@@ -388,6 +389,14 @@ const ConfigDron = (() => {
             if (datos[k]) datos[k] = parseInt(datos[k], 10);
             else delete datos[k];
         });
+
+        // Sincronizar nombres para compatibilidad BD / Adaptadores
+        datos.ip = datos.ip_dron || datos.ip || '192.168.10.1';
+        datos.ip_dron = datos.ip;
+        datos.puerto_comando = datos.puerto_cmd || datos.puerto_comando || 8889;
+        datos.puerto_cmd = datos.puerto_comando;
+        datos.tipo_adaptador = datos.tipo_protocolo || datos.tipo_adaptador || 'tello';
+        datos.tipo_protocolo = datos.tipo_adaptador;
 
         btnGuardar.disabled = true;
         btnGuardar.textContent = 'Guardando...';

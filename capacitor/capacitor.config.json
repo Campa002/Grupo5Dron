@@ -1,0 +1,9 @@
+{
+  "appId": "ar.edu.eest1vl.grupo5dron",
+  "appName": "Grupo 5 — Dron",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

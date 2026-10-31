@@ -31,3 +31,6 @@ desktop.ini
 
 # Logs
 *.log
+
+# Junction local para desarrollo
+backend/public/api

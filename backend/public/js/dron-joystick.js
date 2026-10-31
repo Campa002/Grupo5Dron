@@ -90,16 +90,23 @@ class DronJoystick {
     // ----------------------------------------------------------------
 
     _agregarEventos() {
+        this._boundTouchStart  = this._onTouchStart.bind(this);
+        this._boundTouchMove   = this._onTouchMove.bind(this);
+        this._boundTouchEnd    = this._onTouchEnd.bind(this);
+        this._boundMouseDown   = this._onMouseDown.bind(this);
+        this._boundMouseMove   = this._onMouseMove.bind(this);
+        this._boundMouseUp     = this._onMouseUp.bind(this);
+
         // Eventos táctiles
-        this.canvas.addEventListener('touchstart', this._onTouchStart.bind(this), { passive: false });
-        this.canvas.addEventListener('touchmove',  this._onTouchMove.bind(this),  { passive: false });
-        this.canvas.addEventListener('touchend',   this._onTouchEnd.bind(this),   { passive: false });
-        this.canvas.addEventListener('touchcancel',this._onTouchEnd.bind(this),   { passive: false });
+        this.canvas.addEventListener('touchstart', this._boundTouchStart, { passive: false });
+        this.canvas.addEventListener('touchmove',  this._boundTouchMove,  { passive: false });
+        this.canvas.addEventListener('touchend',   this._boundTouchEnd,   { passive: false });
+        this.canvas.addEventListener('touchcancel',this._boundTouchEnd,   { passive: false });
 
         // Eventos de mouse (para pruebas en escritorio)
-        this.canvas.addEventListener('mousedown', this._onMouseDown.bind(this));
-        window.addEventListener('mousemove', this._onMouseMove.bind(this));
-        window.addEventListener('mouseup',   this._onMouseUp.bind(this));
+        this.canvas.addEventListener('mousedown', this._boundMouseDown);
+        window.addEventListener('mousemove', this._boundMouseMove);
+        window.addEventListener('mouseup',   this._boundMouseUp);
     }
 
     _coordenadasRelativas(clientX, clientY) {
@@ -295,10 +302,21 @@ class DronJoystick {
      * Elimina los listeners y el canvas del DOM.
      */
     destruir() {
-        window.removeEventListener('mousemove', this._onMouseMove);
-        window.removeEventListener('mouseup',   this._onMouseUp);
-        if (this.canvas && this.canvas.parentNode) {
-            this.canvas.parentNode.removeChild(this.canvas);
+        if (this._boundMouseMove) window.removeEventListener('mousemove', this._boundMouseMove);
+        if (this._boundMouseUp)   window.removeEventListener('mouseup',   this._boundMouseUp);
+
+        if (this.canvas) {
+            if (this._boundTouchStart) this.canvas.removeEventListener('touchstart', this._boundTouchStart);
+            if (this._boundTouchMove)  this.canvas.removeEventListener('touchmove',  this._boundTouchMove);
+            if (this._boundTouchEnd)   {
+                this.canvas.removeEventListener('touchend',    this._boundTouchEnd);
+                this.canvas.removeEventListener('touchcancel', this._boundTouchEnd);
+            }
+            if (this._boundMouseDown)  this.canvas.removeEventListener('mousedown',  this._boundMouseDown);
+
+            if (this.canvas.parentNode) {
+                this.canvas.parentNode.removeChild(this.canvas);
+            }
         }
     }
 }
