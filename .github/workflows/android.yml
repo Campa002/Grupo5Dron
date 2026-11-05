@@ -16,10 +16,10 @@ jobs:
       - name: 1. Checkout del código
         uses: actions/checkout@v4
 
-      - name: 2. Configurar Node.js 18
+      - name: 2. Configurar Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: 3. Configurar Java JDK 17
         uses: actions/setup-java@v4
@@ -46,12 +46,12 @@ jobs:
             npx cap add android
           fi
 
-      - name: 8. Copiar plugin Kotlin y registrar en MainActivity
+      - name: 8. Copiar plugin Java y registrar en MainActivity
         working-directory: capacitor
         run: |
-          # 8.1 Copiar plugin Kotlin
+          # 8.1 Copiar plugin Java (sin Kotlin)
           mkdir -p android/app/src/main/java/ar/edu/eest1vl/grupo5dron/plugins
-          cp android_plugin/DronNativePlugin.kt android/app/src/main/java/ar/edu/eest1vl/grupo5dron/plugins/DronNativePlugin.kt
+          cp android_plugin/DronNativePlugin.java android/app/src/main/java/ar/edu/eest1vl/grupo5dron/plugins/DronNativePlugin.java
 
           # 8.2 Registrar plugin en MainActivity.java antes de super.onCreate
           MAIN_ACTIVITY="android/app/src/main/java/ar/edu/eest1vl/grupo5dron/MainActivity.java"
@@ -127,3 +127,14 @@ jobs:
           name: Grupo5Dron-app-debug
           path: capacitor/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
+
+      - name: 13. Informar tamaño del APK
+        run: |
+          APK_PATH="capacitor/android/app/build/outputs/apk/debug/app-debug.apk"
+          if [ -f "$APK_PATH" ]; then
+            SIZE=$(du -h "$APK_PATH" | cut -f1)
+            echo "📦 Tamaño del APK: $SIZE"
+            echo "### 📦 APK generado: $SIZE" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠ APK no encontrado en $APK_PATH"
+          fi
