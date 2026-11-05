@@ -88,6 +88,18 @@ const Auth = (() => {
     }
 
     /**
+     * Borra la sesión guardada en el dispositivo (sin llamar al servidor).
+     * La usa app.js cuando el servidor avisa que la sesión venció.
+     */
+    function cerrarSesionLocal() {
+        API.eliminarToken();
+        localStorage.removeItem('grupo5dron_usuario');
+        usuarioActual = null;
+        modoSinConexion = false;
+        document.body.classList.remove('rol-admin', 'rol-docente', 'rol-usuario');
+    }
+
+    /**
      * Cierra la sesión del usuario.
      */
     async function logout() {
@@ -96,12 +108,13 @@ const Auth = (() => {
         } catch (e) {
             // Ignorar errores al cerrar sesión
         }
-
-        API.eliminarToken();
-        localStorage.removeItem('grupo5dron_usuario');
-        usuarioActual = null;
+        cerrarSesionLocal();
         desactivarModoInvitado();
-        document.body.classList.remove('rol-admin', 'rol-docente', 'rol-usuario');
+    }
+
+    /** true si el usuario tiene que cambiar la contraseña (cuentas del seed o reseteadas). */
+    function debeCambiarPassword() {
+        return !!obtenerUsuario()?.debe_cambiar_password;
     }
 
     /**
@@ -113,21 +126,14 @@ const Auth = (() => {
             return false;
         }
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-
         try {
-            const respuesta = await API.get('auth.php?action=sesion', { signal: controller.signal });
-            clearTimeout(timeoutId);
+            // 3 s como máximo: en el WiFi del Tello no hay internet. El 401 se maneja acá (sin aviso global).
+            const respuesta = await API.auth.sesion({ timeoutMs: 3000, sinAvisoSesion: true });
             guardarUsuario(respuesta.usuario);
             modoSinConexion = false;
             return true;
         } catch (e) {
-            clearTimeout(timeoutId);
-            const es401o403 = e.status === 401 || e.status === 403 || 
-                             (e.message && (e.message.includes('401') || e.message.includes('403') || e.message.includes('expirada')));
-
-            if (es401o403) {
+            if (e.status === 401 || e.status === 403) {
                 // Token rechazado explícitamente por el servidor
                 API.eliminarToken();
                 localStorage.removeItem('grupo5dron_usuario');
@@ -239,8 +245,13 @@ const Auth = (() => {
             try {
                 await login(email, password);
                 modoSinConexion = false;
-                App.mostrarToast('¡Bienvenido/a!', 'exito');
-                window.location.hash = '#/inicio';
+                if (debeCambiarPassword()) {
+                    App.mostrarToast('Antes de seguir, cambiá la contraseña temporal.', 'advertencia', 6000);
+                    window.location.hash = '#/cambiar-password';
+                } else {
+                    App.mostrarToast('¡Bienvenido/a!', 'exito');
+                    window.location.hash = '#/inicio';
+                }
             } catch (error) {
                 if (avisoOffline && !obtenerUsuario()) {
                     avisoOffline.style.display = 'block';
@@ -249,6 +260,44 @@ const Auth = (() => {
             } finally {
                 btnSubmit.disabled = false;
                 btnSubmit.textContent = 'Iniciar sesión';
+            }
+        });
+    }
+
+    /**
+     * Inicializa la página de cambio de contraseña (#/cambiar-password).
+     */
+    function inicializarPaginaCambiarPassword() {
+        const form = document.getElementById('form-cambiar-password');
+        if (!form) return;
+        const aviso = document.getElementById('aviso-cambio-obligatorio');
+        if (aviso) aviso.style.display = debeCambiarPassword() ? 'flex' : 'none';
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const actual = document.getElementById('password-actual').value;
+            const nueva = document.getElementById('password-nueva').value;
+            const repetida = document.getElementById('password-repetida').value;
+            const btn = form.querySelector('button[type="submit"]');
+
+            if (!actual || !nueva || !repetida) { App.mostrarToast('Completá los tres campos.', 'advertencia'); return; }
+            if (nueva.length < 8) { App.mostrarToast('La nueva contraseña debe tener al menos 8 caracteres.', 'advertencia'); return; }
+            if (nueva !== repetida) { App.mostrarToast('Las contraseñas nuevas no coinciden.', 'advertencia'); return; }
+            if (nueva === actual) { App.mostrarToast('La nueva contraseña tiene que ser distinta de la actual.', 'advertencia'); return; }
+
+            btn.disabled = true;
+            btn.textContent = 'Guardando...';
+            try {
+                await API.auth.cambiarMiPassword(actual, nueva);
+                const usuario = obtenerUsuario();
+                if (usuario) guardarUsuario({ ...usuario, debe_cambiar_password: false });
+                App.mostrarToast('Contraseña actualizada.', 'exito');
+                window.location.hash = '#/inicio';
+            } catch (error) {
+                App.mostrarToast(error.message, 'error', 6000);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Guardar contraseña';
             }
         });
     }
@@ -268,5 +317,8 @@ const Auth = (() => {
         esModoInvitado,
         activarModoInvitado,
         desactivarModoInvitado,
+        cerrarSesionLocal,
+        debeCambiarPassword,
+        inicializarPaginaCambiarPassword,
     };
 })();

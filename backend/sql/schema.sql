@@ -187,8 +187,8 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- DATOS DE EJEMPLO (SEED)
 -- ============================================================
 
--- Usuarios iniciales de ejemplo (Contraseña temporal: Admin1234!)
--- Hash generado con password_hash('Admin1234!', PASSWORD_DEFAULT)
+-- Usuarios iniciales de ejemplo (contraseña temporal de todos: password)
+-- El hash corresponde a 'password'. La app obliga a cambiarla en el primer inicio de sesión.
 -- ⚠️ ADVERTENCIA DE SEGURIDAD: Todos los usuarios iniciales tienen
 -- `debe_cambiar_password` = 1 para forzar el cambio de clave en el primer
 -- inicio de sesión. Cambiá estas credenciales inmediatamente antes de

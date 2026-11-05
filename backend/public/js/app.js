@@ -139,7 +139,7 @@ const App = (() => {
         const hash = window.location.hash || '#/inicio';
         const ruta = hash.replace(/^#\/?/, '').split('?')[0].trim() || 'inicio';
 
-        const rutasValidas = ['login', 'inicio', 'aula', 'dron', 'sensores', 'config-dron', 'admin', 'acerca', 'prueba-tello'];
+        const rutasValidas = ['login', 'inicio', 'aula', 'dron', 'sensores', 'config-dron', 'admin', 'acerca', 'prueba-tello', 'cambiar-password'];
         const destino = rutasValidas.includes(ruta) ? ruta : 'inicio';
 
         // 1. Control de autenticación (permite usuario cacheado sin conexión)
@@ -165,6 +165,12 @@ const App = (() => {
 
         if (estaAutenticado && destino === 'login') {
             window.location.hash = '#/inicio';
+            return;
+        }
+
+        // Contraseña temporal: hay que cambiarla antes de seguir (solo con conexión; sin servidor no se puede)
+        if (estaAutenticado && !esOffline && Auth.debeCambiarPassword() && destino !== 'cambiar-password') {
+            window.location.hash = '#/cambiar-password';
             return;
         }
 
@@ -208,30 +214,7 @@ const App = (() => {
         if (miNavegacion !== navegacionActual) return;
 
         // 5. Adaptación visual del layout (header y menú en pantalla de login)
-        const header = document.getElementById('header-principal');
-        const btnMenu = document.getElementById('btn-menu');
-        const btnUsuario = document.getElementById('btn-usuario');
-        const indicadorEsp = document.getElementById('indicador-esp32');
-
-        const indicadorOffline = document.getElementById('indicador-offline');
-        if (destino === 'login') {
-            document.body.classList.add('pantalla-login');
-            if (btnMenu) btnMenu.style.visibility = 'hidden';
-            if (btnUsuario) btnUsuario.style.visibility = 'hidden';
-            if (indicadorEsp) indicadorEsp.style.display = 'none';
-            if (indicadorOffline) indicadorOffline.style.display = 'none';
-        } else {
-            document.body.classList.remove('pantalla-login');
-            if (btnMenu) btnMenu.style.visibility = 'visible';
-            if (btnUsuario) btnUsuario.style.visibility = 'visible';
-            if (indicadorEsp) indicadorEsp.style.display = invitado ? 'none' : 'flex';
-            if (indicadorOffline) {
-                indicadorOffline.textContent = invitado ? '🚁 Sin cuenta' : '📡 Modo sin conexión';
-                indicadorOffline.style.display = (invitado || esOffline) ? 'inline-flex' : 'none';
-            }
-        }
-        const enlaceSesion = document.getElementById('btn-cerrar-sesion');
-        if (enlaceSesion) enlaceSesion.textContent = invitado ? '🔑 Iniciar sesión' : '🚪 Cerrar sesión';
+        actualizarEncabezado(destino);
 
         // 6. Cargar plantilla en el contenedor principal
         const contenedor = document.getElementById('app-contenido');
@@ -250,6 +233,58 @@ const App = (() => {
 
         // 8. Inicializar controlador específico de la página
         await inicializarControladorPagina(destino);
+    }
+
+    /**
+     * Ajusta el header y el menú según la pantalla y el tipo de sesión
+     * (login, sesión normal, sin conexión o dron sin cuenta).
+     * @param {string} destino ruta actual
+     */
+    function actualizarEncabezado(destino) {
+        const invitado = !API.estaAutenticado() && !Auth.obtenerUsuario() && Auth.esModoInvitado();
+        const esOffline = Auth.esModoSinConexion();
+        const btnMenu = document.getElementById('btn-menu');
+        const btnUsuario = document.getElementById('btn-usuario');
+        const indicadorEsp = document.getElementById('indicador-esp32');
+        const indicadorOffline = document.getElementById('indicador-offline');
+
+        if (destino === 'login') {
+            document.body.classList.add('pantalla-login');
+            if (btnMenu) btnMenu.style.visibility = 'hidden';
+            if (btnUsuario) btnUsuario.style.visibility = 'hidden';
+            if (indicadorEsp) indicadorEsp.style.display = 'none';
+            if (indicadorOffline) indicadorOffline.style.display = 'none';
+        } else {
+            document.body.classList.remove('pantalla-login');
+            if (btnMenu) btnMenu.style.visibility = 'visible';
+            if (btnUsuario) btnUsuario.style.visibility = 'visible';
+            if (indicadorEsp) indicadorEsp.style.display = invitado ? 'none' : 'flex';
+            if (indicadorOffline) {
+                indicadorOffline.textContent = invitado ? '🚁 Sin cuenta' : '📡 Modo sin conexión';
+                indicadorOffline.style.display = (invitado || esOffline) ? 'inline-flex' : 'none';
+            }
+        }
+        const enlaceSesion = document.getElementById('btn-cerrar-sesion');
+        if (enlaceSesion) enlaceSesion.textContent = invitado ? '🔑 Iniciar sesión' : '🚪 Cerrar sesión';
+    }
+
+    /**
+     * El servidor rechazó el token (401): la sesión venció.
+     * En las pantallas del dron se sigue en modo sin cuenta (no se interrumpe un vuelo);
+     * en el resto se vuelve al login.
+     */
+    function manejarSesionVencida() {
+        if (!API.estaAutenticado()) return;
+        Auth.cerrarSesionLocal();
+        const ruta = window.location.hash.replace(/^#\/?/, '').split('?')[0].trim() || 'inicio';
+        if (RUTAS_SIN_CUENTA.includes(ruta)) {
+            Auth.activarModoInvitado();
+            actualizarEncabezado(ruta);
+            mostrarToast('Tu sesión venció. Seguís usando el dron en modo sin cuenta; para el aula, iniciá sesión de nuevo.', 'advertencia', 7000);
+        } else {
+            mostrarToast('Tu sesión venció. Iniciá sesión de nuevo.', 'advertencia', 6000);
+            window.location.hash = '#/login';
+        }
     }
 
     /**
@@ -320,6 +355,10 @@ const App = (() => {
 
             case 'acerca':
                 // Vista estática informativa
+                break;
+
+            case 'cambiar-password':
+                Auth.inicializarPaginaCambiarPassword();
                 break;
 
             case 'prueba-tello': {
@@ -420,6 +459,7 @@ const App = (() => {
                             </div>
                         </div>
                     </div>
+                    <button class="btn btn--secundario btn--bloque mb-md" id="btn-modal-cambiar-pass">🔑 Cambiar contraseña</button>
                     <p class="texto-xs texto-secundario">
                         Conectado al servidor de Grupo 5 — EEST N° 1 "Eduardo Ader".
                     </p>
@@ -436,6 +476,10 @@ const App = (() => {
         const cerrar = () => modalOverlay.remove();
         document.getElementById('btn-cerrar-modal-user').onclick = cerrar;
         document.getElementById('btn-modal-cancelar').onclick = cerrar;
+        document.getElementById('btn-modal-cambiar-pass').onclick = () => {
+            cerrar();
+            window.location.hash = '#/cambiar-password';
+        };
         modalOverlay.onclick = (e) => { if (e.target === modalOverlay) cerrar(); };
 
         document.getElementById('btn-modal-logout').onclick = async () => {
@@ -788,6 +832,9 @@ const App = (() => {
                 cerrarMenu();
             });
         });
+
+        // Sesión vencida avisada por api.js (401 con sesión iniciada)
+        window.addEventListener(API.EVENTO_SESION_VENCIDA, manejarSesionVencida);
 
         // Verificar sesión activa antes de la primera carga con timeout estricto de 3s
         if (API.estaAutenticado() || Auth.obtenerUsuario()) {

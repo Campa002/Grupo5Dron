@@ -7,6 +7,7 @@
  *   POST ?action=registro   — Registrar usuario (solo admin)
  *   GET  ?action=sesion      — Obtener datos de la sesión actual
  *   POST ?action=logout      — Cerrar sesión (invalidar token en cliente)
+ *   POST ?action=cambiar_mi_password — Cambiar la contraseña propia (pide la actual)
  */
 
 require_once __DIR__ . '/../config/database.php';
@@ -33,8 +34,11 @@ switch ($action) {
     case 'logout':
         cerrarSesion();
         break;
+    case 'cambiar_mi_password':
+        cambiarMiPassword();
+        break;
     default:
-        responderError('Acción no válida. Usar: login, registro, sesion, logout.', 400);
+        responderError('Acción no válida. Usar: login, registro, sesion, logout, cambiar_mi_password.', 400);
 }
 
 /**
@@ -182,6 +186,54 @@ function obtenerSesion(): void
             'debe_cambiar_password' => (bool) ($usuario['debe_cambiar_password'] ?? false),
         ],
     ]);
+}
+
+/**
+ * Cambia la contraseña del usuario autenticado.
+ * Exige la contraseña actual y apaga debe_cambiar_password.
+ * Los errores de la contraseña actual responden 400 (no 401) para no confundirse con una sesión vencida.
+ */
+function cambiarMiPassword(): void
+{
+    validarMetodo(['POST']);
+    $usuario = verificarAutenticacion();
+
+    $datos = obtenerBodyJson();
+    validarCamposRequeridos($datos, ['password_actual', 'password_nueva']);
+    $actual = (string) $datos['password_actual'];
+    $nueva = (string) $datos['password_nueva'];
+
+    if (strlen($nueva) < 8) {
+        responderError('La nueva contraseña debe tener al menos 8 caracteres.', 400);
+    }
+    if ($nueva === $actual) {
+        responderError('La nueva contraseña tiene que ser distinta de la actual.', 400);
+    }
+    if (!verificarRateLimit($usuario['email'])) {
+        responderError('Demasiados intentos fallidos. Intentá de nuevo en unos minutos.', 429);
+    }
+
+    try {
+        $pdo = obtenerConexion();
+        $stmt = $pdo->prepare('SELECT password_hash FROM usuarios WHERE id = ?');
+        $stmt->execute([$usuario['id']]);
+        $fila = $stmt->fetch();
+
+        if (!$fila || !password_verify($actual, $fila['password_hash'])) {
+            registrarIntentoFallido($usuario['email']);
+            responderError('La contraseña actual no es correcta.', 400);
+        }
+
+        $stmt = $pdo->prepare(
+            'UPDATE usuarios SET password_hash = ?, debe_cambiar_password = 0, intentos_login = 0, bloqueado_hasta = NULL WHERE id = ?'
+        );
+        $stmt->execute([password_hash($nueva, PASSWORD_DEFAULT), $usuario['id']]);
+
+        responderExito('Contraseña actualizada.');
+    } catch (Exception $e) {
+        registrarLog('Error cambiando la contraseña propia: ' . $e->getMessage(), 'ERROR');
+        responderError('Error al cambiar la contraseña.', 500);
+    }
 }
 
 /**

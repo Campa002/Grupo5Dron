@@ -31,8 +31,9 @@ return [
         'max_intentos_login'   => 5,
         // Minutos de bloqueo tras superar intentos
         'bloqueo_minutos'      => 15,
-        // Orígenes CORS permitidos (ajustar al dominio real)
-        'cors_origenes'        => ['https://tu-dominio.com'],
+        // Orígenes CORS permitidos. 'https://localhost' es el origen de la app Android (Capacitor):
+        // sin él, el APK no puede iniciar sesión ni usar la API.
+        'cors_origenes'        => ['https://tu-dominio.com', 'https://localhost'],
     ],
 
     // --- Aplicación ---

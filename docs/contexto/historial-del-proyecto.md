@@ -78,6 +78,13 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - job "verificar" en CI.
 
     Quedó probado en navegador y con el mock. Falta la prueba con el dron.
+14. **Fase 2 con Claude Code (5/11).** Funciones:
+    - contrato de perfiles con la API corregido, con perfiles locales fijos (Tello y Simulador);
+    - permisos iguales a los de la API (crear y editar: admin y docente; eliminar: admin);
+    - `api.js` con timeout de 10 s; un 401 = sesión vencida (en el aula, login; en el dron, modo sin cuenta);
+    - cambio obligatorio de la contraseña temporal del seed (endpoint `cambiar_mi_password`);
+    - plantilla de comandos fuera del formulario;
+    - CORS con `https://localhost` en el ejemplo y contraseña del seed bien documentada.
 
 ## 4. Hardware
 

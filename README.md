@@ -46,14 +46,14 @@ Grupo5Dron/
 
 > [!WARNING]
 > **ADVERTENCIA DE SEGURIDAD CRÍTICA:**  
-> Las credenciales listadas abajo son de uso temporal y exclusivo para entornos de prueba locales. En la base de datos ([schema.sql](file:///c:/Users/Alumnos/Desktop/Grupo5Dron/backend/sql/schema.sql)), todos los usuarios iniciales tienen activada la bandera `debe_cambiar_password = 1`. **Es obligatorio cambiar las contraseñas antes del despliegue en producción o en el aula real.**
+> Las credenciales listadas abajo son de uso temporal y exclusivo para entornos de prueba locales. En la base de datos ([schema.sql](file:///c:/Users/Alumnos/Desktop/Grupo5Dron/backend/sql/schema.sql)), todos los usuarios iniciales tienen activada la bandera `debe_cambiar_password = 1`: la app pide cambiar la contraseña en el primer inicio de sesión. **Es obligatorio cambiar las contraseñas antes del despliegue en producción o en el aula real.**
 
 | Rol | Correo Electrónico | Contraseña Temporal | Propósito |
 | :--- | :--- | :---: | :--- |
-| **Administrador** | `admin@grupo5dron.local` | `Admin1234!` | Acceso completo al panel administrativo y configuración. |
-| **Docente** | `piris@grupo5dron.local` | `Admin1234!` | Control de aula, modo aprendizaje IR y autorización de relé. |
-| **Estudiante** | `demian@grupo5dron.local` | `Admin1234!` | Operación de dispositivos permitidos y telemetría. |
-| **Estudiante** | `luciano@grupo5dron.local` | `Admin1234!` | Operación de dispositivos permitidos y telemetría. |
+| **Administrador** | `admin@grupo5dron.local` | `password` | Acceso completo al panel administrativo y configuración. |
+| **Docente** | `piris@grupo5dron.local` | `password` | Control de aula, modo aprendizaje IR y autorización de relé. |
+| **Estudiante** | `demian@grupo5dron.local` | `password` | Operación de dispositivos permitidos y telemetría. |
+| **Estudiante** | `luciano@grupo5dron.local` | `password` | Operación de dispositivos permitidos y telemetría. |
 
 ### Cómo regenerar contraseñas seguras por consola:
 Podés generar nuevos hashes seguros con el script provisto en la carpeta `scripts/`:

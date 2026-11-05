@@ -3,14 +3,17 @@
  * EEST N° 1 de Vicente López "Eduardo Ader" — 7° 2°
  *
  * Gestiona los perfiles de dron:
- *  - Listado y selección del perfil activo
- *  - Creación, edición y eliminación de perfiles (sólo admin)
- *  - Caché local en localStorage: los perfiles se cachean para funcionar
- *    sin internet cuando el teléfono está conectado al WiFi del dron.
- *  - Integración con API.perfilesDron y validación del formulario
+ *  - Dos perfiles LOCALES que siempre existen (no dependen del servidor):
+ *    "DJI Tello" y "Simulador". Sirven sin internet y en el modo sin cuenta.
+ *  - Perfiles del SERVIDOR (tabla perfiles_dron), cacheados en localStorage
+ *    para usarlos sin internet cuando el teléfono está en el WiFi del dron.
+ *  - Crear y editar: admin y docente (como exige la API). Eliminar: solo admin.
+ *  - Timeout del failsafe de telemetría.
  *
- * Depende de: api.js, auth.js
- * Renderizado por: app.js → rutear('#/config-dron')
+ * Contrato con la API (dron-perfiles.php): listar -> {perfiles: [...]}, obtener -> {perfil: {...}},
+ * campos tipo_adaptador (tello|simulador), ip, puerto_comando, puerto_video.
+ *
+ * Depende de: api.js, auth.js, dron-adaptadores.js
  */
 
 // eslint-disable-next-line no-unused-vars
@@ -19,39 +22,46 @@ const ConfigDron = (() => {
 
     const CACHE_KEY = 'grupo5dron_perfiles_cache';
 
-    const PERFIL_DEFAULT_TELLO = {
-        id: 'tello-default',
-        nombre: 'DJI Tello (Oficial)',
-        tipo_protocolo: 'tello',
-        tipo_adaptador: 'tello',
-        ip_dron: '192.168.10.1',
-        puerto_cmd: 8889,
-        puerto_estado: 8890,
-        puerto_video: 11111,
-        descripcion: 'Perfil por defecto para vuelo offline con DJI Tello.'
-    };
+    // Perfiles que viven en la app (no se pueden editar ni borrar)
+    const PERFILES_LOCALES = [
+        {
+            id: 'tello-default',
+            local: true,
+            nombre: 'DJI Tello',
+            tipo_adaptador: 'tello',
+            ip: '192.168.10.1',
+            puerto_comando: 8889,
+            puerto_estado: 8890,
+            puerto_video: 11111,
+            descripcion: 'Tello real por su WiFi (TELLO-XXXXXX). Necesita la app instalada.',
+        },
+        {
+            id: 'simulador-local',
+            local: true,
+            nombre: 'Simulador',
+            tipo_adaptador: 'simulador',
+            ip: '127.0.0.1',
+            puerto_comando: 0,
+            descripcion: 'Dron virtual para practicar sin el Tello. Funciona también en el navegador.',
+        },
+    ];
 
     // ----------------------------------------------------------------
-    // Caché local
+    // Caché local de perfiles del servidor
     // ----------------------------------------------------------------
 
     function guardarCache(perfiles) {
         try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify({
-                ts: Date.now(),
-                perfiles,
-            }));
-        } catch (_) { /* storage lleno */ }
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), perfiles }));
+        } catch (_) { /* almacenamiento lleno */ }
     }
 
     function leerCache() {
         try {
-            const raw = localStorage.getItem(CACHE_KEY);
-            if (!raw) return null;
-            const datos = JSON.parse(raw);
-            return datos.perfiles || null;
+            const datos = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+            return Array.isArray(datos?.perfiles) ? datos.perfiles : [];
         } catch (_) {
-            return null;
+            return [];
         }
     }
 
@@ -60,11 +70,19 @@ const ConfigDron = (() => {
     }
 
     function guardarPerfilActivo(id) {
-        if (id) {
-            localStorage.setItem('grupo5dron_perfil_activo', String(id));
-        } else {
-            localStorage.removeItem('grupo5dron_perfil_activo');
-        }
+        if (id) localStorage.setItem('grupo5dron_perfil_activo', String(id));
+        else localStorage.removeItem('grupo5dron_perfil_activo');
+    }
+
+    /** Solo se consulta la API con sesión iniciada y conexión (no en modo sin cuenta ni sin conexión). */
+    function puedeUsarApi() {
+        return API.estaAutenticado() && !Auth.esModoInvitado() && !Auth.esModoSinConexion();
+    }
+
+    function _conLocales(servidor) {
+        // Por compatibilidad: una caché vieja podía guardar copias de los perfiles locales
+        const ids = new Set(PERFILES_LOCALES.map(p => p.id));
+        return [...PERFILES_LOCALES, ...servidor.filter(p => !ids.has(String(p.id)))];
     }
 
     // ----------------------------------------------------------------
@@ -72,122 +90,133 @@ const ConfigDron = (() => {
     // ----------------------------------------------------------------
 
     /**
-     * Carga los perfiles desde la API (o desde caché si no hay conexión).
-     * @returns {Promise<Array>}
+     * Perfiles locales + los del servidor (o los de la caché si no hay conexión).
+     * @returns {Promise<{perfiles: Array, origen: 'servidor'|'cache', error?: string}>}
      */
     async function cargarPerfiles() {
+        if (!puedeUsarApi()) {
+            return { perfiles: _conLocales(leerCache()), origen: 'cache' };
+        }
         try {
             const resp = await API.perfilesDron.listar();
-            const perfiles = resp.datos || resp.data || [];
-            if (perfiles && perfiles.length > 0) {
-                guardarCache(perfiles);
-                return perfiles;
-            }
+            const servidor = Array.isArray(resp.perfiles) ? resp.perfiles : [];
+            guardarCache(servidor);
+            return { perfiles: _conLocales(servidor), origen: 'servidor' };
         } catch (err) {
-            console.warn('[ConfigDron] No se pudo cargar desde la API, usando caché:', err.message);
+            console.warn('[ConfigDron] No se pudieron cargar los perfiles del servidor; se usa la caché:', err.message);
+            return { perfiles: _conLocales(leerCache()), origen: 'cache', error: err.message };
         }
-        const cache = leerCache();
-        return (cache && cache.length > 0) ? cache : [PERFIL_DEFAULT_TELLO];
     }
 
     /**
-     * Carga un perfil específico por ID.
+     * Carga un perfil por ID: primero los locales, después la caché y por último la API.
      * @param {number|string} id
      * @returns {Promise<Object|null>}
      */
     async function cargarPerfil(id) {
-        if (!id || id === 'tello-default') {
-            const cache = leerCache();
-            if (cache) {
-                const local = cache.find(p => String(p.id) === 'tello-default');
-                if (local) return local;
-            }
-            return PERFIL_DEFAULT_TELLO;
-        }
-        // Intentar desde caché primero para respuesta rápida
-        const cache = leerCache();
-        if (cache) {
-            const local = cache.find(p => String(p.id) === String(id));
-            if (local) return local;
-        }
+        const clave = String(id || 'tello-default');
+        const local = PERFILES_LOCALES.find(p => p.id === clave);
+        if (local) return local;
+
+        const enCache = leerCache().find(p => String(p.id) === clave);
+        if (enCache) return enCache;
+
+        if (!puedeUsarApi()) return null;
         try {
-            const resp = await API.perfilesDron.obtener(id);
-            return resp.datos || resp.data || null;
+            const resp = await API.perfilesDron.obtener(clave);
+            return resp.perfil || null;
         } catch (err) {
-            console.warn('[ConfigDron] No se pudo cargar el perfil ID', id, err.message);
+            console.warn('[ConfigDron] No se pudo cargar el perfil', clave, err.message);
             return null;
         }
     }
 
     // ----------------------------------------------------------------
-    // Renderizado principal de la página
+    // Renderizado de la página
     // ----------------------------------------------------------------
 
+    function _permisos() {
+        const rol = Auth.obtenerUsuario()?.rol;
+        const conSesion = API.estaAutenticado() && !Auth.esModoInvitado();
+        return {
+            editar: conSesion && (rol === 'admin' || rol === 'docente'),
+            eliminar: conSesion && rol === 'admin',
+        };
+    }
+
     /**
-     * Inicializa la vista Config-Dron en el contenedor dado.
+     * Inicializa la vista Config. Dron en el contenedor dado.
+     * Muestra al instante los perfiles guardados y después actualiza con los del servidor.
      * @param {HTMLElement} contenedor
      */
     async function inicializar(contenedor) {
         if (!contenedor) return;
-        const usuario = Auth.obtenerUsuario();
-        const esAdmin = usuario && (usuario.rol === 'admin' || usuario.rol === 'profesor');
+        const permisos = _permisos();
+        contenedor.innerHTML = _plantillaBase(permisos);
+        _agregarEventos(contenedor, permisos);
 
-        // Esqueleto inicial con spinner
-        contenedor.innerHTML = _plantillaBase(esAdmin);
+        // 1. Lo que hay en el teléfono, sin esperar a la red
+        _renderizarListaPerfiles(contenedor, _conLocales(leerCache()), permisos);
+        _mostrarOrigen(contenedor, puedeUsarApi() ? 'Actualizando perfiles del servidor...' : _textoSinServidor());
 
-        const perfiles = await cargarPerfiles();
-
-        // Si no hay perfiles en caché ni en API
-        if (!perfiles || perfiles.length === 0) {
-            _renderizarVacio(contenedor, esAdmin);
-            return;
-        }
-
-        _renderizarListaPerfiles(contenedor, perfiles, esAdmin);
-        _agregarEventos(contenedor, esAdmin);
+        // 2. Perfiles del servidor (si hay sesión y conexión)
+        if (!puedeUsarApi()) return;
+        const { perfiles, origen, error } = await cargarPerfiles();
+        if (!contenedor.isConnected) return;
+        _renderizarListaPerfiles(contenedor, perfiles, permisos);
+        _mostrarOrigen(contenedor, origen === 'servidor'
+            ? ''
+            : `No se pudo actualizar desde el servidor (${error}). Se muestran los perfiles guardados en el teléfono.`);
     }
 
-    // ----------------------------------------------------------------
-    // Renderizado de subvistas
-    // ----------------------------------------------------------------
+    function _textoSinServidor() {
+        if (Auth.esModoInvitado()) return 'Modo sin cuenta: se muestran los perfiles locales y los guardados en el teléfono.';
+        if (Auth.esModoSinConexion()) return 'Sin conexión con el servidor: se muestran los perfiles guardados en el teléfono.';
+        return '';
+    }
 
-    function _plantillaBase(esAdmin) {
+    function _mostrarOrigen(contenedor, texto) {
+        const nota = contenedor.querySelector('#config-dron-origen');
+        if (!nota) return;
+        nota.textContent = texto;
+        nota.hidden = !texto;
+    }
+
+    function _plantillaBase(permisos) {
         return `
         <div class="config-dron-pagina">
             <div class="flex justify-between items-center mb-md flex-wrap gap-sm">
                 <div>
-                    <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">
-                        🔧 Configuración de Perfiles de Dron
-                    </h2>
+                    <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">🔧 Configuración del dron</h2>
                     <p class="texto-sm texto-secundario">
-                        Seleccioná el perfil de dron a utilizar. Los perfiles se guardan localmente para funcionar sin internet.
+                        Elegí el perfil que usa la cabina. Los perfiles se guardan en el teléfono para funcionar sin internet.
                     </p>
                 </div>
-                ${esAdmin ? `<button id="btn-nuevo-perfil" class="btn btn--primario">➕ Nuevo perfil</button>` : ''}
+                ${permisos.editar ? `<button id="btn-nuevo-perfil" class="btn btn--primario">➕ Nuevo perfil</button>` : ''}
             </div>
 
+            <p id="config-dron-origen" class="texto-xs texto-secundario mb-md" hidden></p>
+            <div id="config-dron-contenido"></div>
+
             <!-- Failsafe configurable -->
-            <div class="tarjeta mb-md">
-                <h3 class="texto-sm font-semibold texto-secundario mb-xs">⏱️ Failsafe de Seguridad (Telemetría UDP 8890)</h3>
-                <p class="texto-xs texto-secundario mb-sm">
-                    Tiempo máximo sin recibir paquetes de telemetría antes de frenar y aterrizar automáticamente el dron.
+            <div class="tarjeta mt-lg">
+                <h3 class="texto-sm texto-secundario" style="font-weight:600; margin-bottom: var(--espacio-xs);">⏱️ Failsafe de seguridad (telemetría UDP 8890)</h3>
+                <p class="texto-xs texto-secundario" style="margin-bottom: var(--espacio-sm);">
+                    Tiempo máximo sin recibir telemetría antes de frenar y aterrizar automáticamente.
                 </p>
                 <div class="flex items-center gap-sm flex-wrap">
-                    <input type="number" id="input-failsafe-timeout" class="campo-formulario__entrada" style="width:120px;" min="1000" max="30000" step="500" value="3500">
-                    <span class="texto-xs texto-secundario">ms (1000 a 30000 ms, por defecto 3500)</span>
-                    <button id="btn-guardar-failsafe" class="btn btn--secundario texto-xs">Guardar Timeout</button>
+                    <input type="number" id="input-failsafe-timeout" class="campo__input" style="width:8rem;" min="1000" max="30000" step="500" value="3500">
+                    <span class="texto-xs texto-secundario">ms (1000 a 30000; por defecto 3500)</span>
+                    <button id="btn-guardar-failsafe" class="btn btn--secundario">Guardar</button>
                 </div>
             </div>
 
-            <div id="config-dron-contenido">
-                <div class="cargando"><div class="cargando__spinner"></div><p>Cargando perfiles...</p></div>
-            </div>
             <!-- Modal de edición -->
             <div id="modal-perfil" class="modal" style="display:none;" aria-modal="true" role="dialog" aria-labelledby="modal-perfil-titulo">
                 <div class="modal__overlay" id="modal-perfil-overlay"></div>
                 <div class="modal__contenido tarjeta" style="max-width:520px; width:94%;">
                     <div class="modal__header">
-                        <h3 id="modal-perfil-titulo" class="modal__titulo">Perfil de Dron</h3>
+                        <h3 id="modal-perfil-titulo" class="modal__titulo">Perfil de dron</h3>
                         <button id="btn-cerrar-modal-perfil" class="modal__btn-cerrar" aria-label="Cerrar">✕</button>
                     </div>
                     <div id="modal-perfil-body" class="modal__cuerpo"></div>
@@ -196,105 +225,72 @@ const ConfigDron = (() => {
         </div>`;
     }
 
-    function _renderizarVacio(contenedor, esAdmin) {
-        const div = contenedor.querySelector('#config-dron-contenido');
-        if (!div) return;
-        div.innerHTML = `
-            <div class="tarjeta tarjeta--acento texto-centro" style="padding: var(--espacio-2xl) var(--espacio-lg);">
-                <div style="font-size:3rem; margin-bottom: var(--espacio-md);">🚁</div>
-                <h3 style="font-size: var(--tamano-xl); font-weight:700; margin-bottom: var(--espacio-sm);">
-                    No hay perfiles de dron configurados
-                </h3>
-                <p class="texto-sm texto-secundario mb-lg">
-                    ${esAdmin
-                        ? 'Creá el primer perfil para empezar a volar.'
-                        : 'Un administrador debe crear al menos un perfil de dron.'}
-                </p>
-                ${esAdmin ? `<button id="btn-nuevo-perfil-vacio" class="btn btn--primario">➕ Crear primer perfil</button>` : ''}
-            </div>`;
-        if (esAdmin) {
-            div.querySelector('#btn-nuevo-perfil-vacio')
-               ?.addEventListener('click', () => _abrirModalPerfil(contenedor, null));
-        }
-    }
-
-    function _renderizarListaPerfiles(contenedor, perfiles, esAdmin) {
+    function _renderizarListaPerfiles(contenedor, perfiles, permisos) {
         const div = contenedor.querySelector('#config-dron-contenido');
         if (!div) return;
         const activoId = perfilActivoId();
+        div.innerHTML = `<div class="grilla-perfiles" style="display:grid; gap: var(--espacio-md); grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));">
+            ${perfiles.map(p => _tarjetaPerfil(p, activoId, permisos)).join('')}
+        </div>`;
 
-        const tarjetas = perfiles.map(p => _tarjetaPerfil(p, activoId, esAdmin)).join('');
-        div.innerHTML = `<div class="grilla-perfiles" style="display:grid; gap: var(--espacio-md); grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${tarjetas}</div>`;
-
-        // Eventos de selección y administración
         div.querySelectorAll('.btn-seleccionar-perfil').forEach(btn => {
             btn.addEventListener('click', () => {
-                const id = btn.dataset.id;
-                guardarPerfilActivo(id);
-                div.querySelectorAll('.tarjeta-perfil').forEach(t => t.classList.remove('tarjeta-perfil--activo'));
-                btn.closest('.tarjeta-perfil')?.classList.add('tarjeta-perfil--activo');
-                btn.textContent = '✓ Seleccionado';
-                btn.disabled = true;
-                App.mostrarToast('Perfil seleccionado correctamente', 'exito');
+                guardarPerfilActivo(btn.dataset.id);
+                _renderizarListaPerfiles(contenedor, perfiles, permisos);
+                App.mostrarToast('Perfil seleccionado. La cabina va a usar este perfil.', 'exito');
             });
         });
-
-        if (esAdmin) {
-            div.querySelectorAll('.btn-editar-perfil').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const id = btn.dataset.id;
-                    const perfil = await cargarPerfil(id);
-                    _abrirModalPerfil(contenedor, perfil);
-                });
+        div.querySelectorAll('.btn-editar-perfil').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const perfil = perfiles.find(p => String(p.id) === btn.dataset.id);
+                if (perfil) _abrirModalPerfil(contenedor, perfil);
             });
-
-            div.querySelectorAll('.btn-eliminar-perfil').forEach(btn => {
-                btn.addEventListener('click', () => _confirmarEliminar(contenedor, btn.dataset.id, btn.dataset.nombre, perfiles));
-            });
-        }
+        });
+        div.querySelectorAll('.btn-eliminar-perfil').forEach(btn => {
+            btn.addEventListener('click', () => _confirmarEliminar(contenedor, btn.dataset.id, btn.dataset.nombre));
+        });
     }
 
-    function _tarjetaPerfil(perfil, activoId, esAdmin) {
-        const esActivo = String(perfil.id) === String(activoId);
-        const tipo = perfil.tipo_protocolo || 'desconocido';
-        const iconoTipo = { tello: '🛸', http: '🌐', udp_tcp: '📡', simulador: '🎮' }[tipo] || '🚁';
+    function _tarjetaPerfil(perfil, activoId, permisos) {
+        const p = DronAdaptadores.normalizarPerfil(perfil);
+        const id = String(perfil.id);
+        const esActivo = id === String(activoId);
+        const esTello = p.tipo_adaptador === 'tello';
+        const editable = !perfil.local;
 
         return `
-        <div class="tarjeta tarjeta-perfil ${esActivo ? 'tarjeta-perfil--activo' : ''}" data-id="${perfil.id}">
-            <div class="flex justify-between items-start mb-sm">
-                <div>
-                    <span style="font-size:1.75rem;">${iconoTipo}</span>
-                    <h3 class="texto-md font-semibold mt-xs">${_esc(perfil.nombre)}</h3>
+        <div class="tarjeta tarjeta-perfil ${esActivo ? 'tarjeta--acento' : ''}" data-id="${_esc(id)}">
+            <div class="flex justify-between items-center mb-md">
+                <div class="flex items-center gap-sm">
+                    <span style="font-size:1.75rem;">${esTello ? '🛸' : '🎮'}</span>
+                    <h3 class="tarjeta__titulo" style="margin:0;">${_esc(perfil.nombre)}</h3>
                 </div>
-                <div class="flex gap-xs">
-                    ${esAdmin ? `
-                        <button class="btn btn--icono btn-editar-perfil" data-id="${perfil.id}" title="Editar perfil">✏️</button>
-                        <button class="btn btn--icono btn-eliminar-perfil" data-id="${perfil.id}" data-nombre="${_esc(perfil.nombre)}" title="Eliminar perfil">🗑️</button>
-                    ` : ''}
-                </div>
+                ${editable && (permisos.editar || permisos.eliminar) ? `
+                <div class="flex gap-sm">
+                    ${permisos.editar ? `<button class="btn btn--secundario btn--icono btn-editar-perfil" data-id="${_esc(id)}" aria-label="Editar perfil">✏️</button>` : ''}
+                    ${permisos.eliminar ? `<button class="btn btn--secundario btn--icono btn-eliminar-perfil" data-id="${_esc(id)}" data-nombre="${_esc(perfil.nombre)}" aria-label="Eliminar perfil">🗑️</button>` : ''}
+                </div>` : ''}
             </div>
-            <div class="texto-sm texto-secundario mb-xs">
-                <span class="badge badge--info">${tipo}</span>
+            <div class="flex gap-sm flex-wrap mb-md">
+                <span class="badge badge--info">${esTello ? 'DJI Tello' : 'Simulador'}</span>
+                <span class="badge ${perfil.local ? 'badge--exito' : 'badge--advertencia'}">${perfil.local ? 'Local' : 'Servidor'}</span>
             </div>
-            ${perfil.descripcion ? `<p class="texto-sm texto-secundario mb-md">${_esc(perfil.descripcion)}</p>` : '<div class="mb-md"></div>'}
-            <div class="texto-xs texto-secundario mb-md">
-                ${perfil.ip_dron ? `IP: <code>${_esc(perfil.ip_dron)}</code>` : ''}
-                ${perfil.puerto_cmd ? ` · Puerto CMD: <code>${_esc(String(perfil.puerto_cmd))}</code>` : ''}
-            </div>
-            <button class="btn ${esActivo ? 'btn--secundario' : 'btn--primario'} btn-seleccionar-perfil w-full" data-id="${perfil.id}" ${esActivo ? 'disabled' : ''}>
+            ${perfil.descripcion ? `<p class="texto-sm texto-secundario mb-md">${_esc(perfil.descripcion)}</p>` : ''}
+            ${esTello ? `<p class="texto-xs texto-secundario mb-md">IP: <code>${_esc(p.ip)}</code> · Puerto de comandos: <code>${_esc(String(p.puerto_comando))}</code></p>` : ''}
+            <button class="btn ${esActivo ? 'btn--secundario' : 'btn--primario'} btn--bloque btn-seleccionar-perfil" data-id="${_esc(id)}" ${esActivo ? 'disabled' : ''}>
                 ${esActivo ? '✓ Seleccionado' : 'Seleccionar'}
             </button>
         </div>`;
     }
 
     // ----------------------------------------------------------------
-    // Modal de creación / edición
+    // Modal de creación / edición (solo perfiles del servidor)
     // ----------------------------------------------------------------
 
     function _abrirModalPerfil(contenedor, perfil) {
         const modal = contenedor.querySelector('#modal-perfil');
         const titulo = contenedor.querySelector('#modal-perfil-titulo');
-        const body   = contenedor.querySelector('#modal-perfil-body');
+        const body = contenedor.querySelector('#modal-perfil-body');
         if (!modal || !body) return;
 
         titulo.textContent = perfil ? 'Editar perfil de dron' : 'Nuevo perfil de dron';
@@ -302,197 +298,137 @@ const ConfigDron = (() => {
         modal.style.display = 'flex';
         body.querySelector('#campo-nombre-perfil')?.focus();
 
-        // Cerrar
-        contenedor.querySelector('#btn-cerrar-modal-perfil')?.addEventListener('click', () => { modal.style.display = 'none'; });
-        contenedor.querySelector('#modal-perfil-overlay')?.addEventListener('click', () => { modal.style.display = 'none'; });
-        body.querySelector('#btn-cancelar-perfil')?.addEventListener('click', () => { modal.style.display = 'none'; });
-
-        // Guardar
-        body.querySelector('#form-perfil')?.addEventListener('submit', async (e) => {
+        const cerrar = () => { modal.style.display = 'none'; };
+        contenedor.querySelector('#btn-cerrar-modal-perfil').onclick = cerrar;
+        contenedor.querySelector('#modal-perfil-overlay').onclick = cerrar;
+        body.querySelector('#btn-cancelar-perfil').onclick = cerrar;
+        body.querySelector('#form-perfil').addEventListener('submit', async (e) => {
             e.preventDefault();
             await _guardarPerfil(contenedor, body, perfil ? perfil.id : null);
         });
-
-        // Mostrar/ocultar campos según protocolo
-        body.querySelector('#campo-tipo-protocolo')?.addEventListener('change', () => {
-            _actualizarCamposProtocolo(body);
-        });
-        _actualizarCamposProtocolo(body);
+        const selTipo = body.querySelector('#campo-tipo-adaptador');
+        selTipo.addEventListener('change', () => _actualizarCamposTipo(body));
+        _actualizarCamposTipo(body);
     }
 
     function _formularioPerfil(perfil) {
-        const p = perfil || {};
-        const tipos = ['tello', 'simulador'];
-        const opcionesTipo = tipos.map(t =>
-            `<option value="${t}" ${p.tipo_protocolo === t ? 'selected' : ''}>${t}</option>`
-        ).join('');
-
+        const p = perfil ? DronAdaptadores.normalizarPerfil(perfil) : { tipo_adaptador: 'tello', ip: '192.168.10.1', puerto_comando: 8889 };
+        const opcion = (valor, texto) => `<option value="${valor}" ${p.tipo_adaptador === valor ? 'selected' : ''}>${texto}</option>`;
         return `
         <form id="form-perfil" novalidate>
-            <div class="campo-formulario">
-                <label class="campo-formulario__etiqueta" for="campo-nombre-perfil">Nombre *</label>
-                <input id="campo-nombre-perfil" class="campo-formulario__entrada" name="nombre"
-                    type="text" required maxlength="80" value="${_esc(p.nombre || '')}" placeholder="Ej: Tello del aula">
+            <div class="campo">
+                <label class="campo__label" for="campo-nombre-perfil">Nombre *</label>
+                <input id="campo-nombre-perfil" class="campo__input" name="nombre" type="text" required maxlength="100"
+                    value="${_esc(perfil?.nombre || '')}" placeholder="Ej: Tello del aula">
             </div>
-            <div class="campo-formulario">
-                <label class="campo-formulario__etiqueta" for="campo-tipo-protocolo">Tipo de protocolo *</label>
-                <select id="campo-tipo-protocolo" class="campo-formulario__entrada" name="tipo_protocolo" required>
-                    ${opcionesTipo}
+            <div class="campo">
+                <label class="campo__label" for="campo-tipo-adaptador">Tipo *</label>
+                <select id="campo-tipo-adaptador" class="campo__input" name="tipo_adaptador">
+                    ${opcion('tello', 'DJI Tello')}
+                    ${opcion('simulador', 'Simulador')}
                 </select>
             </div>
-            <div class="campo-formulario">
-                <label class="campo-formulario__etiqueta" for="campo-descripcion-perfil">Descripción</label>
-                <input id="campo-descripcion-perfil" class="campo-formulario__entrada" name="descripcion"
-                    type="text" maxlength="200" value="${_esc(p.descripcion || '')}" placeholder="Descripción opcional">
-            </div>
             <div id="campos-red-perfil">
-                <div class="campo-formulario">
-                    <label class="campo-formulario__etiqueta" for="campo-ip-dron">IP del dron</label>
-                    <input id="campo-ip-dron" class="campo-formulario__entrada" name="ip_dron"
-                        type="text" maxlength="45" value="${_esc(p.ip_dron || p.ip || '')}" placeholder="Ej: 192.168.10.1">
+                <div class="campo">
+                    <label class="campo__label" for="campo-ip-dron">IP del dron</label>
+                    <input id="campo-ip-dron" class="campo__input" name="ip" type="text" maxlength="45" inputmode="decimal"
+                        value="${_esc(p.ip)}" placeholder="192.168.10.1">
                 </div>
-                <div class="flex gap-sm">
-                    <div class="campo-formulario" style="flex:1;">
-                        <label class="campo-formulario__etiqueta" for="campo-puerto-cmd">Puerto CMD</label>
-                        <input id="campo-puerto-cmd" class="campo-formulario__entrada" name="puerto_cmd"
-                            type="number" min="1" max="65535" value="${p.puerto_cmd || p.puerto_comando || ''}" placeholder="8889">
-                    </div>
-                    <div class="campo-formulario" style="flex:1;">
-                        <label class="campo-formulario__etiqueta" for="campo-puerto-estado">Puerto Estado</label>
-                        <input id="campo-puerto-estado" class="campo-formulario__entrada" name="puerto_estado"
-                            type="number" min="1" max="65535" value="${p.puerto_estado || ''}" placeholder="8890">
-                    </div>
+                <div class="campo">
+                    <label class="campo__label" for="campo-puerto-cmd">Puerto de comandos</label>
+                    <input id="campo-puerto-cmd" class="campo__input" name="puerto_comando" type="number" min="1" max="65535"
+                        value="${_esc(String(p.puerto_comando || 8889))}">
                 </div>
-                <div class="campo-formulario">
-                    <label class="campo-formulario__etiqueta" for="campo-puerto-video">Puerto Video</label>
-                    <input id="campo-puerto-video" class="campo-formulario__entrada" name="puerto_video"
-                        type="number" min="1" max="65535" value="${p.puerto_video || ''}" placeholder="11111">
-                </div>
+                <p class="texto-xs texto-secundario mb-md">
+                    El Tello usa siempre 192.168.10.1 y el puerto 8889; la telemetría (8890) y el video (11111) son fijos.
+                </p>
             </div>
-            <div class="campo-formulario">
-                <label class="campo-formulario__etiqueta" for="campo-plantilla-cmds">Plantilla de comandos (JSON)</label>
-                <textarea id="campo-plantilla-cmds" class="campo-formulario__entrada" name="plantilla_comandos"
-                    rows="4" placeholder='{"despegar":"takeoff","aterrizar":"land"}'>${_esc(
-                        typeof p.plantilla_comandos === 'object'
-                            ? JSON.stringify(p.plantilla_comandos, null, 2)
-                            : (p.plantilla_comandos || '')
-                    )}</textarea>
-                <span class="campo-formulario__ayuda">Opcional. Sobreescribe los comandos por defecto del adaptador.</span>
-            </div>
-            <div id="error-form-perfil" class="alerta alerta--error" style="display:none;"></div>
-            <div class="flex gap-sm justify-end mt-md">
+            <div id="error-form-perfil" class="advertencia-seguridad" style="display:none;"></div>
+            <div class="flex gap-sm mt-md" style="justify-content:flex-end;">
                 <button type="button" id="btn-cancelar-perfil" class="btn btn--secundario">Cancelar</button>
-                <button type="submit" class="btn btn--primario" id="btn-guardar-perfil">
-                    ${perfil ? '💾 Guardar cambios' : '➕ Crear perfil'}
-                </button>
+                <button type="submit" class="btn btn--primario" id="btn-guardar-perfil">${perfil ? '💾 Guardar cambios' : '➕ Crear perfil'}</button>
             </div>
         </form>`;
     }
 
-    function _actualizarCamposProtocolo(body) {
-        const tipo = body.querySelector('#campo-tipo-protocolo')?.value;
+    function _actualizarCamposTipo(body) {
+        const tipo = body.querySelector('#campo-tipo-adaptador')?.value;
         const campos = body.querySelector('#campos-red-perfil');
-        if (!campos) return;
-        // El simulador no requiere IP/puerto
-        campos.style.display = (tipo === 'simulador') ? 'none' : 'block';
+        if (campos) campos.hidden = tipo === 'simulador';
     }
 
     async function _guardarPerfil(contenedor, body, idExistente) {
-        const form = body.querySelector('#form-perfil');
         const errorDiv = body.querySelector('#error-form-perfil');
         const btnGuardar = body.querySelector('#btn-guardar-perfil');
+        const mostrarError = (msg) => { errorDiv.textContent = msg; errorDiv.style.display = 'flex'; };
 
-        if (!form) return;
+        const nombre = body.querySelector('#campo-nombre-perfil').value.trim();
+        const tipo = body.querySelector('#campo-tipo-adaptador').value === 'simulador' ? 'simulador' : 'tello';
+        const ip = body.querySelector('#campo-ip-dron').value.trim();
+        const puerto = parseInt(body.querySelector('#campo-puerto-cmd').value, 10);
 
-        // Recoger datos
-        const datos = {};
-        new FormData(form).forEach((val, key) => { datos[key] = val; });
-
-        // Validar plantilla JSON si hay algo escrito
-        if (datos.plantilla_comandos && datos.plantilla_comandos.trim()) {
-            try {
-                datos.plantilla_comandos = JSON.parse(datos.plantilla_comandos);
-            } catch (err) {
-                errorDiv.textContent = 'La plantilla de comandos no es JSON válido: ' + err.message;
-                errorDiv.style.display = 'block';
-                return;
-            }
+        if (!nombre) { mostrarError('Poné un nombre para el perfil.'); return; }
+        const datos = { nombre, tipo_adaptador: tipo };
+        if (tipo === 'tello') {
+            if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip) || ip.split('.').some(n => Number(n) > 255)) { mostrarError('La IP no es válida (ejemplo: 192.168.10.1).'); return; }
+            if (!(puerto >= 1 && puerto <= 65535)) { mostrarError('El puerto tiene que estar entre 1 y 65535.'); return; }
+            datos.ip = ip;
+            datos.puerto_comando = puerto;
         } else {
-            delete datos.plantilla_comandos;
+            datos.ip = '127.0.0.1';
+            datos.puerto_comando = 0;
         }
-
-        // Convertir puertos a enteros
-        ['puerto_cmd', 'puerto_estado', 'puerto_video'].forEach(k => {
-            if (datos[k]) datos[k] = parseInt(datos[k], 10);
-            else delete datos[k];
-        });
-
-        // Sincronizar nombres para compatibilidad BD / Adaptadores
-        datos.ip = datos.ip_dron || datos.ip || '192.168.10.1';
-        datos.ip_dron = datos.ip;
-        datos.puerto_comando = datos.puerto_cmd || datos.puerto_comando || 8889;
-        datos.puerto_cmd = datos.puerto_comando;
-        datos.tipo_adaptador = datos.tipo_protocolo || datos.tipo_adaptador || 'tello';
-        datos.tipo_protocolo = datos.tipo_adaptador;
 
         btnGuardar.disabled = true;
         btnGuardar.textContent = 'Guardando...';
         errorDiv.style.display = 'none';
-
         try {
             if (idExistente) {
                 await API.perfilesDron.actualizar(idExistente, datos);
-                App.mostrarToast('Perfil actualizado correctamente', 'exito');
+                App.mostrarToast('Perfil actualizado.', 'exito');
             } else {
                 await API.perfilesDron.crear(datos);
-                App.mostrarToast('Perfil creado correctamente', 'exito');
+                App.mostrarToast('Perfil creado.', 'exito');
             }
-
-            // Cerrar modal y recargar lista
-            const modal = contenedor.querySelector('#modal-perfil');
-            if (modal) modal.style.display = 'none';
+            contenedor.querySelector('#modal-perfil').style.display = 'none';
             await inicializar(contenedor);
         } catch (err) {
-            errorDiv.textContent = 'Error al guardar: ' + (err.message || 'error desconocido');
-            errorDiv.style.display = 'block';
+            mostrarError('No se pudo guardar: ' + (err.message || 'error desconocido'));
             btnGuardar.disabled = false;
             btnGuardar.textContent = idExistente ? '💾 Guardar cambios' : '➕ Crear perfil';
         }
     }
 
-    function _confirmarEliminar(contenedor, id, nombre, perfilesActuales) {
+    function _confirmarEliminar(contenedor, id, nombre) {
         if (!confirm(`¿Eliminar el perfil "${nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
         API.perfilesDron.eliminar(id)
             .then(() => {
                 if (perfilActivoId() === String(id)) guardarPerfilActivo(null);
-                App.mostrarToast('Perfil eliminado', 'info');
+                guardarCache(leerCache().filter(p => String(p.id) !== String(id)));
+                App.mostrarToast('Perfil eliminado.', 'info');
                 return inicializar(contenedor);
             })
-            .catch(err => App.mostrarToast('Error al eliminar: ' + err.message, 'error'));
+            .catch(err => App.mostrarToast('No se pudo eliminar: ' + err.message, 'error'));
     }
 
     // ----------------------------------------------------------------
-    // Eventos globales del módulo
+    // Eventos de la página
     // ----------------------------------------------------------------
 
-    function _agregarEventos(contenedor, esAdmin) {
-        if (esAdmin) {
-            contenedor.querySelector('#btn-nuevo-perfil')
-                ?.addEventListener('click', () => _abrirModalPerfil(contenedor, null));
+    function _agregarEventos(contenedor, permisos) {
+        if (permisos.editar) {
+            contenedor.querySelector('#btn-nuevo-perfil')?.addEventListener('click', () => _abrirModalPerfil(contenedor, null));
         }
 
         const inputTimeout = contenedor.querySelector('#input-failsafe-timeout');
-        const btnFailsafe = contenedor.querySelector('#btn-guardar-failsafe');
-        if (inputTimeout) {
-            inputTimeout.value = localStorage.getItem('grupo5dron_failsafe_timeout_ms') || '3500';
-        }
-        btnFailsafe?.addEventListener('click', () => {
+        if (inputTimeout) inputTimeout.value = localStorage.getItem('grupo5dron_failsafe_timeout_ms') || '3500';
+        contenedor.querySelector('#btn-guardar-failsafe')?.addEventListener('click', () => {
             const ms = parseInt(inputTimeout?.value, 10);
-            if (ms && ms >= 1000 && ms <= 30000) {
+            if (ms >= 1000 && ms <= 30000) {
                 localStorage.setItem('grupo5dron_failsafe_timeout_ms', String(ms));
-                App.mostrarToast(`Timeout de failsafe configurado en ${ms} ms`, 'exito');
+                App.mostrarToast(`Failsafe configurado en ${ms} ms.`, 'exito');
             } else {
-                App.mostrarToast('El timeout debe estar entre 1000 y 30000 ms.', 'advertencia');
+                App.mostrarToast('El tiempo tiene que estar entre 1000 y 30000 ms.', 'advertencia');
             }
         });
     }
@@ -511,9 +447,6 @@ const ConfigDron = (() => {
             .replace(/'/g, '&#39;');
     }
 
-    // ----------------------------------------------------------------
-    // API pública
-    // ----------------------------------------------------------------
     return {
         inicializar,
         cargarPerfiles,

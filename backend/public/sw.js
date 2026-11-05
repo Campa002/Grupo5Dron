@@ -5,7 +5,7 @@
  * y actualización en segundo plano.
  */
 
-const CACHE_NAME = 'grupo5dron-v4';
+const CACHE_NAME = 'grupo5dron-v5';
 
 // Recursos estáticos confirmados para precaché inicial
 const RECURSOS_ESTATICOS = [
@@ -46,6 +46,7 @@ const RECURSOS_ESTATICOS = [
     '/pages/sensores.html',
     '/pages/prueba-tello.html',
     '/pages/config-dron.html',
+    '/pages/cambiar-password.html',
 ];
 
 // Instalación: cachear recursos individualmente para evitar fallos en bloque

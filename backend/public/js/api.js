@@ -78,20 +78,30 @@ const API = (() => {
         return !!obtenerToken();
     }
 
+    // Tiempo máximo de espera de cualquier petición (nada queda "Cargando..." para siempre)
+    const TIMEOUT_POR_DEFECTO_MS = 10000;
+
+    // Evento que se dispara cuando el servidor rechaza el token (401): lo atiende app.js
+    const EVENTO_SESION_VENCIDA = 'grupo5dron:sesion-vencida';
+
     /**
      * Realiza una petición HTTP a la API.
      * @param {string} endpoint - Ruta relativa (ej: 'auth.php?action=login')
-     * @param {Object} opciones - Opciones de fetch
+     * @param {Object} opciones - Opciones de fetch, más:
+     *   timeoutMs     (por defecto 10000)
+     *   signal        (AbortSignal externo: también cancela la petición)
+     *   sinAvisoSesion (true: un 401 no dispara el aviso de sesión vencida)
      * @returns {Promise<Object>} Respuesta JSON
      */
     async function peticion(endpoint, opciones = {}) {
         if (!_baseUrl) {
             throw new Error('URL del servidor no configurada. Por favor, ingresá la URL del servidor.');
         }
+        const { timeoutMs = TIMEOUT_POR_DEFECTO_MS, signal: signalExterno, sinAvisoSesion = false, ...opcionesFetch } = opciones;
         const url = `${_baseUrl}/${endpoint.replace(/^\/+/, '')}`;
         const headers = {
             'Content-Type': 'application/json',
-            ...(opciones.headers || {}),
+            ...(opcionesFetch.headers || {}),
         };
 
         // Agregar token si existe
@@ -100,10 +110,20 @@ const API = (() => {
             headers['Authorization'] = `Bearer ${token}`;
         }
 
+        // Cancelación por tiempo o por la señal externa
+        const controlador = new AbortController();
+        const temporizador = setTimeout(() => controlador.abort(), timeoutMs);
+        const abortarPorExterno = () => controlador.abort();
+        if (signalExterno) {
+            if (signalExterno.aborted) controlador.abort();
+            else signalExterno.addEventListener('abort', abortarPorExterno, { once: true });
+        }
+
         try {
             const respuesta = await fetch(url, {
-                ...opciones,
+                ...opcionesFetch,
                 headers,
+                signal: controlador.signal,
             });
 
             let datos = {};
@@ -111,10 +131,14 @@ const API = (() => {
                 datos = await respuesta.json();
             } catch (_) {}
 
-            // Si el token expiró con 401 explícito del servidor
+            // Token rechazado por el servidor
             if ((respuesta.status === 401 || respuesta.status === 403) && estaAutenticado()) {
                 const err = new Error(datos.mensaje || 'Sesión expirada o no autorizada.');
                 err.status = respuesta.status;
+                // 401 = sesión vencida o token inválido (403 = sin permisos: no cierra la sesión)
+                if (respuesta.status === 401 && !sinAvisoSesion) {
+                    window.dispatchEvent(new CustomEvent(EVENTO_SESION_VENCIDA, { detail: { mensaje: err.message } }));
+                }
                 throw err;
             }
 
@@ -138,21 +162,25 @@ const API = (() => {
                 throw err;
             }
             throw error;
+        } finally {
+            clearTimeout(temporizador);
+            if (signalExterno) signalExterno.removeEventListener('abort', abortarPorExterno);
         }
     }
 
     /**
      * Petición GET.
      */
-    function get(endpoint) {
-        return peticion(endpoint, { method: 'GET' });
+    function get(endpoint, opciones = {}) {
+        return peticion(endpoint, { ...opciones, method: 'GET' });
     }
 
     /**
      * Petición POST con cuerpo JSON.
      */
-    function post(endpoint, datos) {
+    function post(endpoint, datos, opciones = {}) {
         return peticion(endpoint, {
+            ...opciones,
             method: 'POST',
             body: JSON.stringify(datos),
         });
@@ -161,8 +189,9 @@ const API = (() => {
     /**
      * Petición PUT con cuerpo JSON.
      */
-    function put(endpoint, datos) {
+    function put(endpoint, datos, opciones = {}) {
         return peticion(endpoint, {
+            ...opciones,
             method: 'PUT',
             body: JSON.stringify(datos),
         });
@@ -171,8 +200,8 @@ const API = (() => {
     /**
      * Petición DELETE.
      */
-    function eliminar(endpoint) {
-        return peticion(endpoint, { method: 'DELETE' });
+    function eliminar(endpoint, opciones = {}) {
+        return peticion(endpoint, { ...opciones, method: 'DELETE' });
     }
 
     // ============================================================
@@ -182,9 +211,11 @@ const API = (() => {
     // --- Autenticación ---
     const auth = {
         login: (email, password) => post('auth.php?action=login', { email, password }),
-        sesion: () => get('auth.php?action=sesion'),
-        logout: () => post('auth.php?action=logout', {}),
+        sesion: (opciones) => get('auth.php?action=sesion', opciones),
+        // Al cerrar sesión un 401 no es "sesión vencida": ya se está saliendo
+        logout: () => post('auth.php?action=logout', {}, { sinAvisoSesion: true, timeoutMs: 4000 }),
         registro: (datos) => post('auth.php?action=registro', datos),
+        cambiarMiPassword: (actual, nueva) => post('auth.php?action=cambiar_mi_password', { password_actual: actual, password_nueva: nueva }),
     };
 
     // --- Dispositivos ---
@@ -265,5 +296,6 @@ const API = (() => {
         setBaseUrl,
         getBaseUrl,
         esNativo,
+        EVENTO_SESION_VENCIDA,
     };
 })();

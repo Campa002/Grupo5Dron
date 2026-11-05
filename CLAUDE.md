@@ -105,8 +105,8 @@ docs/contexto/    informe, historial, reportes
   - `php -S 127.0.0.1:8088 -t backend/public` sirve el frontend pero NO `/api` (la API vive en `backend/api/`).
   - Para la API hace falta la junction local (ignorada por git): `cmd /c mklink /J backend\public\api backend\api`, o un router de `php -S` que mapee `/api/*.php` a `backend/api/`.
   - MySQL: base `grupo5dron_db` importada desde `backend/sql/schema.sql`; `backend/config/config.php` local con root sin contraseña.
-- Usuarios del seed: la contraseña real de todos es `password`. El comentario de `schema.sql` y el README dicen `Admin1234!`, y es incorrecto.
-- CORS: `config.php` tiene que incluir `https://localhost` en `cors_origenes` para que el APK pueda usar la API.
+- Usuarios del seed: la contraseña de todos es `password` y tienen `debe_cambiar_password = 1`: la app obliga a cambiarla en el primer login (`auth.php?action=cambiar_mi_password`). Para volver al estado inicial de la base local, reimportá `schema.sql`.
+- CORS: `config.php` tiene que incluir `https://localhost` en `cors_origenes` (ya está en `config.example.php`) para que el APK pueda usar la API.
 - Pruebas en navegador: Playwright con Microsoft Edge del sistema (`chromium.launch({ channel: 'msedge' })`). Para el TelloAdapter sin dron, se puede inyectar un mock de `window.Capacitor.Plugins.DronNative` que respete el contrato de arriba.
 - APK: se compila en GitHub Actions en cada push a `main`. Artefacto: `Grupo5Dron-app-debug`.
 - NO agregues `android-actions/setup-android` al workflow: el SDK ya viene en el runner y esa acción rompió el build.
@@ -159,22 +159,19 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
   - Playwright + Edge: Simulador de punta a punta, mock del plugin, decodificador de video con H.264 real en paquetes de 1460 bytes, responsive a 360/390/412 en las dos orientaciones;
   - el plugin compila con javac 17 contra stubs de Android y Capacitor.
 - SIN probar con hardware: todo lo UDP real, `vincularRedWifi`, video del Tello en el WebView, failsafe en vuelo, seguimiento.
+- Fase 2 aplicada el 5/11 (verificada con Playwright contra PHP + MySQL locales):
+  - perfiles: contrato con la API corregido; dos perfiles locales fijos (DJI Tello y Simulador) más los del servidor; sin llamadas a la API en modo sin cuenta; crear y editar para admin y docente, eliminar solo admin; la plantilla de comandos salió del formulario;
+  - `api.js`: timeout de 10 s y `signal`; un 401 con sesión dispara `grupo5dron:sesion-vencida`: en el aula va al login y en las pantallas del dron pasa a modo sin cuenta;
+  - cambio obligatorio de contraseña (`#/cambiar-password`, `auth.php?action=cambiar_mi_password`), también accesible desde el menú de usuario;
+  - `https://localhost` en `config.example.php`, y contraseña del seed corregida en el README y en `schema.sql`.
 
 ## Próximos pasos (lista única)
 
 1. **Primera prueba real con el Tello.** Commit, APK de CI e instalación (si dice "App no instalada", desinstalar la anterior: cada build de CI firma con otra clave debug). Después: "Usar el dron sin cuenta", `#/prueba-tello` (command, battery?, streamon), "Copiar informe" y pegarlo. Luego la cabina: despegar, aterrizar, paso, freno, giroscopio, failsafe, emergencia.
 2. **Corregir lo que salga de esa prueba.** Lo más probable: red sin internet (`vincularRedWifi`), video en el WebView, si el `rc` interfiere con los pasos y la unidad de `vgx`/`vgy`.
-3. **Fase 2, funciones:**
-   - perfiles del servidor: el frontend lee `resp.datos`, la API manda `perfiles`/`perfil`, y el badge usa `tipo_protocolo` en vez de `tipo_adaptador`;
-   - `esAdmin` usa el rol inexistente `profesor`;
-   - en modo sin cuenta, Config. Dron no debería pedir perfiles a la API (hoy da 401 y usa la caché);
-   - timeouts reales en `api.js` (`API.get` ignora el `signal`; Config. Dron se cuelga si el servidor no responde);
-   - "plantilla de comandos" guardada pero no usada (sacarla o implementarla);
-   - 401 en el aula ya no redirige al login (cambio compartido: avisar antes);
-   - contraseña del seed mal documentada (README y comentario de `schema.sql`);
-   - `debe_cambiar_password` no se aplica;
-   - `https://localhost` en `cors_origenes` de `config.example.php`.
+3. ~~Fase 2, funciones~~: hecha (ver "Estado").
 4. **Fase 3, interfaz fuera de la cabina:**
+   - modo sin cuenta: inicio con las dos opciones del informe ("Control del Dron" entra directo y "Control del Aula" lleva al login), en lugar de saltar a la cabina;
    - clases que faltan en app.css (`alerta*`, `campo-formulario*`, utilidades);
    - modal de perfiles sin overlay ni estilos;
    - inputs de Prueba Tello y failsafe de 19 px;
