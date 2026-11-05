@@ -57,7 +57,70 @@
             <h3 class="texto-sm font-semibold texto-secundario">📟 Registro de Respuestas UDP</h3>
             <button id="btn-limpiar-log-tello" class="btn btn--secundario texto-xs" style="padding: 2px 8px;">Limpiar</button>
         </div>
-        <pre id="tello-log-salida" style="background:#0a0e14; color:#38ef7d; font-family:monospace; font-size:12px; padding:12px; border-radius:8px; min-height:160px; max-height:260px; overflow-y:auto; white-space:pre-wrap;">Esperando comandos de prueba...</pre>
+        <pre id="tello-log-salida" style="background:#0a0e14; color:#38ef7d; font-family:monospace; font-size:12px; padding:12px; border-radius:8px; min-height:140px; max-height:220px; overflow-y:auto; white-space:pre-wrap;">Esperando comandos de prueba...</pre>
+    </div>
+
+    <!-- Panel Diagnóstico Completo -->
+    <div class="tarjeta mb-md" id="panel-diagnostico-tello">
+        <div class="flex justify-between items-center mb-sm flex-wrap gap-xs">
+            <h3 class="texto-sm font-semibold texto-secundario">🛠️ Diagnóstico para Pruebas de Campo</h3>
+            <div class="flex gap-xs">
+                <button id="btn-ejecutar-diagnostico" class="btn btn--primario texto-xs">🔄 Diagnosticar Ahora</button>
+                <button id="btn-copiar-diagnostico" class="btn btn--secundario texto-xs">📋 Copiar informe</button>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; font-size: 0.8rem;">
+            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
+                <span class="texto-secundario block">Plugin DronNative:</span>
+                <strong id="diag-plugin-info">No detectado</strong>
+            </div>
+            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
+                <span class="texto-secundario block">Red Wi-Fi Vinculada:</span>
+                <strong id="diag-wifi-status">Pendiente</strong>
+            </div>
+            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
+                <span class="texto-secundario block">Soporte WebCodecs:</span>
+                <strong id="diag-webcodecs-status">Verificando...</strong>
+            </div>
+            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
+                <span class="texto-secundario block">Comandos ("command" / "battery?"):</span>
+                <strong id="diag-latencia-cmd">Sin probar</strong>
+            </div>
+            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
+                <span class="texto-secundario block">Telemetría (8890):</span>
+                <strong id="diag-telemetria-pps">0 pps | Ninguna</strong>
+            </div>
+            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
+                <span class="texto-secundario block">Video (11111):</span>
+                <strong id="diag-video-bytes">0 bytes</strong>
+            </div>
+            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
+                <span class="texto-secundario block">API Base URL:</span>
+                <strong id="diag-api-url" style="word-break:break-all;">—</strong>
+            </div>
+            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
+                <span class="texto-secundario block">Modo Conexión:</span>
+                <strong id="diag-conexion-estado">—</strong>
+            </div>
+        </div>
+
+        <div class="mt-xs">
+            <span class="texto-xs texto-secundario block">WebView / UserAgent:</span>
+            <code id="diag-user-agent" style="font-size:10px; display:block; padding:4px; background:var(--color-fondo); border-radius:4px; word-break:break-all;"></code>
+        </div>
+
+        <!-- Área de texto oculta para respaldo de portapapeles -->
+        <textarea id="diag-textarea-respaldo" style="position:absolute; left:-9999px; opacity:0;"></textarea>
+
+        <!-- Registro de últimos 20 errores -->
+        <div class="mt-sm">
+            <div class="flex justify-between items-center mb-xs">
+                <span class="texto-xs font-semibold texto-secundario">Últimos 20 errores:</span>
+                <button id="btn-limpiar-errores-diag" class="btn btn--secundario texto-xs" style="padding:1px 6px;">Borrar</button>
+            </div>
+            <pre id="diag-errores-salida" style="background:#0a0e14; color:#ef4444; font-family:monospace; font-size:11px; padding:8px; border-radius:6px; max-height:110px; overflow-y:auto; white-space:pre-wrap;">Sin errores registrados.</pre>
+        </div>
     </div>
 </div>
 

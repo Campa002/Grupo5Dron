@@ -53,8 +53,12 @@ function listarPerfiles(): void
         $stmt = $pdo->query('SELECT * FROM perfiles_dron ORDER BY nombre ASC');
         $perfiles = $stmt->fetchAll();
 
-        // Parsear campos JSON
+        // Parsear campos JSON y normalizar adaptadores a tello|simulador
         foreach ($perfiles as &$perfil) {
+            $tipo = strtolower($perfil['tipo_adaptador'] ?? 'simulador');
+            if ($tipo !== 'tello' && $tipo !== 'simulador') {
+                $perfil['tipo_adaptador'] = 'tello';
+            }
             if ($perfil['plantilla_comandos']) {
                 $perfil['plantilla_comandos'] = json_decode($perfil['plantilla_comandos'], true);
             }
@@ -93,6 +97,10 @@ function obtenerPerfil(): void
             responderError('Perfil no encontrado.', 404);
         }
 
+        $tipo = strtolower($perfil['tipo_adaptador'] ?? 'simulador');
+        if ($tipo !== 'tello' && $tipo !== 'simulador') {
+            $perfil['tipo_adaptador'] = 'tello';
+        }
         if ($perfil['plantilla_comandos']) {
             $perfil['plantilla_comandos'] = json_decode($perfil['plantilla_comandos'], true);
         }
@@ -118,6 +126,12 @@ function crearPerfil(): void
     $datos = obtenerBodyJson();
     validarCamposRequeridos($datos, ['nombre', 'tipo_adaptador', 'ip']);
 
+    // Solo se aceptan tello o simulador (otros tipos pasan a tello)
+    $tipoAdaptador = strtolower(trim((string)($datos['tipo_adaptador'] ?? 'tello')));
+    if ($tipoAdaptador !== 'tello' && $tipoAdaptador !== 'simulador') {
+        $tipoAdaptador = 'tello';
+    }
+
     try {
         $pdo = obtenerConexion();
         $stmt = $pdo->prepare(
@@ -127,7 +141,7 @@ function crearPerfil(): void
         );
         $stmt->execute([
             sanear($datos['nombre']),
-            sanear($datos['tipo_adaptador']),
+            $tipoAdaptador,
             sanear($datos['ip']),
             (int) ($datos['puerto_comando'] ?? 8889),
             isset($datos['puerto_video']) ? (int) $datos['puerto_video'] : null,
@@ -176,6 +190,9 @@ function actualizarPerfil(): void
                 $campos[] = "$campo = ?";
                 if (in_array($campo, ['puerto_comando', 'puerto_video', 'activo'])) {
                     $valores[] = (int) $datos[$campo];
+                } elseif ($campo === 'tipo_adaptador') {
+                    $tipo = strtolower(trim((string)$datos[$campo]));
+                    $valores[] = ($tipo === 'tello' || $tipo === 'simulador') ? $tipo : 'tello';
                 } else {
                     $valores[] = sanear((string) $datos[$campo]);
                 }

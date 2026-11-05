@@ -9,6 +9,15 @@ const Auth = (() => {
     'use strict';
 
     let usuarioActual = null;
+    let modoSinConexion = false;
+
+    function esModoSinConexion() {
+        return modoSinConexion;
+    }
+
+    function setModoSinConexion(val) {
+        modoSinConexion = !!val;
+    }
 
     /**
      * Intenta recuperar la sesión del usuario desde localStorage.
@@ -78,17 +87,39 @@ const Auth = (() => {
      * @returns {Promise<boolean>}
      */
     async function verificarSesion() {
-        if (!API.estaAutenticado()) return false;
+        if (!API.estaAutenticado()) {
+            return false;
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
 
         try {
-            const respuesta = await API.auth.sesion();
+            const respuesta = await API.get('auth.php?action=sesion', { signal: controller.signal });
+            clearTimeout(timeoutId);
             guardarUsuario(respuesta.usuario);
+            modoSinConexion = false;
             return true;
         } catch (e) {
-            API.eliminarToken();
-            localStorage.removeItem('grupo5dron_usuario');
-            usuarioActual = null;
-            return false;
+            clearTimeout(timeoutId);
+            const es401o403 = e.status === 401 || e.status === 403 || 
+                             (e.message && (e.message.includes('401') || e.message.includes('403') || e.message.includes('expirada')));
+
+            if (es401o403) {
+                // Token rechazado explícitamente por el servidor
+                API.eliminarToken();
+                localStorage.removeItem('grupo5dron_usuario');
+                usuarioActual = null;
+                modoSinConexion = false;
+                return false;
+            }
+
+            // Error de red, timeout o sin conexión (ej: conectados al Wi-Fi del dron Tello)
+            console.warn('[Auth] No se pudo verificar sesión con el servidor (modo offline):', e.message);
+            modoSinConexion = true;
+            const usuarioCacheado = obtenerUsuario();
+            // Mantener token y usuario si existen
+            return !!usuarioCacheado;
         }
     }
 
@@ -126,8 +157,43 @@ const Auth = (() => {
         const form = document.getElementById('form-login');
         if (!form) return;
 
+        const contApiUrl = document.getElementById('contenedor-api-url');
+        const inputApiUrl = document.getElementById('login-api-url');
+        const avisoOffline = document.getElementById('aviso-offline-login');
+
+        // En APK o si no hay baseUrl configurada, mostrar campo de URL del servidor
+        const esNativo = API.esNativo && API.esNativo();
+        if (contApiUrl && (esNativo || !API.getBaseUrl())) {
+            contApiUrl.style.display = 'block';
+            if (inputApiUrl) {
+                inputApiUrl.value = API.getBaseUrl() || '';
+                inputApiUrl.addEventListener('change', () => {
+                    API.setBaseUrl(inputApiUrl.value);
+                });
+            }
+        }
+
+        // Si no hay usuario cacheado y no hay conexión con el servidor
+        if (avisoOffline) {
+            if (!obtenerUsuario() && (!navigator.onLine || modoSinConexion)) {
+                avisoOffline.style.display = 'block';
+            } else {
+                avisoOffline.style.display = 'none';
+            }
+        }
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            if (inputApiUrl && inputApiUrl.value.trim()) {
+                API.setBaseUrl(inputApiUrl.value.trim());
+            }
+
+            if (esNativo && !API.getBaseUrl()) {
+                App.mostrarToast('Ingresá la URL del servidor antes de iniciar sesión.', 'advertencia');
+                inputApiUrl?.focus();
+                return;
+            }
 
             const email = document.getElementById('login-email').value.trim();
             const password = document.getElementById('login-password').value;
@@ -143,9 +209,13 @@ const Auth = (() => {
 
             try {
                 await login(email, password);
+                modoSinConexion = false;
                 App.mostrarToast('¡Bienvenido/a!', 'exito');
                 window.location.hash = '#/inicio';
             } catch (error) {
+                if (avisoOffline && !obtenerUsuario()) {
+                    avisoOffline.style.display = 'block';
+                }
                 App.mostrarToast(error.message, 'error');
             } finally {
                 btnSubmit.disabled = false;
@@ -164,5 +234,7 @@ const Auth = (() => {
         esAdmin,
         esDocente,
         inicializarPaginaLogin,
+        esModoSinConexion,
+        setModoSinConexion,
     };
 })();

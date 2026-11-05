@@ -21,13 +21,13 @@ const API = (() => {
     // Para configurar la URL desde la app, llamar:
     //   API.setBaseUrl('https://tuhosting.com/api')
     //
-    function _resolverBaseUrl() {
-        const enCapacitor = window.location.protocol === 'capacitor:' ||
-            window.location.protocol === 'file:' ||
-            (window.location.hostname === 'localhost' && window.location.port !== '80' && window.location.port !== '8080' && window.location.protocol !== 'http:' && window.location.protocol !== 'https:');
+    function esNativo() {
+        return !!(window.Capacitor?.isNativePlatform?.());
+    }
 
-        if (enCapacitor) {
-            return localStorage.getItem('grupo5dron_api_url') || (window.CAPACITOR_API_URL || '');
+    function _resolverBaseUrl() {
+        if (esNativo()) {
+            return localStorage.getItem('grupo5dron_api_url') || '';
         }
         return window.location.origin + '/api';
     }
@@ -35,9 +35,12 @@ const API = (() => {
     let _baseUrl = _resolverBaseUrl();
 
     function setBaseUrl(nuevaUrl) {
-        if (!nuevaUrl) return;
-        _baseUrl = nuevaUrl.replace(/\/+$/, '');
-        localStorage.setItem('grupo5dron_api_url', _baseUrl);
+        _baseUrl = (nuevaUrl || '').trim().replace(/\/+$/, '');
+        if (_baseUrl) {
+            localStorage.setItem('grupo5dron_api_url', _baseUrl);
+        } else {
+            localStorage.removeItem('grupo5dron_api_url');
+        }
     }
 
     function getBaseUrl() {
@@ -82,7 +85,10 @@ const API = (() => {
      * @returns {Promise<Object>} Respuesta JSON
      */
     async function peticion(endpoint, opciones = {}) {
-        const url = `${BASE_URL}/${endpoint}`;
+        if (!_baseUrl) {
+            throw new Error('URL del servidor no configurada. Por favor, ingresá la URL del servidor.');
+        }
+        const url = `${_baseUrl}/${endpoint.replace(/^\/+/, '')}`;
         const headers = {
             'Content-Type': 'application/json',
             ...(opciones.headers || {}),
@@ -100,24 +106,36 @@ const API = (() => {
                 headers,
             });
 
-            const datos = await respuesta.json();
+            let datos = {};
+            try {
+                datos = await respuesta.json();
+            } catch (_) {}
 
-            // Si el token expiró, cerrar sesión
-            if (respuesta.status === 401 && estaAutenticado()) {
-                eliminarToken();
-                localStorage.removeItem('grupo5dron_usuario');
-                window.location.hash = '#/login';
-                throw new Error('Sesión expirada. Iniciá sesión nuevamente.');
+            // Si el token expiró con 401 explícito del servidor
+            if ((respuesta.status === 401 || respuesta.status === 403) && estaAutenticado()) {
+                const err = new Error(datos.mensaje || 'Sesión expirada o no autorizada.');
+                err.status = respuesta.status;
+                throw err;
             }
 
             if (!respuesta.ok) {
-                throw new Error(datos.mensaje || `Error HTTP ${respuesta.status}`);
+                const err = new Error(datos.mensaje || `Error HTTP ${respuesta.status}`);
+                err.status = respuesta.status;
+                throw err;
             }
 
             return datos;
         } catch (error) {
-            if (error.name === 'TypeError' && error.message.includes('fetch')) {
-                throw new Error('No se pudo conectar con el servidor. Verificá tu conexión.');
+            if (error.name === 'AbortError') {
+                const err = new Error('Tiempo de espera agotado al conectar con el servidor.');
+                err.name = 'AbortError';
+                err.status = 0;
+                throw err;
+            }
+            if (error.name === 'TypeError' && error.message && error.message.includes('fetch')) {
+                const err = new Error('No se pudo conectar con el servidor. Verificá tu conexión.');
+                err.status = 0;
+                throw err;
             }
             throw error;
         }
@@ -246,5 +264,6 @@ const API = (() => {
         usuarios,
         setBaseUrl,
         getBaseUrl,
+        esNativo,
     };
 })();

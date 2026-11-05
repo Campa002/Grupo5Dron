@@ -369,13 +369,6 @@ function normalizarPlantilla(plantilla) {
                             timeoutMs: timeoutMs
                         });
                         return res?.respuesta || 'ok';
-                    } else if (plugin.sendUdpPacket) {
-                        await plugin.sendUdpPacket({
-                            ip: this.ip,
-                            port: this.puertoComando,
-                            message: cmd
-                        });
-                        return 'ok';
                     }
                 } catch (e) {
                     console.error('[Tello Native Error]', e);
@@ -460,11 +453,11 @@ function normalizarPlantilla(plantilla) {
             // 5. Iniciar bucle RC continuo (15 Hz)
             this.iniciarBucleRC((rc) => {
                 const cmd = `rc ${rc.roll} ${rc.pitch} ${rc.throttle} ${rc.yaw}`;
-                if (this.tienePluginNativo() && window.Capacitor.Plugins.DronNative.sendUdpPacket) {
-                    window.Capacitor.Plugins.DronNative.sendUdpPacket({
-                        ip: this.ip,
-                        port: this.puertoComando,
-                        message: cmd
+                if (this.tienePluginNativo() && window.Capacitor.Plugins.DronNative.enviarSinRespuesta) {
+                    window.Capacitor.Plugins.DronNative.enviarSinRespuesta({
+                        host: this.ip,
+                        puerto: this.puertoComando,
+                        mensaje: cmd
                     });
                 } else {
                     // En modo emulado no spamear console
@@ -543,154 +536,7 @@ function normalizarPlantilla(plantilla) {
     }
 
     // ============================================================
-    // 4. ADAPTADOR: Dron HTTP Genérico (Cámaras ESP32-CAM / API REST)
-    // ============================================================
-    class HttpDroneAdapter extends DroneAdapter {
-        constructor(perfil) {
-            super(perfil);
-            this.baseUrl = `http://${perfil.ip || '192.168.1.100'}:${perfil.puerto_comando || 80}`;
-        }
-
-        async peticion(accion, params = {}) {
-            const endpoint = this.plantilla[accion] || `/api/${accion}`;
-            const url = `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
-
-            try {
-                const resp = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(params),
-                    signal: controller.signal,
-                });
-                clearTimeout(timeoutId);
-                return await resp.json().catch(() => ({}));
-            } catch (e) {
-                clearTimeout(timeoutId);
-                throw new Error(`Fallo HTTP en dron (${url}): ${e.message}`);
-            }
-        }
-
-        async conectar() {
-            await this.peticion('conectar');
-            this.conectado = true;
-            this.telemetria.estado = 'conectado (HTTP)';
-            this.notificarTelemetria();
-
-            this.iniciarBucleRC((rc) => {
-                this.peticion('mover', rc).catch(() => {});
-            });
-            return true;
-        }
-
-        async despegar() {
-            await this.peticion('despegar');
-            this.enVuelo = true;
-            this.telemetria.estado = 'en vuelo';
-            this.notificarTelemetria();
-            return true;
-        }
-
-        async aterrizar() {
-            await this.peticion('aterrizar');
-            this.enVuelo = false;
-            this.telemetria.estado = 'aterrizado';
-            this.notificarTelemetria();
-            return true;
-        }
-
-        async detenerEmergencia() {
-            try {
-                await this.peticion('emergencia');
-            } catch (e) {
-                console.error('[HTTP] Error enviando emergencia:', e);
-            }
-            await super.detenerEmergencia();
-            return true;
-        }
-
-        obtenerVideoUrl() {
-            // El stream MJPEG sobre HTTP es soportado de forma nativa por elementos <img>
-            return this.perfil.url_video || `${this.baseUrl}:8080/video`;
-        }
-    }
-
-    // ============================================================
-    // 5. ADAPTADOR: UDP / TCP con Plantillas Configurables
-    // ============================================================
-    class UdpTcpAdapter extends DroneAdapter {
-        constructor(perfil) {
-            super(perfil);
-            this.ip = perfil.ip;
-            this.puerto = perfil.puerto_comando;
-            this.protocolo = (perfil.protocolo || 'UDP').toUpperCase();
-        }
-
-        interpolar(plantillaStr, variables = {}) {
-            if (!plantillaStr) return '';
-            let resultado = plantillaStr;
-            for (const [k, v] of Object.entries(variables)) {
-                resultado = resultado.replaceAll(`{${k}}`, String(v));
-            }
-            return resultado;
-        }
-
-        async enviarTrama(comandoStr) {
-            if (window.Capacitor?.Plugins?.DronNative) {
-                return await window.Capacitor.Plugins.DronNative.sendUdpPacket({
-                    ip: this.ip,
-                    port: this.puerto,
-                    message: comandoStr,
-                });
-            } else {
-                console.log(`[${this.protocolo} Genérico] -> ${this.ip}:${this.puerto} : "${comandoStr}"`);
-                return { success: true };
-            }
-        }
-
-        async conectar() {
-            const cmd = this.interpolar(this.plantilla.conectar || 'connect');
-            await this.enviarTrama(cmd);
-            this.conectado = true;
-            this.telemetria.estado = `conectado (${this.protocolo})`;
-            this.notificarTelemetria();
-
-            this.iniciarBucleRC((rc) => {
-                const cmdRC = this.interpolar(this.plantilla.mover || 'rc {roll} {pitch} {throttle} {yaw}', rc);
-                this.enviarTrama(cmdRC);
-            });
-            return true;
-        }
-
-        async despegar() {
-            const cmd = this.interpolar(this.plantilla.despegar || 'takeoff');
-            await this.enviarTrama(cmd);
-            this.enVuelo = true;
-            this.telemetria.estado = 'en vuelo';
-            this.notificarTelemetria();
-            return true;
-        }
-
-        async aterrizar() {
-            const cmd = this.interpolar(this.plantilla.aterrizar || 'land');
-            await this.enviarTrama(cmd);
-            this.enVuelo = false;
-            this.telemetria.estado = 'aterrizando';
-            this.notificarTelemetria();
-            return true;
-        }
-
-        async detenerEmergencia() {
-            const cmd = this.interpolar(this.plantilla.emergencia || 'emergency');
-            await this.enviarTrama(cmd);
-            await super.detenerEmergencia();
-            return true;
-        }
-    }
-
-    // ============================================================
-    // 6. FACTORY
+    // 4. FACTORY (Exclusivo: DJI Tello y Simulador)
     // ============================================================
     function crearAdaptador(perfil) {
         perfil = normalizarPerfil(perfil);
@@ -699,18 +545,12 @@ function normalizarPlantilla(plantilla) {
             return new SimulatorDroneAdapter({ nombre: 'Simulador por defecto' });
         }
 
-        // Acepta tanto tipo_adaptador (campo interno) como tipo_protocolo (campo de BD/UI)
+        // Acepta tanto tipo_adaptador como tipo_protocolo (tello | simulador)
         const tipo = ((perfil.tipo_adaptador || perfil.tipo_protocolo || 'simulador')).toLowerCase();
 
         switch (tipo) {
             case 'tello':
                 return new TelloAdapter(perfil);
-            case 'http':
-                return new HttpDroneAdapter(perfil);
-            case 'udp_tcp':
-            case 'udp':
-            case 'tcp':
-                return new UdpTcpAdapter(perfil);
             case 'simulador':
             default:
                 return new SimulatorDroneAdapter(perfil);
@@ -723,8 +563,6 @@ function normalizarPlantilla(plantilla) {
         DroneAdapter,
         SimulatorDroneAdapter,
         TelloAdapter,
-        HttpDroneAdapter,
-        UdpTcpAdapter,
         normalizarPlantilla,
     };
 })();

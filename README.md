@@ -27,14 +27,17 @@ Grupo5Dron/
 │   ├── api/                       # Endpoints REST (auth, dispositivos, esp32, etc.)
 │   ├── config/                    # Configuración de base de datos y credenciales
 │   ├── includes/                  # Middleware JWT, seguridad HTTP y helpers
-│   ├── public/                    # DocumentRoot público (index.php, CSS, JS, pages)
+│   ├── public/                    # DocumentRoot público (index.php, CSS, JS, libs, pages)
 │   └── sql/                       # Esquema relacional MySQL / MariaDB (schema.sql)
-├── firmware/                      # Código C++ para microcontrolador ESP32
-│   ├── platformio.ini             # Configuración PlatformIO
-│   ├── src/                       # Código fuente (WiFi, HTTPS, IR, Relé, main.cpp)
-│   └── tests/                     # Banco de pruebas de hardware sin servidor
-├── scripts/                       # Utilidades auxiliares (generador de hash, íconos)
-└── docs/                          # Documentación técnica y manuales (Etapa 5)
+├── capacitor/                     # Configuración y plugin nativo para APK Android
+│   ├── android_plugin/            # Plugin Java nativo DronNativePlugin.java
+│   ├── capacitor.config.json      # Configuración de Capacitor 5
+│   └── network_security_config.xml# Reglas de tráfico cleartext (192.168.10.1)
+├── posibles-implementaciones/     # Módulos desacoplados y herramientas archivadas
+│   ├── aula-esp32/firmware/       # Firmware PlatformIO en C++ para ESP32
+│   ├── herramientas/              # Scripts auxiliares de desarrollo local
+│   └── adaptadores-genericos/     # Adaptadores HTTP y UDP/TCP genéricos
+└── scripts/                       # Scripts activos (build-apk.js, check_js.py, check_refs.py, generar_hash.php)
 ```
 
 ---

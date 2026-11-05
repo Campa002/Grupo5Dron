@@ -19,6 +19,18 @@ const ConfigDron = (() => {
 
     const CACHE_KEY = 'grupo5dron_perfiles_cache';
 
+    const PERFIL_DEFAULT_TELLO = {
+        id: 'tello-default',
+        nombre: 'DJI Tello (Oficial)',
+        tipo_protocolo: 'tello',
+        tipo_adaptador: 'tello',
+        ip_dron: '192.168.10.1',
+        puerto_cmd: 8889,
+        puerto_estado: 8890,
+        puerto_video: 11111,
+        descripcion: 'Perfil por defecto para vuelo offline con DJI Tello.'
+    };
+
     // ----------------------------------------------------------------
     // Caché local
     // ----------------------------------------------------------------
@@ -44,7 +56,7 @@ const ConfigDron = (() => {
     }
 
     function perfilActivoId() {
-        return localStorage.getItem('grupo5dron_perfil_activo') || null;
+        return localStorage.getItem('grupo5dron_perfil_activo') || 'tello-default';
     }
 
     function guardarPerfilActivo(id) {
@@ -67,12 +79,15 @@ const ConfigDron = (() => {
         try {
             const resp = await API.perfilesDron.listar();
             const perfiles = resp.datos || resp.data || [];
-            guardarCache(perfiles);
-            return perfiles;
+            if (perfiles && perfiles.length > 0) {
+                guardarCache(perfiles);
+                return perfiles;
+            }
         } catch (err) {
             console.warn('[ConfigDron] No se pudo cargar desde la API, usando caché:', err.message);
-            return leerCache() || [];
         }
+        const cache = leerCache();
+        return (cache && cache.length > 0) ? cache : [PERFIL_DEFAULT_TELLO];
     }
 
     /**
@@ -81,6 +96,14 @@ const ConfigDron = (() => {
      * @returns {Promise<Object|null>}
      */
     async function cargarPerfil(id) {
+        if (!id || id === 'tello-default') {
+            const cache = leerCache();
+            if (cache) {
+                const local = cache.find(p => String(p.id) === 'tello-default');
+                if (local) return local;
+            }
+            return PERFIL_DEFAULT_TELLO;
+        }
         // Intentar desde caché primero para respuesta rápida
         const cache = leerCache();
         if (cache) {
@@ -142,6 +165,20 @@ const ConfigDron = (() => {
                 </div>
                 ${esAdmin ? `<button id="btn-nuevo-perfil" class="btn btn--primario">➕ Nuevo perfil</button>` : ''}
             </div>
+
+            <!-- Failsafe configurable -->
+            <div class="tarjeta mb-md">
+                <h3 class="texto-sm font-semibold texto-secundario mb-xs">⏱️ Failsafe de Seguridad (Telemetría UDP 8890)</h3>
+                <p class="texto-xs texto-secundario mb-sm">
+                    Tiempo máximo sin recibir paquetes de telemetría antes de frenar y aterrizar automáticamente el dron.
+                </p>
+                <div class="flex items-center gap-sm flex-wrap">
+                    <input type="number" id="input-failsafe-timeout" class="campo-formulario__entrada" style="width:120px;" min="1000" max="30000" step="500" value="3500">
+                    <span class="texto-xs texto-secundario">ms (1000 a 30000 ms, por defecto 3500)</span>
+                    <button id="btn-guardar-failsafe" class="btn btn--secundario texto-xs">Guardar Timeout</button>
+                </div>
+            </div>
+
             <div id="config-dron-contenido">
                 <div class="cargando"><div class="cargando__spinner"></div><p>Cargando perfiles...</p></div>
             </div>
@@ -285,7 +322,7 @@ const ConfigDron = (() => {
 
     function _formularioPerfil(perfil) {
         const p = perfil || {};
-        const tipos = ['tello', 'http', 'udp_tcp', 'simulador'];
+        const tipos = ['tello', 'simulador'];
         const opcionesTipo = tipos.map(t =>
             `<option value="${t}" ${p.tipo_protocolo === t ? 'selected' : ''}>${t}</option>`
         ).join('');
@@ -443,6 +480,21 @@ const ConfigDron = (() => {
             contenedor.querySelector('#btn-nuevo-perfil')
                 ?.addEventListener('click', () => _abrirModalPerfil(contenedor, null));
         }
+
+        const inputTimeout = contenedor.querySelector('#input-failsafe-timeout');
+        const btnFailsafe = contenedor.querySelector('#btn-guardar-failsafe');
+        if (inputTimeout) {
+            inputTimeout.value = localStorage.getItem('grupo5dron_failsafe_timeout_ms') || '3500';
+        }
+        btnFailsafe?.addEventListener('click', () => {
+            const ms = parseInt(inputTimeout?.value, 10);
+            if (ms && ms >= 1000 && ms <= 30000) {
+                localStorage.setItem('grupo5dron_failsafe_timeout_ms', String(ms));
+                App.mostrarToast(`Timeout de failsafe configurado en ${ms} ms`, 'exito');
+            } else {
+                App.mostrarToast('El timeout debe estar entre 1000 y 30000 ms.', 'advertencia');
+            }
+        });
     }
 
     // ----------------------------------------------------------------

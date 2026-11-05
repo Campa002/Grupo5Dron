@@ -133,8 +133,9 @@ const App = (() => {
         const rutasValidas = ['login', 'inicio', 'aula', 'dron', 'sensores', 'config-dron', 'admin', 'acerca', 'prueba-tello'];
         const destino = rutasValidas.includes(ruta) ? ruta : 'inicio';
 
-        // 1. Control de autenticación
-        const estaAutenticado = API.estaAutenticado();
+        // 1. Control de autenticación (permite usuario cacheado sin conexión)
+        const estaAutenticado = API.estaAutenticado() || !!Auth.obtenerUsuario();
+        const esOffline = Auth.esModoSinConexion();
 
         if (!estaAutenticado && destino !== 'login') {
             window.location.hash = '#/login';
@@ -142,6 +143,13 @@ const App = (() => {
         }
 
         if (estaAutenticado && destino === 'login') {
+            window.location.hash = '#/inicio';
+            return;
+        }
+
+        // Sin conexión: aula y admin exigen sesión válida conectada
+        if (esOffline && (destino === 'aula' || destino === 'admin')) {
+            mostrarToast('El aula y administración requieren conexión activa con el servidor.', 'advertencia');
             window.location.hash = '#/inicio';
             return;
         }
@@ -167,16 +175,21 @@ const App = (() => {
         const btnUsuario = document.getElementById('btn-usuario');
         const indicadorEsp = document.getElementById('indicador-esp32');
 
+        const indicadorOffline = document.getElementById('indicador-offline');
         if (destino === 'login') {
             document.body.classList.add('pantalla-login');
             if (btnMenu) btnMenu.style.visibility = 'hidden';
             if (btnUsuario) btnUsuario.style.visibility = 'hidden';
             if (indicadorEsp) indicadorEsp.style.display = 'none';
+            if (indicadorOffline) indicadorOffline.style.display = 'none';
         } else {
             document.body.classList.remove('pantalla-login');
             if (btnMenu) btnMenu.style.visibility = 'visible';
             if (btnUsuario) btnUsuario.style.visibility = 'visible';
             if (indicadorEsp) indicadorEsp.style.display = 'flex';
+            if (indicadorOffline) {
+                indicadorOffline.style.display = esOffline ? 'inline-flex' : 'none';
+            }
         }
 
         // 5. Cargar plantilla en el contenedor principal
@@ -298,9 +311,13 @@ const App = (() => {
             elemRol.className = `badge badge--${usuario.rol === 'admin' ? 'advertencia' : (usuario.rol === 'docente' ? 'info' : 'exito')}`;
         }
 
-        // Consultar estado rápido del ESP32 para el resumen
+        // Consultar estado rápido del ESP32 para el resumen (omitir si está offline)
         const elemEsp32 = document.getElementById('inicio-esp32-resumen');
         if (elemEsp32) {
+            if (Auth.esModoSinConexion()) {
+                elemEsp32.innerHTML = '<span class="texto-xs texto-secundario">Modo sin conexión. Estado del ESP32 no disponible.</span>';
+                return;
+            }
             try {
                 const resp = await API.esp32.estado();
                 const estado = resp.estado;
@@ -442,6 +459,7 @@ const App = (() => {
      */
         /**
      * Inicializa la vista de prueba y diagnóstico directo con DJI Tello.
+     * Incluye panel completo de diagnóstico para pruebas de campo.
      */
     function inicializarPaginaPruebaTello(contenedor) {
         const badge = contenedor.querySelector('#tello-entorno-badge');
@@ -455,7 +473,61 @@ const App = (() => {
         const btnCustom = contenedor.querySelector('#btn-tello-custom');
         const btnLimpiar = contenedor.querySelector('#btn-limpiar-log-tello');
 
+        // Elementos del panel de diagnóstico
+        const btnEjecutarDiag = contenedor.querySelector('#btn-ejecutar-diagnostico');
+        const btnCopiarDiag = contenedor.querySelector('#btn-copiar-diagnostico');
+        const btnLimpiarErrores = contenedor.querySelector('#btn-limpiar-errores-diag');
+        const diagPlugin = contenedor.querySelector('#diag-plugin-info');
+        const diagWifi = contenedor.querySelector('#diag-wifi-status');
+        const diagWebCodecs = contenedor.querySelector('#diag-webcodecs-status');
+        const diagLatencia = contenedor.querySelector('#diag-latencia-cmd');
+        const diagTelemetria = contenedor.querySelector('#diag-telemetria-pps');
+        const diagVideoBytes = contenedor.querySelector('#diag-video-bytes');
+        const diagApiUrl = contenedor.querySelector('#diag-api-url');
+        const diagConexion = contenedor.querySelector('#diag-conexion-estado');
+        const diagUserAgent = contenedor.querySelector('#diag-user-agent');
+        const diagErroresBox = contenedor.querySelector('#diag-errores-salida');
+        const textareaRespaldo = contenedor.querySelector('#diag-textarea-respaldo');
+
         const tieneNativo = !!(window.Capacitor?.Plugins?.DronNative);
+        const plugin = tieneNativo ? window.Capacitor.Plugins.DronNative : null;
+
+        // Estado del diagnóstico
+        const estadoDiag = {
+            pluginInfo: 'No detectado',
+            wifi: 'Pendiente',
+            webCodecs: 'Verificando...',
+            latencias: { command: '--', battery: '--' },
+            telemetriaPPS: 0,
+            ultimaTelemetria: 'Ninguna',
+            totalBytesVideo: 0,
+            apiUrl: API.getBaseUrl() || '(no configurada)',
+            modoSinConexion: Auth.esModoSinConexion() ? 'Modo sin conexión' : 'Conectado a servidor',
+            userAgent: navigator.userAgent,
+            errores: []
+        };
+
+        function registrarError(err) {
+            const hora = new Date().toLocaleTimeString();
+            const msg = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
+            estadoDiag.errores.push(`[${hora}] ${msg}`);
+            if (estadoDiag.errores.length > 20) {
+                estadoDiag.errores.shift();
+            }
+            if (diagErroresBox) {
+                diagErroresBox.textContent = estadoDiag.errores.join('\n');
+            }
+        }
+
+        // Monitoreo de telemetría y PPS (puerto 8890)
+        let conteoPaquetesTelemetria = 0;
+        let intervaloPPS = setInterval(() => {
+            estadoDiag.telemetriaPPS = conteoPaquetesTelemetria;
+            conteoPaquetesTelemetria = 0;
+            if (diagTelemetria) {
+                diagTelemetria.textContent = `${estadoDiag.telemetriaPPS} pps | ${estadoDiag.ultimaTelemetria.slice(0, 35)}`;
+            }
+        }, 1000);
 
         if (badge) {
             if (tieneNativo) {
@@ -482,29 +554,110 @@ const App = (() => {
             const puerto = parseInt(puertoInput?.value, 10) || 8889;
 
             agregarLog('tx', `Comando: "${cmd}" -> ${ip}:${puerto}`);
+            const tInicio = performance.now();
 
-            if (tieneNativo) {
-                const plugin = window.Capacitor.Plugins.DronNative;
+            if (tieneNativo && plugin?.enviarComando) {
                 try {
-                    let resp = 'ok';
-                    if (plugin.enviarComando) {
-                        const r = await plugin.enviarComando({ host: ip, puerto: puerto, mensaje: cmd, timeoutMs: 5000 });
-                        resp = r?.respuesta || 'ok';
-                    } else if (plugin.sendUdpPacket) {
-                        await plugin.sendUdpPacket({ ip: ip, port: puerto, message: cmd });
-                    }
-                    agregarLog('rx', `Respuesta: "${resp}"`);
+                    const r = await plugin.enviarComando({ host: ip, puerto: puerto, mensaje: cmd, timeoutMs: 5000 });
+                    const tTotal = Math.round(performance.now() - tInicio);
+                    const resp = r?.respuesta || 'ok';
+                    agregarLog('rx', `Respuesta: "${resp}" (${tTotal} ms)`);
+                    if (cmd === 'command') estadoDiag.latencias.command = `${resp} (${tTotal} ms)`;
+                    if (cmd === 'battery?') estadoDiag.latencias.battery = `${resp}% (${tTotal} ms)`;
+                    actualizarUIResumen();
                 } catch (err) {
-                    agregarLog('rx', `❌ Error: ${err.message || err}`);
+                    const tTotal = Math.round(performance.now() - tInicio);
+                    agregarLog('rx', `❌ Error: ${err.message || err} (${tTotal} ms)`);
+                    registrarError(`Comando "${cmd}": ${err.message || err}`);
                 }
             } else {
-                await new Promise(r => setTimeout(r, 400));
+                await new Promise(r => setTimeout(r, 200));
+                const tTotal = Math.round(performance.now() - tInicio);
                 let respSim = 'ok';
-                if (cmd === 'battery?') respSim = '85 (batería simulada al 85%)';
-                agregarLog('rx', `[Simulado] Respuesta: "${respSim}"`);
+                if (cmd === 'battery?') respSim = '85 (simulado 85%)';
+                agregarLog('rx', `[Simulado] Respuesta: "${respSim}" (${tTotal} ms)`);
+                if (cmd === 'command') estadoDiag.latencias.command = `${respSim} (${tTotal} ms)`;
+                if (cmd === 'battery?') estadoDiag.latencias.battery = `${respSim} (${tTotal} ms)`;
+                actualizarUIResumen();
             }
         }
 
+        async function ejecutarDiagnosticoCompleto() {
+            if (diagPlugin) diagPlugin.textContent = 'Consultando...';
+            if (diagWifi) diagWifi.textContent = 'Vinculando...';
+
+            // 1. Info del Plugin Nativo
+            if (tieneNativo && plugin?.info) {
+                try {
+                    const inf = await plugin.info();
+                    estadoDiag.pluginInfo = `v${inf.version || '2.0'} (Android SDK ${inf.sdkAndroid || 'N/A'}, Red: ${inf.redVinculada ? 'OK' : 'No'})`;
+                } catch (e) {
+                    estadoDiag.pluginInfo = `Error info: ${e.message}`;
+                    registrarError(e);
+                }
+            } else {
+                estadoDiag.pluginInfo = 'No disponible (navegador / emulador web)';
+            }
+
+            // 2. Vincular Red Wi-Fi
+            if (tieneNativo && plugin?.vincularRedWifi) {
+                try {
+                    const resW = await plugin.vincularRedWifi();
+                    estadoDiag.wifi = resW.vinculada ? `✓ Vinculada (${resW.motivo || 'OK'})` : `✗ No vinculada (${resW.motivo || 'Timeout'})`;
+                } catch (e) {
+                    estadoDiag.wifi = `Error: ${e.message}`;
+                    registrarError(`vincularRedWifi: ${e.message}`);
+                }
+            } else {
+                estadoDiag.wifi = 'Nativo no disponible (Web)';
+            }
+
+            // 3. Soporte de WebCodecs
+            if (typeof VideoDecoder !== 'undefined') {
+                try {
+                    const configH264 = {
+                        codec: 'avc1.42001e', // Baseline Level 3.0 (DJI Tello H.264)
+                        codedWidth: 960,
+                        codedHeight: 720
+                    };
+                    if (VideoDecoder.isConfigSupported) {
+                        const sop = await VideoDecoder.isConfigSupported(configH264);
+                        estadoDiag.webCodecs = sop.supported ? '✓ Soportado (avc1.42001e)' : '✗ No soportado por hardware';
+                    } else {
+                        estadoDiag.webCodecs = '✓ VideoDecoder presente';
+                    }
+                } catch (e) {
+                    estadoDiag.webCodecs = `Error al verificar: ${e.message}`;
+                }
+            } else {
+                estadoDiag.webCodecs = '✗ VideoDecoder no soportado en este WebView';
+            }
+
+            // 4. API, Conexión y UserAgent
+            estadoDiag.apiUrl = API.getBaseUrl() || '(no configurada)';
+            estadoDiag.modoSinConexion = Auth.esModoSinConexion() ? 'Modo sin conexión' : 'Conectado a servidor';
+            estadoDiag.userAgent = navigator.userAgent;
+
+            actualizarUIResumen();
+            agregarLog('info', 'Diagnóstico general completado.');
+        }
+
+        function actualizarUIResumen() {
+            if (diagPlugin) diagPlugin.textContent = estadoDiag.pluginInfo;
+            if (diagWifi) diagWifi.textContent = estadoDiag.wifi;
+            if (diagWebCodecs) diagWebCodecs.textContent = estadoDiag.webCodecs;
+            if (diagLatencia) {
+                diagLatencia.textContent = `cmd: ${estadoDiag.latencias.command} | bat: ${estadoDiag.latencias.battery}`;
+            }
+            if (diagVideoBytes) {
+                diagVideoBytes.textContent = `${estadoDiag.totalBytesVideo.toLocaleString()} bytes`;
+            }
+            if (diagApiUrl) diagApiUrl.textContent = estadoDiag.apiUrl;
+            if (diagConexion) diagConexion.textContent = estadoDiag.modoSinConexion;
+            if (diagUserAgent) diagUserAgent.textContent = estadoDiag.userAgent;
+        }
+
+        // Eventos de botones
         btnCmd?.addEventListener('click', () => enviarPrueba('command'));
         btnBat?.addEventListener('click', () => enviarPrueba('battery?'));
         btnStream?.addEventListener('click', () => enviarPrueba('streamon'));
@@ -515,15 +668,85 @@ const App = (() => {
         btnLimpiar?.addEventListener('click', () => {
             if (logBox) logBox.textContent = 'Consola limpia. Listo para nuevas pruebas.';
         });
+        btnEjecutarDiag?.addEventListener('click', ejecutarDiagnosticoCompleto);
+        btnLimpiarErrores?.addEventListener('click', () => {
+            estadoDiag.errores = [];
+            if (diagErroresBox) diagErroresBox.textContent = 'Sin errores registrados.';
+        });
 
-        // Escuchar telemetría nativa si está activa
-        if (tieneNativo) {
+        // Botón Copiar Informe
+        btnCopiarDiag?.addEventListener('click', async () => {
+            const fecha = new Date().toLocaleString();
+            const informe = [
+                '========================================',
+                '📋 INFORME DE DIAGNÓSTICO — GRUPO 5 DRON',
+                `Fecha y Hora: ${fecha}`,
+                '========================================',
+                `• Plugin DronNative:     ${estadoDiag.pluginInfo}`,
+                `• Red Wi-Fi Vinculada:   ${estadoDiag.wifi}`,
+                `• Soporte WebCodecs:     ${estadoDiag.webCodecs}`,
+                `• Latencia "command":    ${estadoDiag.latencias.command}`,
+                `• Latencia "battery?":   ${estadoDiag.latencias.battery}`,
+                `• Telemetría (UDP 8890): ${estadoDiag.telemetriaPPS} pps`,
+                `• Última telemetría:     ${estadoDiag.ultimaTelemetria}`,
+                `• Video (UDP 11111):     ${estadoDiag.totalBytesVideo} bytes recibidos`,
+                `• Base API URL:          ${estadoDiag.apiUrl}`,
+                `• Modo de Sesión:        ${estadoDiag.modoSinConexion}`,
+                `• WebView / UserAgent:   ${estadoDiag.userAgent}`,
+                '----------------------------------------',
+                'ÚLTIMOS ERRORES REGISTRADOS:',
+                estadoDiag.errores.length ? estadoDiag.errores.join('\n') : 'Ninguno.',
+                '========================================'
+            ].join('\n');
+
+            let copiado = false;
+            if (navigator.clipboard?.writeText) {
+                try {
+                    await navigator.clipboard.writeText(informe);
+                    copiado = true;
+                } catch (_) {}
+            }
+
+            if (!copiado && textareaRespaldo) {
+                try {
+                    textareaRespaldo.value = informe;
+                    textareaRespaldo.select();
+                    document.execCommand('copy');
+                    copiado = true;
+                } catch (_) {}
+            }
+
+            if (copiado) {
+                App.mostrarToast('📋 Informe copiado al portapapeles', 'exito');
+            } else {
+                App.mostrarToast('No se pudo copiar automáticamente. Revisá los permisos.', 'advertencia');
+            }
+        });
+
+        // Listeners nativos para telemetría y video
+        if (tieneNativo && plugin) {
             try {
-                window.Capacitor.Plugins.DronNative.addListener('telemetria', (data) => {
-                    agregarLog('rx', `Telemetría recibida: ${data.raw || data.mensaje}`);
+                plugin.addListener('telemetria', (data) => {
+                    const raw = data.raw || data.mensaje || '';
+                    conteoPaquetesTelemetria++;
+                    estadoDiag.ultimaTelemetria = raw;
+                    agregarLog('rx', `Telemetría: ${raw.slice(0, 50)}...`);
                 });
-            } catch (e) {}
+
+                plugin.addListener('videoPaquete', (data) => {
+                    const tam = data.tamano || 0;
+                    estadoDiag.totalBytesVideo += tam;
+                    if (diagVideoBytes) {
+                        diagVideoBytes.textContent = `${estadoDiag.totalBytesVideo.toLocaleString()} bytes`;
+                    }
+                });
+            } catch (e) {
+                registrarError(`addListener: ${e.message}`);
+            }
         }
+
+        // Ejecutar diagnóstico inicial
+        ejecutarDiagnosticoCompleto();
     }
 
     async function iniciar() {
@@ -561,12 +784,15 @@ const App = (() => {
             });
         });
 
-        // Verificar sesión activa antes de la primera carga
-        if (API.estaAutenticado()) {
+        // Verificar sesión activa antes de la primera carga con timeout estricto de 3s
+        if (API.estaAutenticado() || Auth.obtenerUsuario()) {
             try {
-                await Auth.verificarSesion();
+                await Promise.race([
+                    Auth.verificarSesion(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+                ]);
             } catch (e) {
-                // Si la sesión no es válida, Auth.verificarSesion ya limpia el token
+                Auth.setModoSinConexion(true);
             }
         }
 

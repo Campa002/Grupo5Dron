@@ -1,21 +1,22 @@
 # Configuración con datos reales (nunca subir)
 backend/config/config.php
-firmware/src/config.h
-firmware/include/config.h
+posibles-implementaciones/aula-esp32/firmware/src/config.h
+posibles-implementaciones/aula-esp32/firmware/include/config.h
 
 # Dependencias
 node_modules/
 vendor/
 
 # Capacitor / Android build
+capacitor/www/
 capacitor/android/
 capacitor/.gradle/
 capacitor/build/
 *.apk
 
 # PlatformIO
-firmware/.pio/
-firmware/.vscode/
+posibles-implementaciones/aula-esp32/firmware/.pio/
+posibles-implementaciones/aula-esp32/firmware/.vscode/
 
 # IDE
 .idea/

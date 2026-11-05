@@ -8,7 +8,7 @@
  * supervisión humana permanente.
  *
  * Modalidades de Detección:
- *  1. Modo 'persona': Detección por IA con TensorFlow.js + COCO-SSD (modelo empaquetado localmente en /vendor/coco-ssd/).
+ *  1. Modo 'persona': Detección por IA con TensorFlow.js + COCO-SSD (modelo empaquetado localmente en ./libs/coco-ssd/).
  *  2. Modo 'color': Respaldo por segmentación de color (offline, sin librerías pesadas), útil para pruebas en clase.
  */
 
@@ -62,7 +62,7 @@ const DronSeguimiento = (() => {
                 try {
                     console.info('[Seguimiento] Intentando cargar modelo COCO-SSD local...');
                     this._modelo = await cocoSsd.load({
-                        modelUrl: '/vendor/coco-ssd/model.json',
+                        modelUrl: './libs/coco-ssd/model.json',
                     });
                     this.modeloCargado = true;
                     this.cargando = false;
@@ -82,7 +82,7 @@ const DronSeguimiento = (() => {
             return {
                 ok: true,
                 modo: 'color',
-                aviso: 'Operando en modo respaldo por color (modelo IA no encontrado en /vendor/coco-ssd/).'
+                aviso: 'Operando en modo respaldo por color (modelo IA no encontrado en ./libs/coco-ssd/).'
             };
         }
 

@@ -30,7 +30,7 @@ if (fs.existsSync(wwwDir)) {
 fs.mkdirSync(wwwDir, { recursive: true });
 
 // Copiar recursos
-['css', 'js', 'img', 'pages', 'vendor'].forEach(d => {
+['css', 'js', 'img', 'pages', 'libs'].forEach(d => {
     const s = path.join(pubDir, d);
     if (fs.existsSync(s)) copiarDirectorioRecursivo(s, path.join(wwwDir, d));
 });

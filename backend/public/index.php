@@ -27,10 +27,7 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
     <link rel="apple-touch-icon" href="/img/icon-192.png">
     <link rel="shortcut icon" href="/favicon.ico">
 
-    <!-- Fuente tipográfica -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tipografía del sistema (offline) -->
 
     <!-- Estilos -->
     <link rel="stylesheet" href="/css/app.css">
@@ -47,6 +44,7 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
                 Control de Sistemas y Dron
             </h1>
             <div class="header__acciones">
+                <span id="indicador-offline" class="badge badge--advertencia" style="display:none; font-size:0.75rem;">📡 Modo sin conexión</span>
                 <span id="indicador-esp32" class="indicador indicador--offline" title="ESP32 desconectado">
                     <span class="indicador__punto"></span>
                     <span class="indicador__texto">ESP32</span>
@@ -104,8 +102,8 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
     <script src="/js/dron-joystick.js"></script>
     <script src="/js/dron-giroscopio.js"></script>
     <!-- ML Local para Seguimiento Visual Autónomo (COCO-SSD) -->
-    <script src="/vendor/tfjs/tf.min.js"></script>
-    <script src="/vendor/coco-ssd/coco-ssd.min.js"></script>
+    <script src="/libs/tfjs/tf.min.js"></script>
+    <script src="/libs/coco-ssd/coco-ssd.min.js"></script>
     <script src="/js/dron-seguimiento.js"></script>
     <script src="/js/dron-video.js"></script>
     <script src="/js/config-dron.js"></script>

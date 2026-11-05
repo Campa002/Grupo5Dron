@@ -155,7 +155,7 @@ DROP TABLE IF EXISTS `perfiles_dron`;
 CREATE TABLE `perfiles_dron` (
     `id`              INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     `nombre`          VARCHAR(100)    NOT NULL,
-    `tipo_adaptador`  VARCHAR(30)     NOT NULL DEFAULT 'simulador' COMMENT 'tello, http, udp_tcp, simulador',
+    `tipo_adaptador`  ENUM('tello', 'simulador') NOT NULL DEFAULT 'tello' COMMENT 'tello, simulador',
     `ip`              VARCHAR(45)     NOT NULL DEFAULT '192.168.10.1',
     `puerto_comando`  INT UNSIGNED    NOT NULL DEFAULT 8889,
     `puerto_video`    INT UNSIGNED    NULL DEFAULT 11111,
@@ -246,12 +246,10 @@ INSERT INTO `codigos_ir` (`boton_id`, `protocolo`, `codigo`, `bits`, `frecuencia
 INSERT INTO `estado_esp32` (`dispositivo_id`, `en_linea`, `version_fw`) VALUES
 ('esp32-principal', 0, '1.0.0');
 
--- Perfiles de dron
+-- Perfiles de dron (Exclusivo: tello | simulador)
 INSERT INTO `perfiles_dron` (`nombre`, `tipo_adaptador`, `ip`, `puerto_comando`, `puerto_video`, `protocolo`, `url_video`, `formato_video`, `plantilla_comandos`) VALUES
 ('DJI Tello (referencia)', 'tello', '192.168.10.1', 8889, 11111, 'UDP', NULL, 'H264',
  '{"conectar":"command","despegar":"takeoff","aterrizar":"land","emergencia":"emergency","arriba":"up {dist}","abajo":"down {dist}","izquierda":"left {dist}","derecha":"right {dist}","adelante":"forward {dist}","atras":"back {dist}","rotar_izq":"ccw {deg}","rotar_der":"cw {deg}","velocidad":"speed {vel}","bateria":"battery?","estado":"state?"}'),
-('Dron HTTP genérico', 'http', '192.168.1.100', 80, 0, 'HTTP', 'http://192.168.1.100:8080/video', 'MJPEG',
- '{"conectar":"/api/connect","despegar":"/api/takeoff","aterrizar":"/api/land","emergencia":"/api/emergency","mover":"/api/move"}'),
 ('Simulador de prueba', 'simulador', '127.0.0.1', 0, 0, 'UDP', NULL, NULL, NULL);
 
 -- Configuración general

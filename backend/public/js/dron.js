@@ -204,7 +204,11 @@ let _modoSeguimiento = false; // Seguimiento activo (OFF por defecto)
     // Watchdog de conexión
     // ----------------------------------------------------------------
 
-    const TIMEOUT_TELEMETRIA_FAILSAFE_MS = 3500; // 3.5 segundos sin telemetría UDP 8890
+    function _obtenerTimeoutFailsafe() {
+        const val = parseInt(localStorage.getItem('grupo5dron_failsafe_timeout_ms'), 10);
+        return (val && val >= 1000 && val <= 30000) ? val : 3500;
+    }
+
     let _failsafeActivado = false;
 
     function _iniciarWatchdog() {
@@ -215,13 +219,14 @@ let _modoSeguimiento = false; // Seguimiento activo (OFF por defecto)
             if (!_adaptador || !_adaptador.conectado) return;
             const ahora = Date.now();
             const tiempoSinTelemetria = ahora - _ultimaRespuesta;
+            const timeoutFailsafe = _obtenerTimeoutFailsafe();
 
             // Failsafe de seguridad en vuelo:
-            // Si pasan >3.5 s sin telemetría del puerto 8890 durante el vuelo:
+            // Si pasa más tiempo del timeout sin telemetría del puerto 8890 durante el vuelo:
             // 1. Detener movimiento enviando rc 0 0 0 0
             // 2. Ejecutar aterrizaje automático (land)
             // 3. Notificar visiblemente al usuario
-            if (tiempoSinTelemetria > TIMEOUT_TELEMETRIA_FAILSAFE_MS && _adaptador.enVuelo && !_failsafeActivado) {
+            if (tiempoSinTelemetria > timeoutFailsafe && _adaptador.enVuelo && !_failsafeActivado) {
                 _failsafeActivado = true;
                 console.warn(`[Dron Failsafe] ⚠ Sin telemetría en puerto 8890 por ${(tiempoSinTelemetria/1000).toFixed(1)} s. Ejecutando failsafe...`);
 

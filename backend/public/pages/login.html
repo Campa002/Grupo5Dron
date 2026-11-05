@@ -4,6 +4,18 @@
         <h2 class="login-form__titulo">Grupo 5</h2>
         <p class="login-form__subtitulo">Control de Sistemas y Dron — EEST N° 1</p>
 
+        <div id="aviso-offline-login" class="alerta alerta--advertencia mb-md" style="display:none; font-size:0.85rem;">
+            ⚠️ El primer ingreso requiere conexión a internet para autenticar con el servidor.
+        </div>
+
+        <div id="contenedor-api-url" class="campo mb-md" style="display:none;">
+            <label class="campo__label" for="login-api-url">URL del servidor</label>
+            <input class="campo__input" id="login-api-url" type="url" placeholder="https://mihosting.com/api" autocomplete="url">
+            <span class="campo-formulario__ayuda" style="font-size:0.75rem; color:var(--color-texto-secundario); display:block; margin-top:4px;">
+                Ingresá la dirección base de la API del servidor (requerido en APK).
+            </span>
+        </div>
+
         <div class="campo mb-md">
             <label class="campo__label" for="login-email">Correo electrónico</label>
             <input class="campo__input" id="login-email" type="email" placeholder="usuario@grupo5dron.local" required autocomplete="email">
