@@ -27,9 +27,6 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 4. Configurar Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: 5. Preparar www/ estático
         run: |
           node scripts/build-apk.js
