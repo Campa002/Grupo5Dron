@@ -8,6 +8,38 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Chequeos rápidos de sintaxis y referencias. Corre en paralelo con el build:
+  # si falla, el APK igual se compila, pero el commit queda marcado en rojo.
+  verificar:
+    name: Verificar sintaxis y referencias
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Sintaxis JavaScript (node --check)
+        run: |
+          for f in backend/public/js/*.js backend/public/sw.js scripts/*.js; do
+            node --check "$f" || exit 1
+          done
+          echo "JS OK"
+
+      - name: Sintaxis PHP (php -l)
+        run: |
+          php -v
+          find backend scripts -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Balance de llaves y referencias a archivos
+        run: |
+          python3 scripts/check_js.py
+          python3 scripts/check_refs.py
+
   build-apk:
     name: Compilar APK Debug
     runs-on: ubuntu-latest

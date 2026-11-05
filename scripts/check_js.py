@@ -1,4 +1,5 @@
 import glob
+import sys
 import re
 
 def check_brackets(content):
@@ -122,7 +123,12 @@ def check_brackets(content):
     return 'SINTAXIS CORRECTA'
 
 if __name__ == '__main__':
+    errores = 0
     for f in sorted(glob.glob('backend/public/js/*.js')):
         with open(f, 'r', encoding='utf-8') as js:
             res = check_brackets(js.read())
             print(f'{f}: {res}')
+            if res != 'SINTAXIS CORRECTA':
+                errores += 1
+    # Código de salida distinto de 0 si algún archivo falla (lo usa el job "verificar" de CI)
+    sys.exit(1 if errores else 0)

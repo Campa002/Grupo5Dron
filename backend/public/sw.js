@@ -5,7 +5,7 @@
  * y actualización en segundo plano.
  */
 
-const CACHE_NAME = 'grupo5dron-v3';
+const CACHE_NAME = 'grupo5dron-v4';
 
 // Recursos estáticos confirmados para precaché inicial
 const RECURSOS_ESTATICOS = [

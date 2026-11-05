@@ -14,6 +14,15 @@ const App = (() => {
     // Página activa actual
     let paginaActual = null;
 
+    // Función de limpieza de la página activa (por ejemplo, cerrar escuchas UDP de Prueba Tello)
+    let limpiezaPaginaActual = null;
+
+    // Número de navegación: si llega otra mientras esta espera, esta se abandona
+    let navegacionActual = 0;
+
+    // Rutas permitidas en el modo "dron sin cuenta"
+    const RUTAS_SIN_CUENTA = ['dron', 'prueba-tello', 'sensores', 'config-dron', 'acerca'];
+
     /**
      * Muestra una notificación emergente (Toast) en pantalla.
      * 
@@ -135,10 +144,22 @@ const App = (() => {
 
         // 1. Control de autenticación (permite usuario cacheado sin conexión)
         const estaAutenticado = API.estaAutenticado() || !!Auth.obtenerUsuario();
+        const invitado = !estaAutenticado && Auth.esModoInvitado();
         const esOffline = Auth.esModoSinConexion();
 
-        if (!estaAutenticado && destino !== 'login') {
+        if (!estaAutenticado && !invitado && destino !== 'login') {
             window.location.hash = '#/login';
+            return;
+        }
+
+        // Modo dron sin cuenta: solo las pantallas del dron
+        if (invitado && destino !== 'login' && !RUTAS_SIN_CUENTA.includes(destino)) {
+            if (destino === 'inicio') {
+                window.location.hash = '#/dron';
+            } else {
+                mostrarToast('El aula y la administración requieren iniciar sesión.', 'advertencia');
+                window.location.hash = '#/login';
+            }
             return;
         }
 
@@ -161,15 +182,32 @@ const App = (() => {
             return;
         }
 
-        // 3. Limpieza de página anterior si corresponde
+        // 3. Salir de la cabina con el dron en el aire: confirmar y aterrizar
+        if (paginaActual === 'dron' && destino !== 'dron' && typeof Dron !== 'undefined' && Dron.estaEnVuelo && Dron.estaEnVuelo()) {
+            if (!confirm('El dron está en vuelo.\n\n¿Aterrizar y salir de la cabina?\n(Cancelar = quedarse en la cabina)')) {
+                history.replaceState(null, '', '#/dron');
+                return;
+            }
+        }
+
+        const miNavegacion = ++navegacionActual;
+
+        // 4. Limpieza de página anterior si corresponde
         if (paginaActual === 'aula' && typeof Aula !== 'undefined' && Aula.destruir) {
             Aula.destruir();
         }
         if (paginaActual === 'dron' && typeof Dron !== 'undefined' && Dron.destruir) {
-            Dron.destruir();
+            paginaActual = null;
+            await Dron.destruir(); // si estaba en vuelo, aterriza antes de desconectar
         }
+        if (limpiezaPaginaActual) {
+            const limpiar = limpiezaPaginaActual;
+            limpiezaPaginaActual = null;
+            try { await limpiar(); } catch (e) { console.warn('[App] Error limpiando la página anterior:', e); }
+        }
+        if (miNavegacion !== navegacionActual) return;
 
-        // 4. Adaptación visual del layout (header y menú en pantalla de login)
+        // 5. Adaptación visual del layout (header y menú en pantalla de login)
         const header = document.getElementById('header-principal');
         const btnMenu = document.getElementById('btn-menu');
         const btnUsuario = document.getElementById('btn-usuario');
@@ -186,27 +224,31 @@ const App = (() => {
             document.body.classList.remove('pantalla-login');
             if (btnMenu) btnMenu.style.visibility = 'visible';
             if (btnUsuario) btnUsuario.style.visibility = 'visible';
-            if (indicadorEsp) indicadorEsp.style.display = 'flex';
+            if (indicadorEsp) indicadorEsp.style.display = invitado ? 'none' : 'flex';
             if (indicadorOffline) {
-                indicadorOffline.style.display = esOffline ? 'inline-flex' : 'none';
+                indicadorOffline.textContent = invitado ? '🚁 Sin cuenta' : '📡 Modo sin conexión';
+                indicadorOffline.style.display = (invitado || esOffline) ? 'inline-flex' : 'none';
             }
         }
+        const enlaceSesion = document.getElementById('btn-cerrar-sesion');
+        if (enlaceSesion) enlaceSesion.textContent = invitado ? '🔑 Iniciar sesión' : '🚪 Cerrar sesión';
 
-        // 5. Cargar plantilla en el contenedor principal
+        // 6. Cargar plantilla en el contenedor principal
         const contenedor = document.getElementById('app-contenido');
         if (!contenedor) return;
 
         contenedor.innerHTML = '<div class="cargando"><div class="cargando__spinner"></div><p>Cargando...</p></div>';
 
         const html = await cargarPlantilla(destino);
+        if (miNavegacion !== navegacionActual) return;
         contenedor.innerHTML = html;
         paginaActual = destino;
 
-        // 6. Actualizar enlaces activos en menú lateral
+        // 7. Actualizar enlaces activos en menú lateral
         actualizarNavegacionActiva(destino);
         cerrarMenu();
 
-        // 7. Inicializar controlador específico de la página
+        // 8. Inicializar controlador específico de la página
         await inicializarControladorPagina(destino);
     }
 
@@ -283,7 +325,7 @@ const App = (() => {
             case 'prueba-tello': {
                 const contenedorPrueba = document.getElementById('app-contenido');
                 if (contenedorPrueba) {
-                    inicializarPaginaPruebaTello(contenedorPrueba);
+                    limpiezaPaginaActual = inicializarPaginaPruebaTello(contenedorPrueba);
                 }
                 break;
             }
@@ -455,88 +497,67 @@ const App = (() => {
     }
 
     /**
-     * Inicialización global de la aplicación.
-     */
-        /**
-     * Inicializa la vista de prueba y diagnóstico directo con DJI Tello.
-     * Incluye panel completo de diagnóstico para pruebas de campo.
+     * Inicializa la vista de prueba y diagnóstico directo con el DJI Tello.
+     * Abre las escuchas de telemetría (8890) y video (11111) mientras la página está abierta.
+     * @returns {Function} limpieza que cierra escuchas, oyentes e intervalos al salir de la página
      */
     function inicializarPaginaPruebaTello(contenedor) {
-        const badge = contenedor.querySelector('#tello-entorno-badge');
-        const logBox = contenedor.querySelector('#tello-log-salida');
-        const ipInput = contenedor.querySelector('#tello-ip-prueba');
-        const puertoInput = contenedor.querySelector('#tello-puerto-prueba');
-        const cmdInput = contenedor.querySelector('#tello-cmd-custom');
-        const btnCmd = contenedor.querySelector('#btn-tello-cmd');
-        const btnBat = contenedor.querySelector('#btn-tello-bat');
-        const btnStream = contenedor.querySelector('#btn-tello-streamon');
-        const btnCustom = contenedor.querySelector('#btn-tello-custom');
-        const btnLimpiar = contenedor.querySelector('#btn-limpiar-log-tello');
+        const q = sel => contenedor.querySelector(sel);
+        const badge = q('#tello-entorno-badge');
+        const logBox = q('#tello-log-salida');
+        const ipInput = q('#tello-ip-prueba');
+        const puertoInput = q('#tello-puerto-prueba');
+        const cmdInput = q('#tello-cmd-custom');
+        const diagPlugin = q('#diag-plugin-info');
+        const diagWifi = q('#diag-wifi-status');
+        const diagWebCodecs = q('#diag-webcodecs-status');
+        const diagLatencia = q('#diag-latencia-cmd');
+        const diagTelemetria = q('#diag-telemetria-pps');
+        const diagVideoBytes = q('#diag-video-bytes');
+        const diagApiUrl = q('#diag-api-url');
+        const diagConexion = q('#diag-conexion-estado');
+        const diagUserAgent = q('#diag-user-agent');
+        const diagErroresBox = q('#diag-errores-salida');
+        const textareaRespaldo = q('#diag-textarea-respaldo');
 
-        // Elementos del panel de diagnóstico
-        const btnEjecutarDiag = contenedor.querySelector('#btn-ejecutar-diagnostico');
-        const btnCopiarDiag = contenedor.querySelector('#btn-copiar-diagnostico');
-        const btnLimpiarErrores = contenedor.querySelector('#btn-limpiar-errores-diag');
-        const diagPlugin = contenedor.querySelector('#diag-plugin-info');
-        const diagWifi = contenedor.querySelector('#diag-wifi-status');
-        const diagWebCodecs = contenedor.querySelector('#diag-webcodecs-status');
-        const diagLatencia = contenedor.querySelector('#diag-latencia-cmd');
-        const diagTelemetria = contenedor.querySelector('#diag-telemetria-pps');
-        const diagVideoBytes = contenedor.querySelector('#diag-video-bytes');
-        const diagApiUrl = contenedor.querySelector('#diag-api-url');
-        const diagConexion = contenedor.querySelector('#diag-conexion-estado');
-        const diagUserAgent = contenedor.querySelector('#diag-user-agent');
-        const diagErroresBox = contenedor.querySelector('#diag-errores-salida');
-        const textareaRespaldo = contenedor.querySelector('#diag-textarea-respaldo');
+        const DN = DronAdaptadores.DronNativo;
+        const tieneNativo = DN.disponible();
+        const PUERTO_TELEMETRIA = 8890;
+        const PUERTO_VIDEO = 11111;
 
-        const tieneNativo = !!(window.Capacitor?.Plugins?.DronNative);
-        const plugin = tieneNativo ? window.Capacitor.Plugins.DronNative : null;
-
-        // Estado del diagnóstico
         const estadoDiag = {
             pluginInfo: 'No detectado',
             wifi: 'Pendiente',
             webCodecs: 'Verificando...',
             latencias: { command: '--', battery: '--' },
+            escuchas: 'ninguna',
             telemetriaPPS: 0,
+            telemetriaTotal: 0,
             ultimaTelemetria: 'Ninguna',
             totalBytesVideo: 0,
+            totalPaquetesVideo: 0,
             apiUrl: API.getBaseUrl() || '(no configurada)',
-            modoSinConexion: Auth.esModoSinConexion() ? 'Modo sin conexión' : 'Conectado a servidor',
+            modoSesion: '',
             userAgent: navigator.userAgent,
-            errores: []
+            errores: [],
         };
+
+        // Recursos a liberar al salir de la página
+        const oyentes = [];
+        const puertosAbiertos = [];
+        let paginaCerrada = false;
+
+        function textoModoSesion() {
+            if (Auth.esModoInvitado()) return 'Dron sin cuenta';
+            return Auth.esModoSinConexion() ? 'Sin conexión con el servidor (sesión cacheada)' : 'Conectado al servidor';
+        }
 
         function registrarError(err) {
             const hora = new Date().toLocaleTimeString();
             const msg = typeof err === 'string' ? err : (err?.message || JSON.stringify(err));
             estadoDiag.errores.push(`[${hora}] ${msg}`);
-            if (estadoDiag.errores.length > 20) {
-                estadoDiag.errores.shift();
-            }
-            if (diagErroresBox) {
-                diagErroresBox.textContent = estadoDiag.errores.join('\n');
-            }
-        }
-
-        // Monitoreo de telemetría y PPS (puerto 8890)
-        let conteoPaquetesTelemetria = 0;
-        let intervaloPPS = setInterval(() => {
-            estadoDiag.telemetriaPPS = conteoPaquetesTelemetria;
-            conteoPaquetesTelemetria = 0;
-            if (diagTelemetria) {
-                diagTelemetria.textContent = `${estadoDiag.telemetriaPPS} pps | ${estadoDiag.ultimaTelemetria.slice(0, 35)}`;
-            }
-        }, 1000);
-
-        if (badge) {
-            if (tieneNativo) {
-                badge.textContent = '🟢 Plugin Nativo Capacitor Activo';
-                badge.style.color = 'var(--color-exito)';
-            } else {
-                badge.textContent = '🟡 Modo Emulador (Sin Dron Real)';
-                badge.style.color = 'var(--color-advertencia)';
-            }
+            if (estadoDiag.errores.length > 20) estadoDiag.errores.shift();
+            if (diagErroresBox) diagErroresBox.textContent = estadoDiag.errores.join('\n');
         }
 
         function agregarLog(tipo, msg) {
@@ -547,208 +568,191 @@ const App = (() => {
             logBox.scrollTop = logBox.scrollHeight;
         }
 
+        function actualizarUIResumen() {
+            if (diagPlugin) diagPlugin.textContent = estadoDiag.pluginInfo;
+            if (diagWifi) diagWifi.textContent = estadoDiag.wifi;
+            if (diagWebCodecs) diagWebCodecs.textContent = estadoDiag.webCodecs;
+            if (diagLatencia) diagLatencia.textContent = `cmd: ${estadoDiag.latencias.command} | bat: ${estadoDiag.latencias.battery}`;
+            if (diagTelemetria) diagTelemetria.textContent = `${estadoDiag.telemetriaPPS} pps | escuchas: ${estadoDiag.escuchas} | ${estadoDiag.ultimaTelemetria.slice(0, 35)}`;
+            if (diagVideoBytes) diagVideoBytes.textContent = `${estadoDiag.totalBytesVideo.toLocaleString()} bytes (${estadoDiag.totalPaquetesVideo} paquetes UDP)`;
+            if (diagApiUrl) diagApiUrl.textContent = estadoDiag.apiUrl;
+            if (diagConexion) diagConexion.textContent = estadoDiag.modoSesion;
+            if (diagUserAgent) diagUserAgent.textContent = estadoDiag.userAgent;
+        }
+
+        // Paquetes por segundo de telemetría
+        let conteoTelemetria = 0;
+        const intervaloPPS = setInterval(() => {
+            estadoDiag.telemetriaPPS = conteoTelemetria;
+            conteoTelemetria = 0;
+            actualizarUIResumen();
+        }, 1000);
+
+        if (badge) {
+            badge.textContent = tieneNativo ? '🟢 Plugin nativo activo' : '🟡 Navegador: sin plugin nativo (respuestas simuladas)';
+            badge.style.color = tieneNativo ? 'var(--color-exito)' : 'var(--color-advertencia)';
+        }
+
         async function enviarPrueba(cmd) {
             cmd = (cmd || '').trim();
             if (!cmd) return;
             const ip = ipInput?.value?.trim() || '192.168.10.1';
             const puerto = parseInt(puertoInput?.value, 10) || 8889;
-
-            agregarLog('tx', `Comando: "${cmd}" -> ${ip}:${puerto}`);
+            agregarLog('tx', `"${cmd}" -> ${ip}:${puerto}`);
             const tInicio = performance.now();
 
-            if (tieneNativo && plugin?.enviarComando) {
-                try {
-                    const r = await plugin.enviarComando({ host: ip, puerto: puerto, mensaje: cmd, timeoutMs: 5000 });
-                    const tTotal = Math.round(performance.now() - tInicio);
-                    const resp = r?.respuesta || 'ok';
-                    agregarLog('rx', `Respuesta: "${resp}" (${tTotal} ms)`);
-                    if (cmd === 'command') estadoDiag.latencias.command = `${resp} (${tTotal} ms)`;
-                    if (cmd === 'battery?') estadoDiag.latencias.battery = `${resp}% (${tTotal} ms)`;
-                    actualizarUIResumen();
-                } catch (err) {
-                    const tTotal = Math.round(performance.now() - tInicio);
-                    agregarLog('rx', `❌ Error: ${err.message || err} (${tTotal} ms)`);
-                    registrarError(`Comando "${cmd}": ${err.message || err}`);
-                }
+            let respuesta;
+            let error = null;
+            if (tieneNativo) {
+                ({ respuesta, error } = await DN.enviarComando(ip, puerto, cmd, 5000));
             } else {
                 await new Promise(r => setTimeout(r, 200));
-                const tTotal = Math.round(performance.now() - tInicio);
-                let respSim = 'ok';
-                if (cmd === 'battery?') respSim = '85 (simulado 85%)';
-                agregarLog('rx', `[Simulado] Respuesta: "${respSim}" (${tTotal} ms)`);
-                if (cmd === 'command') estadoDiag.latencias.command = `${respSim} (${tTotal} ms)`;
-                if (cmd === 'battery?') estadoDiag.latencias.battery = `${respSim} (${tTotal} ms)`;
-                actualizarUIResumen();
+                respuesta = cmd === 'battery?' ? '85' : 'ok';
             }
+            const ms = Math.round(performance.now() - tInicio);
+            const sim = tieneNativo ? '' : ' [simulado]';
+            agregarLog('rx', `"${respuesta}"${error ? ' (' + error + ')' : ''} en ${ms} ms${sim}`);
+            if (cmd === 'command') estadoDiag.latencias.command = `${respuesta} (${ms} ms)${sim}`;
+            if (cmd === 'battery?') estadoDiag.latencias.battery = `${respuesta}% (${ms} ms)${sim}`;
+            if (tieneNativo && cmd !== 'battery?' && !cmd.endsWith('?') && !DronAdaptadores.esOk(respuesta)) {
+                registrarError(`"${cmd}" respondió "${respuesta}"${error ? ' (' + error + ')' : ''}`);
+            }
+            actualizarUIResumen();
+        }
+
+        async function abrirEscuchas() {
+            if (!tieneNativo) { estadoDiag.escuchas = 'no disponible (navegador)'; return; }
+            oyentes.push(DN.escuchar(DN.EVENTO_TELEMETRIA, (data) => {
+                const raw = String(data?.raw || '').trim();
+                conteoTelemetria++;
+                estadoDiag.telemetriaTotal++;
+                estadoDiag.ultimaTelemetria = raw;
+                if (estadoDiag.telemetriaTotal === 1) agregarLog('rx', `Primera telemetría: ${raw.slice(0, 60)}...`);
+            }));
+            oyentes.push(DN.escuchar(DN.EVENTO_VIDEO, (data) => {
+                estadoDiag.totalBytesVideo += data?.tamano || 0;
+                estadoDiag.totalPaquetesVideo += data?.paquetes || 1;
+            }));
+            for (const p of [PUERTO_TELEMETRIA, PUERTO_VIDEO]) {
+                try {
+                    await DN.iniciarEscucha(p);
+                    if (paginaCerrada) { DN.detenerEscucha(p); continue; }
+                    puertosAbiertos.push(p);
+                } catch (e) {
+                    registrarError(`No se pudo escuchar el puerto ${p}: ${e?.message || e}`);
+                }
+            }
+            estadoDiag.escuchas = puertosAbiertos.join(' y ') || 'ninguna';
+            agregarLog('info', `Escuchando UDP en: ${estadoDiag.escuchas}. Mandá "command" para que el Tello empiece a enviar telemetría.`);
         }
 
         async function ejecutarDiagnosticoCompleto() {
             if (diagPlugin) diagPlugin.textContent = 'Consultando...';
             if (diagWifi) diagWifi.textContent = 'Vinculando...';
 
-            // 1. Info del Plugin Nativo
-            if (tieneNativo && plugin?.info) {
+            if (tieneNativo) {
                 try {
-                    const inf = await plugin.info();
-                    estadoDiag.pluginInfo = `v${inf.version || '2.0'} (Android SDK ${inf.sdkAndroid || 'N/A'}, Red: ${inf.redVinculada ? 'OK' : 'No'})`;
+                    const inf = await DN.info();
+                    estadoDiag.pluginInfo = `v${inf.version || '?'} (Android SDK ${inf.sdkAndroid || '?'}, red vinculada: ${inf.redVinculada ? 'sí' : 'no'})`;
                 } catch (e) {
-                    estadoDiag.pluginInfo = `Error info: ${e.message}`;
+                    estadoDiag.pluginInfo = `Error: ${e.message}`;
                     registrarError(e);
                 }
+                const resW = await DN.vincularRedWifi();
+                estadoDiag.wifi = resW.vinculada ? `✓ Vinculada (${resW.motivo || 'OK'})` : `✗ No vinculada (${resW.motivo || 'sin motivo'})`;
+                if (!resW.vinculada) registrarError(`vincularRedWifi: ${resW.motivo}`);
             } else {
-                estadoDiag.pluginInfo = 'No disponible (navegador / emulador web)';
+                estadoDiag.pluginInfo = 'No disponible (navegador)';
+                estadoDiag.wifi = 'No disponible (navegador)';
             }
 
-            // 2. Vincular Red Wi-Fi
-            if (tieneNativo && plugin?.vincularRedWifi) {
-                try {
-                    const resW = await plugin.vincularRedWifi();
-                    estadoDiag.wifi = resW.vinculada ? `✓ Vinculada (${resW.motivo || 'OK'})` : `✗ No vinculada (${resW.motivo || 'Timeout'})`;
-                } catch (e) {
-                    estadoDiag.wifi = `Error: ${e.message}`;
-                    registrarError(`vincularRedWifi: ${e.message}`);
-                }
-            } else {
-                estadoDiag.wifi = 'Nativo no disponible (Web)';
-            }
-
-            // 3. Soporte de WebCodecs
             if (typeof VideoDecoder !== 'undefined') {
                 try {
-                    const configH264 = {
-                        codec: 'avc1.42001e', // Baseline Level 3.0 (DJI Tello H.264)
-                        codedWidth: 960,
-                        codedHeight: 720
-                    };
-                    if (VideoDecoder.isConfigSupported) {
-                        const sop = await VideoDecoder.isConfigSupported(configH264);
-                        estadoDiag.webCodecs = sop.supported ? '✓ Soportado (avc1.42001e)' : '✗ No soportado por hardware';
-                    } else {
-                        estadoDiag.webCodecs = '✓ VideoDecoder presente';
-                    }
+                    const sop = await VideoDecoder.isConfigSupported({ codec: 'avc1.42001f', codedWidth: 960, codedHeight: 720 });
+                    estadoDiag.webCodecs = sop.supported ? '✓ Soportado (H.264 960x720)' : '✗ H.264 no soportado';
                 } catch (e) {
                     estadoDiag.webCodecs = `Error al verificar: ${e.message}`;
                 }
             } else {
-                estadoDiag.webCodecs = '✗ VideoDecoder no soportado en este WebView';
+                estadoDiag.webCodecs = '✗ WebCodecs no disponible en este WebView';
             }
 
-            // 4. API, Conexión y UserAgent
             estadoDiag.apiUrl = API.getBaseUrl() || '(no configurada)';
-            estadoDiag.modoSinConexion = Auth.esModoSinConexion() ? 'Modo sin conexión' : 'Conectado a servidor';
+            estadoDiag.modoSesion = textoModoSesion();
             estadoDiag.userAgent = navigator.userAgent;
-
             actualizarUIResumen();
             agregarLog('info', 'Diagnóstico general completado.');
         }
 
-        function actualizarUIResumen() {
-            if (diagPlugin) diagPlugin.textContent = estadoDiag.pluginInfo;
-            if (diagWifi) diagWifi.textContent = estadoDiag.wifi;
-            if (diagWebCodecs) diagWebCodecs.textContent = estadoDiag.webCodecs;
-            if (diagLatencia) {
-                diagLatencia.textContent = `cmd: ${estadoDiag.latencias.command} | bat: ${estadoDiag.latencias.battery}`;
-            }
-            if (diagVideoBytes) {
-                diagVideoBytes.textContent = `${estadoDiag.totalBytesVideo.toLocaleString()} bytes`;
-            }
-            if (diagApiUrl) diagApiUrl.textContent = estadoDiag.apiUrl;
-            if (diagConexion) diagConexion.textContent = estadoDiag.modoSinConexion;
-            if (diagUserAgent) diagUserAgent.textContent = estadoDiag.userAgent;
-        }
-
-        // Eventos de botones
-        btnCmd?.addEventListener('click', () => enviarPrueba('command'));
-        btnBat?.addEventListener('click', () => enviarPrueba('battery?'));
-        btnStream?.addEventListener('click', () => enviarPrueba('streamon'));
-        btnCustom?.addEventListener('click', () => {
+        q('#btn-tello-cmd')?.addEventListener('click', () => enviarPrueba('command'));
+        q('#btn-tello-bat')?.addEventListener('click', () => enviarPrueba('battery?'));
+        q('#btn-tello-streamon')?.addEventListener('click', () => enviarPrueba('streamon'));
+        q('#btn-tello-custom')?.addEventListener('click', () => {
             enviarPrueba(cmdInput?.value);
             if (cmdInput) cmdInput.value = '';
         });
-        btnLimpiar?.addEventListener('click', () => {
-            if (logBox) logBox.textContent = 'Consola limpia. Listo para nuevas pruebas.';
+        q('#btn-limpiar-log-tello')?.addEventListener('click', () => {
+            if (logBox) logBox.textContent = 'Consola limpia. Lista para nuevas pruebas.';
         });
-        btnEjecutarDiag?.addEventListener('click', ejecutarDiagnosticoCompleto);
-        btnLimpiarErrores?.addEventListener('click', () => {
+        q('#btn-ejecutar-diagnostico')?.addEventListener('click', ejecutarDiagnosticoCompleto);
+        q('#btn-limpiar-errores-diag')?.addEventListener('click', () => {
             estadoDiag.errores = [];
             if (diagErroresBox) diagErroresBox.textContent = 'Sin errores registrados.';
         });
 
-        // Botón Copiar Informe
-        btnCopiarDiag?.addEventListener('click', async () => {
-            const fecha = new Date().toLocaleString();
+        q('#btn-copiar-diagnostico')?.addEventListener('click', async () => {
             const informe = [
                 '========================================',
                 '📋 INFORME DE DIAGNÓSTICO — GRUPO 5 DRON',
-                `Fecha y Hora: ${fecha}`,
+                `Fecha y hora: ${new Date().toLocaleString()}`,
                 '========================================',
                 `• Plugin DronNative:     ${estadoDiag.pluginInfo}`,
-                `• Red Wi-Fi Vinculada:   ${estadoDiag.wifi}`,
+                `• Red WiFi vinculada:    ${estadoDiag.wifi}`,
                 `• Soporte WebCodecs:     ${estadoDiag.webCodecs}`,
-                `• Latencia "command":    ${estadoDiag.latencias.command}`,
-                `• Latencia "battery?":   ${estadoDiag.latencias.battery}`,
-                `• Telemetría (UDP 8890): ${estadoDiag.telemetriaPPS} pps`,
+                `• Respuesta "command":   ${estadoDiag.latencias.command}`,
+                `• Respuesta "battery?":  ${estadoDiag.latencias.battery}`,
+                `• Escuchas UDP abiertas: ${estadoDiag.escuchas}`,
+                `• Telemetría (8890):     ${estadoDiag.telemetriaPPS} pps, ${estadoDiag.telemetriaTotal} paquetes en total`,
                 `• Última telemetría:     ${estadoDiag.ultimaTelemetria}`,
-                `• Video (UDP 11111):     ${estadoDiag.totalBytesVideo} bytes recibidos`,
-                `• Base API URL:          ${estadoDiag.apiUrl}`,
-                `• Modo de Sesión:        ${estadoDiag.modoSinConexion}`,
+                `• Video (11111):         ${estadoDiag.totalBytesVideo} bytes en ${estadoDiag.totalPaquetesVideo} paquetes`,
+                `• URL de la API:         ${estadoDiag.apiUrl}`,
+                `• Sesión:                ${estadoDiag.modoSesion}`,
                 `• WebView / UserAgent:   ${estadoDiag.userAgent}`,
                 '----------------------------------------',
                 'ÚLTIMOS ERRORES REGISTRADOS:',
                 estadoDiag.errores.length ? estadoDiag.errores.join('\n') : 'Ninguno.',
-                '========================================'
+                '========================================',
             ].join('\n');
 
             let copiado = false;
             if (navigator.clipboard?.writeText) {
-                try {
-                    await navigator.clipboard.writeText(informe);
-                    copiado = true;
-                } catch (_) {}
+                try { await navigator.clipboard.writeText(informe); copiado = true; } catch (_) { /* se intenta el respaldo */ }
             }
-
             if (!copiado && textareaRespaldo) {
                 try {
                     textareaRespaldo.value = informe;
                     textareaRespaldo.select();
-                    document.execCommand('copy');
-                    copiado = true;
-                } catch (_) {}
+                    copiado = document.execCommand('copy');
+                } catch (_) { /* sin portapapeles */ }
             }
-
-            if (copiado) {
-                App.mostrarToast('📋 Informe copiado al portapapeles', 'exito');
-            } else {
-                App.mostrarToast('No se pudo copiar automáticamente. Revisá los permisos.', 'advertencia');
-            }
+            mostrarToast(copiado ? '📋 Informe copiado al portapapeles.' : 'No se pudo copiar automáticamente. Revisá los permisos.', copiado ? 'exito' : 'advertencia');
         });
 
-        // Listeners nativos para telemetría y video
-        if (tieneNativo && plugin) {
-            try {
-                plugin.addListener('telemetria', (data) => {
-                    const raw = data.raw || data.mensaje || '';
-                    conteoPaquetesTelemetria++;
-                    estadoDiag.ultimaTelemetria = raw;
-                    agregarLog('rx', `Telemetría: ${raw.slice(0, 50)}...`);
-                });
+        estadoDiag.modoSesion = textoModoSesion();
+        abrirEscuchas().then(ejecutarDiagnosticoCompleto);
 
-                plugin.addListener('videoPaquete', (data) => {
-                    const tam = data.tamano || 0;
-                    estadoDiag.totalBytesVideo += tam;
-                    if (diagVideoBytes) {
-                        diagVideoBytes.textContent = `${estadoDiag.totalBytesVideo.toLocaleString()} bytes`;
-                    }
-                });
-            } catch (e) {
-                registrarError(`addListener: ${e.message}`);
-            }
-        }
-
-        // Ejecutar diagnóstico inicial
-        ejecutarDiagnosticoCompleto();
+        // Limpieza al salir de la página
+        return async () => {
+            paginaCerrada = true;
+            clearInterval(intervaloPPS);
+            await Promise.all(oyentes.splice(0).map(h => h.remove()));
+            await Promise.all(puertosAbiertos.splice(0).map(p => DN.detenerEscucha(p)));
+        };
     }
 
+    /**
+     * Inicialización global de la aplicación.
+     */
     async function iniciar() {
         // Enlazar eventos del menú lateral
         const btnMenu = document.getElementById('btn-menu');
@@ -771,8 +775,9 @@ const App = (() => {
             btnCerrarSesion.addEventListener('click', async (e) => {
                 e.preventDefault();
                 cerrarMenu();
+                const eraInvitado = Auth.esModoInvitado() && !API.estaAutenticado();
                 await Auth.logout();
-                mostrarToast('Sesión finalizada.', 'info');
+                mostrarToast(eraInvitado ? 'Saliste del modo sin cuenta.' : 'Sesión finalizada.', 'info');
                 window.location.hash = '#/login';
             });
         }

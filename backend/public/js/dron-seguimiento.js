@@ -24,7 +24,10 @@ const DronSeguimiento = (() => {
             umbralConfianza = 0.55,
         }) {
             if (!videoEl) throw new Error('[Seguimiento] Se requiere un elemento <video> o <canvas>.');
+            // Fuente de imagen: el <canvas> donde se dibuja el video del Tello (o un <video>)
             this.videoEl         = videoEl;
+            this._ocupado        = false;    // evita inferencias superpuestas
+            this._canvasAnalisis = document.createElement('canvas');
             this.canvasDebug     = canvasDebug;
             this.maxFPS          = maxFPS;
             this.umbralConfianza = umbralConfianza;
@@ -120,13 +123,27 @@ const DronSeguimiento = (() => {
             this._rafId = requestAnimationFrame((t) => this._bucle(t));
         }
 
-        async _detectar() {
-            if (!this.activo) return;
+        _anchoFuente() { return this.videoEl.videoWidth || this.videoEl.width || 0; }
+        _altoFuente()  { return this.videoEl.videoHeight || this.videoEl.height || 0; }
 
-            if (this.modo === 'persona' && this._modelo) {
-                await this._detectarPersona();
-            } else {
-                this._detectarColor();
+        async _detectar() {
+            if (!this.activo || this._ocupado) return;
+            // Sin imagen todavía (video sin señal): contar como pérdida
+            if (this._anchoFuente() < 32 || this._altoFuente() < 32) { this._manejarPerdida(); return; }
+            // El canvas de depuración usa las mismas coordenadas que la fuente
+            if (this.canvasDebug && (this.canvasDebug.width !== this._anchoFuente() || this.canvasDebug.height !== this._altoFuente())) {
+                this.canvasDebug.width = this._anchoFuente();
+                this.canvasDebug.height = this._altoFuente();
+            }
+            this._ocupado = true;
+            try {
+                if (this.modo === 'persona' && this._modelo) {
+                    await this._detectarPersona();
+                } else {
+                    this._detectarColor();
+                }
+            } finally {
+                this._ocupado = false;
             }
         }
 
@@ -149,18 +166,14 @@ const DronSeguimiento = (() => {
         }
 
         _detectarColor() {
-            // Segmentación por color en canvas auxiliar
-            if (!this.canvasDebug) {
-                this._manejarPerdida();
-                return;
-            }
-
-            const ctx = this.canvasDebug.getContext('2d');
-            const w = this.canvasDebug.width || 320;
-            const h = this.canvasDebug.height || 240;
+            // Segmentación por color en un canvas auxiliar reducido (no se muestra)
+            const w = 320;
+            const h = Math.round(320 * this._altoFuente() / this._anchoFuente()) || 240;
+            this._canvasAnalisis.width = w;
+            this._canvasAnalisis.height = h;
+            const ctx = this._canvasAnalisis.getContext('2d', { willReadFrequently: true });
 
             try {
-                // Dibujar frame en el canvas de análisis
                 ctx.drawImage(this.videoEl, 0, 0, w, h);
                 const imgData = ctx.getImageData(0, 0, w, h);
                 const d = imgData.data;
@@ -193,14 +206,19 @@ const DronSeguimiento = (() => {
                     const dx = Math.max(-1, Math.min(1, (cx - w / 2) / (w / 2)));
                     const dy = Math.max(-1, Math.min(1, (cy - h / 2) / (h / 2)));
 
-                    // Dibujar cruz de seguimiento
-                    ctx.strokeStyle = '#22c55e';
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, 20, 0, Math.PI * 2);
-                    ctx.moveTo(cx - 25, cy); ctx.lineTo(cx + 25, cy);
-                    ctx.moveTo(cx, cy - 25); ctx.lineTo(cx, cy + 25);
-                    ctx.stroke();
+                    // Dibujar cruz de seguimiento sobre el canvas de depuración (escalada)
+                    if (this.canvasDebug) {
+                        const d = this.canvasDebug.getContext('2d');
+                        const ex = this.canvasDebug.width / w, ey = this.canvasDebug.height / h;
+                        d.clearRect(0, 0, this.canvasDebug.width, this.canvasDebug.height);
+                        d.strokeStyle = '#22c55e';
+                        d.lineWidth = 3;
+                        d.beginPath();
+                        d.arc(cx * ex, cy * ey, 20, 0, Math.PI * 2);
+                        d.moveTo(cx * ex - 25, cy * ey); d.lineTo(cx * ex + 25, cy * ey);
+                        d.moveTo(cx * ex, cy * ey - 25); d.lineTo(cx * ex, cy * ey + 25);
+                        d.stroke();
+                    }
 
                     if (this.onOffset) {
                         this.onOffset({
@@ -233,8 +251,8 @@ const DronSeguimiento = (() => {
             const centroX = x + ancho / 2;
             const centroY = y + alto / 2;
 
-            const vW = this.videoEl.videoWidth || this.videoEl.width || 640;
-            const vH = this.videoEl.videoHeight || this.videoEl.height || 360;
+            const vW = this._anchoFuente() || 640;
+            const vH = this._altoFuente() || 480;
 
             const dxNorm = (centroX - vW / 2) / (vW / 2);
             const dyNorm = (centroY - vH / 2) / (vH / 2);

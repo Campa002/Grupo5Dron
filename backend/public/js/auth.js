@@ -19,6 +19,26 @@ const Auth = (() => {
         modoSinConexion = !!val;
     }
 
+    // ------------------------------------------------------------
+    // Modo "dron sin cuenta": permite usar SOLO el módulo del dron
+    // (cabina, prueba Tello, sensores, config. del dron y acerca)
+    // sin iniciar sesión. El aula y la administración siguen
+    // exigiendo una sesión válida.
+    // ------------------------------------------------------------
+    const CLAVE_MODO_INVITADO = 'grupo5dron_modo_invitado';
+
+    function esModoInvitado() {
+        return localStorage.getItem(CLAVE_MODO_INVITADO) === '1';
+    }
+
+    function activarModoInvitado() {
+        localStorage.setItem(CLAVE_MODO_INVITADO, '1');
+    }
+
+    function desactivarModoInvitado() {
+        localStorage.removeItem(CLAVE_MODO_INVITADO);
+    }
+
     /**
      * Intenta recuperar la sesión del usuario desde localStorage.
      * @returns {Object|null} Datos del usuario o null
@@ -62,6 +82,7 @@ const Auth = (() => {
 
         API.guardarToken(respuesta.token);
         guardarUsuario(respuesta.usuario);
+        desactivarModoInvitado();
 
         return respuesta.usuario;
     }
@@ -79,6 +100,7 @@ const Auth = (() => {
         API.eliminarToken();
         localStorage.removeItem('grupo5dron_usuario');
         usuarioActual = null;
+        desactivarModoInvitado();
         document.body.classList.remove('rol-admin', 'rol-docente', 'rol-usuario');
     }
 
@@ -182,6 +204,13 @@ const Auth = (() => {
             }
         }
 
+        // Usar el dron sin cuenta (por ejemplo, conectado al WiFi del Tello, sin internet)
+        document.getElementById('btn-modo-invitado')?.addEventListener('click', () => {
+            activarModoInvitado();
+            App.mostrarToast('Modo dron sin cuenta: el aula y la administración requieren iniciar sesión.', 'info', 5000);
+            window.location.hash = '#/dron';
+        });
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -236,5 +265,8 @@ const Auth = (() => {
         inicializarPaginaLogin,
         esModoSinConexion,
         setModoSinConexion,
+        esModoInvitado,
+        activarModoInvitado,
+        desactivarModoInvitado,
     };
 })();
