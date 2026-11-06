@@ -148,6 +148,8 @@ const Dron = (() => {
         _q('#nombre-perfil-activo').textContent = perfil.nombre || '—';
 
         _adaptador.agregarOyenteTelemetria(_actualizarPanelTelemetria);
+        // Avisos de diagnóstico (por ejemplo, despegue confirmado por la telemetría): solo en el modo técnico
+        _adaptador.onAvisoTecnico = (texto) => { if (App.modoTecnico()) App.mostrarToast(texto, 'advertencia', 8000); };
 
         _inicializarJoysticks();
         _onResize = () => {
@@ -234,8 +236,8 @@ const Dron = (() => {
 
         _textoVideo('Esperando el video del dron...');
         try {
-            const ok = await a.iniciarVideo(d => _video?.procesarChunk(d?.data));
-            if (a === _adaptador && !ok) _textoVideo('El dron no prendió la cámara');
+            const ok = await a.iniciarVideo(d => _video?.procesarChunk(d?.data, { perdida: !!d?.perdida }));
+            if (a === _adaptador && !ok && !_video?.frameCount) _textoVideo('El dron no prendió la cámara');
         } catch (err) {
             if (a === _adaptador) _textoVideo('No se pudo abrir el video: ' + err.message);
         }
@@ -375,6 +377,7 @@ const Dron = (() => {
         on('#btn-toggle-giro', _toggleGiroscopio);
         on('#btn-toggle-seguimiento', _toggleSeguimiento);
         on('#btn-copiar-registro-seg', _copiarRegistroSeguimiento);
+        on('#btn-copiar-registro-udp', _copiarRegistroComandos);
         on('#btn-probar-cpu', _probarCuadroEnCpu);
         _q('#sel-que-seguir')?.addEventListener('change', _elegirQueSeguir);
         on('#btn-reconectar', _conectar);
@@ -840,6 +843,16 @@ const Dron = (() => {
         btn.disabled = false;
     }
 
+    /** Copia el registro de comandos y respuestas del dron (cada respuesta con su puerto). */
+    async function _copiarRegistroComandos() {
+        const a = _adaptador;
+        if (typeof a?.registroTexto !== 'function') { App.mostrarToast('El simulador no tiene registro de comandos.', 'info'); return; }
+        const v = _video;
+        const lineaVideo = v ? `Video: ${v.frameCount} cuadros, ${v.cuadrosClave} cuadros clave, ${v.perdidas} pérdidas, ${v.errores} errores` : 'Video: sin decodificador';
+        const ok = typeof DronSeguimiento !== 'undefined' && await DronSeguimiento.copiarTexto(`${lineaVideo}\n${a.registroTexto()}`);
+        App.mostrarToast(ok ? `Registro copiado (${a.registro.length} líneas).` : 'No se pudo copiar el registro.', ok ? 'exito' : 'advertencia');
+    }
+
     /** Copia el registro por cuadro del último ensayo (CSV separado por ";"). */
     async function _copiarRegistroSeguimiento() {
         const filas = _seguimiento?.registro.length || 0;
@@ -1119,6 +1132,17 @@ const Dron = (() => {
                     <button id="btn-copiar-registro-seg" class="btn btn--secundario" hidden>${App.icono('copiar')} Copiar registro</button>
                 </div>
                 <pre id="cab-resultado-cpu" class="panel-seguimiento mt-sm" hidden></pre>
+            </section>
+
+            <!-- Modo técnico: comandos y respuestas del dron -->
+            <section class="cab-panel solo-tecnico">
+                <p class="etiqueta">Modo técnico · Conexión</p>
+                <ul class="ayuda-tecnica">
+                    <li><b>Copiar registro de comandos:</b> copia cada orden que se mandó al dron y cada respuesta que llegó, con su puerto (UDP), para revisar la conexión.</li>
+                </ul>
+                <div class="par-botones mt-sm">
+                    <button id="btn-copiar-registro-udp" class="btn btn--secundario">${App.icono('copiar')} Copiar registro de comandos</button>
+                </div>
             </section>
 
             <div class="cab-acciones">

@@ -58,21 +58,23 @@ Celular (APK Capacitor 5, frontend local en https://localhost)
 - WiFi propio `TELLO-XXXXXX`, IP `192.168.10.1`, sin internet.
 - Comandos de texto por UDP al 8889. Primero `command` (responde `ok`). Luego `takeoff`, `land`, `emergency`, `streamon`, `battery?`, `forward/back/left/right/up/down x` (20-500 cm), `cw/ccw x` (grados). El Tello responde `ok` o `error...` al TERMINAR el movimiento.
 - `stop` es del SDK 2.0 (Tello EDU): NO usarlo. El freno es `rc 0 0 0 0`.
-- `rc a b c d` (roll, pitch, throttle, yaw, -100 a 100) NO recibe respuesta: se manda sin esperar (`enviarSinRespuesta`) a ~15 Hz, solo en vuelo y pausado mientras corre un paso, una misión o un aterrizaje.
+- `rc a b c d` (roll, pitch, throttle, yaw, -100 a 100) NO recibe respuesta: se manda sin esperar (`enviarSinRespuesta`) a ~15 Hz, solo en vuelo y pausado mientras corre un paso, una misión o un aterrizaje. Durante el despegue, si el "ok" no llegó a los 8 s y sigue llegando telemetría, un `rc 0 0 0 0` por segundo (para que no aterrice solo).
+- El Tello contesta al IP:puerto que le habló: todo lo que va al 8889 sale de UN socket con el puerto local 8889 (si está libre) y un hilo lector reparte las respuestas en orden a los comandos que esperan. Las respuestas no dicen a qué comando contestan: no mandes dos comandos con respuesta a la vez (`despegar` espera a que termine el anterior).
 - Telemetría: el Tello manda texto por UDP al puerto 8890 del celular (solo después de `command`). `h` viene en cm. La unidad de `vgx`/`vgy` no está documentada (se asume dm/s, a verificar).
 - Video: tras `streamon`, H.264 (Annex B) por UDP al puerto 11111 del celular. El plugin lo agrupa cada ~30 ms y `dron-video.js` lo decodifica con WebCodecs.
 - Si pasan ~15 s sin comandos, aterriza solo: hay keep-alive (`command` cada 8 s en tierra).
 - El Tello común NO tiene posicionamiento absoluto (los mission pads son del Tello EDU). "Ir a un lugar" = movimientos relativos y misiones.
 
-## Contrato del plugin DronNative (v2.1.0)
+## Contrato del plugin DronNative (v2.2.0)
 
 Fuente de verdad: `DronNativePlugin.java`. Del lado JS, el contrato está centralizado en `DronAdaptadores.DronNativo` (`dron-adaptadores.js`), que usan la cabina y Prueba Tello. Si cambiás algo de un lado, cambialo del otro.
-- `enviarComando({host, puerto, mensaje, timeoutMs})` → `{respuesta, host, puerto, error?}`. NUNCA rechaza por falta de respuesta: resuelve con `respuesta: 'timeout'`. Hay que validar que la respuesta sea `ok`.
-- `enviarSinRespuesta({host, puerto, mensaje})` → `{enviado}` (para `rc` y `emergency`; socket y executor reutilizados).
+- `enviarComando({host, puerto, mensaje, timeoutMs})` → `{respuesta, host, puerto, puertoLocal, desde?, error?}`. NUNCA rechaza por falta de respuesta: resuelve con `respuesta: 'timeout'` (o `'cancelado'`). Hay que validar que la respuesta sea `ok`.
+- `enviarSinRespuesta({host, puerto, mensaje})` → `{enviado}` (para `rc` y `emergency`; mismo socket que los comandos).
+- `cancelarEsperas({comando?})` → `{canceladas}`: lo usa el despegue confirmado por telemetría para que su "ok" tardío no quede para el comando siguiente.
 - `iniciarEscucha({puerto})` / `detenerEscucha({puerto})`. El puerto 11111 se trata como video, cualquier otro como telemetría.
-- Eventos: `telemetria` `{raw, puerto}` y `videoPaquete` `{data (base64), tamano, paquetes}`.
-- `vincularRedWifi()` → `{vinculada, motivo}` con timeout de 5 s. Mantiene un solo callback de red; si ya está vinculada no pide otro.
-- `info()` → `{version, sdkAndroid, redVinculada}`.
+- Eventos: `telemetria` `{raw, puerto}`, `videoPaquete` `{data (base64), tamano, paquetes, perdida, perdidasTotales}` y `respuestaUdp` `{texto, desde, puertoLocal, comando, sinEspera}`.
+- `vincularRedWifi()` → `{vinculada, motivo, red}` (`red`: `wifi`, `datos`, `ninguna` u `otra`). Busca el WiFi activo sin internet (`getAllNetworks`), vincula el proceso y cada socket (`network.bindSocket`) y recrea el socket de comandos. Si no lo encuentra, `requestNetwork` con timeout de 5 s. El primer comando también vincula solo.
+- `info()` → `{version, sdkAndroid, redVinculada, red, puertoLocalComandos}`.
 - `addListener` devuelve un handle con `remove()`: guardalo y quitalo al salir (lo hace `DronNativo.escuchar`).
 - Registro: `@CapacitorPlugin(name = "DronNative")`, registrado en `MainActivity` por el workflow. Paquete `ar.edu.eest1vl.grupo5dron`.
 
@@ -158,6 +160,12 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 - Limpio: sin código muerto, sin funciones duplicadas, sin `console.log` de depuración sueltos, sin archivos referenciados que no existen.
 
 ## Estado al 6/11/2026
+
+- Primera prueba con el Tello real (TELLO-FCD710, A06) y arreglos (6/11, noche):
+  - Resultado: con datos móviles prendidos, "command" sin respuesta; con datos apagados conecta, llegan datos y video (con cuadros rotos) y despega, pero la cabina queda en "Despegando...", sin confirmar `streamon`, los controles no andan y el Tello aterriza solo a los ~15 s.
+  - Causa: cada `enviarComando` usaba un socket nuevo (puerto distinto) que se cerraba al terminar, y el `rc` salía de otro. El Tello contesta a un solo destino, así que las respuestas se perdían. Sin el "ok" del takeoff la app no pasaba a "en vuelo", no mandaba `rc` ni keep-alive (la espera de 20 s supera los 15 s del Tello) y el respaldo por telemetría recién se miraba al vencer.
+  - Arreglos: plugin 2.2.0 (socket único en el puerto local 8889 con hilo lector; WiFi vinculado aunque haya datos móviles; pérdidas de video marcadas y buffer de 2 MB); despegue confirmado por telemetría (desde los 6 s: 30 cm o más y motores encendidos, por el avance de `time`); `rc 0 0 0 0` por segundo desde los 8 s del despegue; `streamon` confirmado si llega video; registro de comandos con puertos (modo técnico, cabina y Prueba Tello); Prueba Tello dice qué red usa.
+  - Verificado: plugin con `javac --release 17` contra stubs y un Tello simulado por UDP (el plugin viejo reproduce las fallas, el nuevo no); cabina con mock del plugin (despegue normal, sin respuesta, sin despegar y sin respuesta a `streamon`); simulador de punta a punta; pruebas de siempre. Sin probar con el dron.
 
 - Detección en el A06 (GPU Mali), Mis objetos y lenguaje simple (6/11, historial §3, punto 28):
   - Si la GPU no puede escribir float32, se apaga el empaquetado de WebGL (`WEBGL_PACK*`, `WEBGL_CONV_IM2COL`): el arreglo conocido para Mali. Modo técnico: "Probar este cuadro en CPU" (mismo cuadro con WebGL y con CPU, lado a lado) y la miniatura con todas las detecciones desde el 10 % (el umbral para seguir sigue en 50 %).

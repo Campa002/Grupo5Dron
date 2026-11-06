@@ -1035,6 +1035,7 @@ const App = (() => {
         const estadoDiag = {
             pluginInfo: 'No detectado',
             wifi: 'Pendiente',
+            red: 'sin dato',
             webCodecs: 'Verificando...',
             latencias: { command: '--', battery: '--' },
             escuchas: 'ninguna',
@@ -1056,6 +1057,10 @@ const App = (() => {
         const puertosAbiertos = [];
         let paginaCerrada = false;
 
+        function textoRed(red) {
+            return { wifi: 'WiFi del Tello', datos: 'datos móviles', ninguna: 'ninguna' }[red] || (red ? 'otra red' : 'sin dato');
+        }
+
         function textoModoSesion() {
             if (Auth.sinCuenta()) return 'Dron sin cuenta';
             return Auth.esModoSinConexion() ? 'Sin conexión con el servidor (sesión cacheada)' : 'Conectado al servidor';
@@ -1072,14 +1077,14 @@ const App = (() => {
         function agregarLog(tipo, msg) {
             if (!logBox) return;
             const hora = new Date().toLocaleTimeString();
-            const prefijo = tipo === 'tx' ? '[TX]' : tipo === 'rx' ? '[RX]' : '[INFO]';
+            const prefijo = tipo === 'tx' ? '[TX]' : tipo === 'rx' ? '[RX]' : tipo === 'res' ? '[RESULTADO]' : '[INFO]';
             logBox.textContent += `\n[${hora}] ${prefijo} ${msg}`;
             logBox.scrollTop = logBox.scrollHeight;
         }
 
         function actualizarUIResumen() {
             if (diagPlugin) diagPlugin.textContent = estadoDiag.pluginInfo;
-            if (diagWifi) diagWifi.textContent = estadoDiag.wifi;
+            if (diagWifi) diagWifi.textContent = `${estadoDiag.wifi} · usa: ${estadoDiag.red}`;
             if (diagWebCodecs) diagWebCodecs.textContent = estadoDiag.webCodecs;
             if (diagLatencia) diagLatencia.textContent = `cmd: ${estadoDiag.latencias.command} | bat: ${estadoDiag.latencias.battery}`;
             if (diagTelemetria) diagTelemetria.textContent = `${estadoDiag.telemetriaPPS} pps | escuchas: ${estadoDiag.escuchas} | ${estadoDiag.ultimaTelemetria.slice(0, 35)}`;
@@ -1113,15 +1118,16 @@ const App = (() => {
 
             let respuesta;
             let error = null;
+            let puertoLocal = null;
             if (tieneNativo) {
-                ({ respuesta, error } = await DN.enviarComando(ip, puerto, cmd, 5000));
+                ({ respuesta, error, puertoLocal } = await DN.enviarComando(ip, puerto, cmd, 5000));
             } else {
                 await new Promise(r => setTimeout(r, 200));
                 respuesta = cmd === 'battery?' ? '85' : 'ok';
             }
             const ms = Math.round(performance.now() - tInicio);
             const sim = tieneNativo ? '' : ' [simulado]';
-            agregarLog('rx', `"${respuesta}"${error ? ' (' + error + ')' : ''} en ${ms} ms${sim}`);
+            agregarLog('res', `"${cmd}": "${respuesta}"${error ? ' (' + error + ')' : ''} en ${ms} ms${puertoLocal ? ` · puerto local ${puertoLocal}` : ''}${sim}`);
             if (cmd === 'command') estadoDiag.latencias.command = `${respuesta} (${ms} ms)${sim}`;
             if (cmd === 'battery?') estadoDiag.latencias.battery = `${respuesta}% (${ms} ms)${sim}`;
             if (tieneNativo && cmd !== 'battery?' && !cmd.endsWith('?') && !DronAdaptadores.esOk(respuesta)) {
@@ -1199,15 +1205,17 @@ const App = (() => {
             const red = await DN.vincularRedWifi();
             if (paginaCerrada) return;
             estadoDiag.wifi = red.vinculada ? `Vinculada (${red.motivo || 'OK'})` : `NO vinculada (${red.motivo || 'sin motivo'})`;
-            if (red.vinculada) marcarPaso('app', 'exito', 'WiFi del Tello vinculado.');
-            else marcarPaso('app', 'advertencia', `WiFi sin vincular (${red.motivo || 'sin motivo'}). Se prueba igual.`);
+            estadoDiag.red = textoRed(red.red);
+            if (red.red === 'wifi') marcarPaso('app', 'exito', 'Usa el WiFi del Tello.');
+            else if (red.red === 'datos') marcarPaso('app', 'advertencia', 'Usa los datos móviles, no el WiFi del Tello. Se prueba igual.');
+            else marcarPaso('app', 'advertencia', `No encontré el WiFi del Tello (${red.motivo || 'sin motivo'}). Se prueba igual.`);
 
             // 02 — Respuesta del dron
             marcarPaso('command', 'acento', 'Conectando con el dron...');
             const rc = await enviarPrueba('command');
             if (paginaCerrada) return;
             if (!rc || !DronAdaptadores.esOk(rc.respuesta)) {
-                marcarPaso('command', 'error', `No respondió (${rc?.respuesta || 'sin respuesta'}). Prendé el dron y conectá el celular a su WiFi TELLO-XXXXXX.`);
+                marcarPaso('command', 'error', `No respondió (${rc?.respuesta || 'sin respuesta'}). Prendé el dron y conectá el celular a su WiFi TELLO-XXXXXX. Apagá los datos móviles y volvé a probar.`);
                 faltas.push('que el dron responda');
                 terminar();
                 return;
@@ -1262,6 +1270,11 @@ const App = (() => {
                 estadoDiag.telemetriaTotal++;
                 estadoDiag.ultimaTelemetria = raw;
                 if (estadoDiag.telemetriaTotal === 1) agregarLog('rx', `Primera telemetría: ${raw.slice(0, 60)}...`);
+            }));
+            // Cada respuesta que llega del dron, con el puerto que la recibió (debe ser siempre el mismo)
+            oyentes.push(DN.escuchar(DN.EVENTO_RESPUESTA, (d) => {
+                const para = d?.comando ? `para "${d.comando}"` : 'sin comando esperando';
+                agregarLog('rx', `"${d?.texto}" de ${d?.desde} → puerto local ${d?.puertoLocal} (${para})`);
             }));
             oyentes.push(DN.escuchar(DN.EVENTO_VIDEO, (data) => {
                 estadoDiag.totalBytesVideo += data?.tamano || 0;
@@ -1347,13 +1360,15 @@ const App = (() => {
             if (tieneNativo) {
                 try {
                     const inf = await DN.info();
-                    estadoDiag.pluginInfo = `v${inf.version || '?'} (Android SDK ${inf.sdkAndroid || '?'}, red vinculada: ${inf.redVinculada ? 'sí' : 'no'})`;
+                    const puertoCmd = inf.puertoLocalComandos > 0 ? inf.puertoLocalComandos : 'sin abrir';
+                    estadoDiag.pluginInfo = `v${inf.version || '?'} (Android SDK ${inf.sdkAndroid || '?'}, red vinculada: ${inf.redVinculada ? 'sí' : 'no'}, red: ${inf.red || '?'}, puerto local de comandos: ${puertoCmd})`;
                 } catch (e) {
                     estadoDiag.pluginInfo = `Error: ${e.message}`;
                     registrarError(e);
                 }
                 const resW = await DN.vincularRedWifi();
                 estadoDiag.wifi = resW.vinculada ? `Vinculada (${resW.motivo || 'OK'})` : `NO vinculada (${resW.motivo || 'sin motivo'})`;
+                estadoDiag.red = textoRed(resW.red);
                 if (!resW.vinculada) registrarError(`vincularRedWifi: ${resW.motivo}`);
             } else {
                 estadoDiag.pluginInfo = 'No disponible (navegador)';
@@ -1410,6 +1425,7 @@ const App = (() => {
                 '----------------------------------------',
                 `• Plugin DronNative:     ${estadoDiag.pluginInfo}`,
                 `• Red WiFi vinculada:    ${estadoDiag.wifi}`,
+                `• Red que usa la app:    ${estadoDiag.red}`,
                 `• Soporte WebCodecs:     ${estadoDiag.webCodecs}`,
                 `• Respuesta "command":   ${estadoDiag.latencias.command}`,
                 `• Respuesta "battery?":  ${estadoDiag.latencias.battery}`,
