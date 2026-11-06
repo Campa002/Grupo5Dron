@@ -43,8 +43,8 @@ jobs:
           python3 scripts/check_js.py
           python3 scripts/check_refs.py
 
-      - name: Pruebas automáticas del seguimiento, la inclinación y Mis objetos (node --test)
-        run: node --test tests/seguimiento.test.js tests/inclinacion.test.js tests/objetos.test.js
+      - name: Pruebas automáticas del seguimiento, la inclinación, Mis objetos y los botones (node --test)
+        run: node --test tests/seguimiento.test.js tests/inclinacion.test.js tests/objetos.test.js tests/botones.test.js
 
   build-apk:
     name: Compilar APK Debug

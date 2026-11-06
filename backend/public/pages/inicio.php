@@ -20,7 +20,7 @@
             <span class="etiqueta">02 — Dron</span>
             <span class="opcion__icono"><span class="ico ico--dron" aria-hidden="true"></span></span>
             <span class="opcion__titulo">Control del Dron</span>
-            <span class="opcion__desc">Video, joysticks, inclinación del celular y seguimiento.</span>
+            <span class="opcion__desc">Video, botones de mando, inclinación del celular y seguimiento.</span>
             <span class="opcion__ir">Entrar <span class="ico ico--ir" aria-hidden="true"></span></span>
         </a>
     </div>

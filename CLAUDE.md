@@ -91,7 +91,8 @@ backend/
     index.php, sw.js, manifest.json, css/app.css (estilos de la cabina acotados a .cabina / body.en-cabina)
     js/dron.js              cabina, pasos, misiones, failsafe, modos giro/seguimiento
     js/dron-adaptadores.js  DronNativo (contrato del plugin), TelloAdapter, SimulatorDroneAdapter
-    js/dron-joystick.js, dron-giroscopio.js, dron-seguimiento.js, dron-video.js
+    js/dron-joystick.js     botones de mantener apretado (DronBotonesMovimiento, mando por defecto) y joysticks (modo técnico)
+    js/dron-giroscopio.js, dron-seguimiento.js, dron-video.js
     js/config-dron.js       perfiles (cache offline), timeout del failsafe
     js/sensores.js          diagnóstico de sensores del celular
     js/app.js, api.js, auth.js   compartidos (router, uso sin cuenta, Prueba Tello, sesión offline)
@@ -114,7 +115,7 @@ docs/contexto/    informe, historial, reportes
   - MySQL: base `grupo5dron_db` importada desde `backend/sql/schema.sql`; `backend/config/config.php` local con root sin contraseña.
 - Usuarios del seed: la contraseña de todos es `password` y tienen `debe_cambiar_password = 1`: la app obliga a cambiarla en el primer login (`auth.php?action=cambiar_mi_password`). Para volver al estado inicial de la base local, reimportá `schema.sql`.
 - CORS: `config.php` tiene que incluir `https://localhost` en `cors_origenes` (ya está en `config.example.php`) para que el APK pueda usar la API.
-- Pruebas automáticas: `node --test tests/seguimiento.test.js tests/inclinacion.test.js tests/objetos.test.js` (selector de Mis objetos, seguimiento con recorridos sintéticos, marco con bordes de la imagen analizada, inclinación por acelerómetro con eventos simulados).
+- Pruebas automáticas: `node --test tests/seguimiento.test.js tests/inclinacion.test.js tests/objetos.test.js tests/botones.test.js` (selector de Mis objetos, seguimiento con recorridos sintéticos, marco con bordes de la imagen analizada, inclinación por acelerómetro con eventos simulados, botones de mantener apretado con eventos de puntero simulados).
 - Pruebas en navegador: Playwright con Microsoft Edge del sistema (`chromium.launch({ channel: 'msedge' })`). Para el TelloAdapter sin dron, se puede inyectar un mock de `window.Capacitor.Plugins.DronNative` que respete el contrato de arriba.
 - APK: se compila en GitHub Actions en cada push a `main`. Artefacto: `Grupo5Dron-app-debug`.
 - Firma del APK debug:
@@ -139,6 +140,7 @@ docs/contexto/    informe, historial, reportes
   - la confirmación antes de despegar y el bloqueo del despegue sin telemetría;
   - el failsafe por pérdida de telemetría: freno + `land`, un reintento y aviso fijo. Desde que se dispara, NO sale ningún comando automático (ni `rc` ni keep-alive) para que el Tello pueda aterrizar solo a los ~15 s. Si vuelve la telemetría, reintenta `land`. Decisión de Luciano: NO cortar motores automáticamente;
   - que giroscopio, seguimiento y misiones arranquen desactivados y que al apagarlos sus ejes vuelvan a cero;
+  - que los botones de movimiento frenen su eje al soltar, al salir del botón, al perder el toque, al pasar a segundo plano o al perder el foco, que arranquen en Lenta y que solo se puedan apretar en vuelo;
   - el seguimiento está SOLO EN ENSAYO (calcula y muestra, no envía) hasta la etapa S3, después de la primera prueba con el Tello;
   - el aterrizaje al salir de la cabina en vuelo.
 - Interfaz en español, tema oscuro con azul institucional, sin violetas.
@@ -160,6 +162,13 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 - Limpio: sin código muerto, sin funciones duplicadas, sin `console.log` de depuración sueltos, sin archivos referenciados que no existen.
 
 ## Estado al 6/11/2026
+
+- Botones de mantener apretado en la cabina (6/11, después de la primera prueba: los joysticks movían el Tello real, pero eran muy sensibles):
+  - Adelante, Atrás, Izquierda, Derecha (cruz derecha) y Subir, Bajar, Girar a la izquierda y a la derecha (cruz izquierda). Mientras están apretados, su eje vale la velocidad elegida; al soltar, ese eje vuelve a 0 y el `rc` sale en el acto (`DroneAdapter.enviarEjesYa`). Se combinan con dos dedos; opuestos se anulan.
+  - Velocidad: Lenta (rc 20, por defecto y siempre al entrar), Normal (35) y Rápida (50).
+  - Frenan también si el dedo sale del botón, si se cancela o pierde el toque, si la app pasa a segundo plano, si la ventana pierde el foco o al salir. Solo se pueden apretar en vuelo; un paso o una misión los sueltan; emergencia y failsafe también. Con la inclinación activa, los de avance y costados quedan bloqueados.
+  - Los joysticks siguen, solo en el modo técnico ("Usar joysticks"); al salir de la cabina vuelven los botones.
+  - Verificado: `tests/botones.test.js` (12 pruebas); mock del Tello (`rc 0 20 0 0` en Lenta, `rc 0 35 35 0` con Adelante + Subir, `rc 0 0 0 0` al salir del botón, en segundo plano y al perder el foco); simulador de punta a punta; 360/390/412 en vertical y horizontal sin scroll ni superposición, botones de 44 px o más. Sin probar con el dron.
 
 - Primera prueba con el Tello real (TELLO-FCD710, A06) y arreglos (6/11, noche):
   - Resultado: con datos móviles prendidos, "command" sin respuesta; con datos apagados conecta, llegan datos y video (con cuadros rotos) y despega, pero la cabina queda en "Despegando...", sin confirmar `streamon`, los controles no andan y el Tello aterriza solo a los ~15 s.

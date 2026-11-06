@@ -301,3 +301,178 @@ class DronJoystick {
         }
     }
 }
+
+// ================================================================
+// Botones de mantener apretado (mando por defecto de la cabina)
+// ================================================================
+//
+// Mientras un botón está apretado, su eje vale la velocidad elegida; al soltarlo, ese eje vuelve a 0.
+// Se pueden combinar (un dedo por botón): Adelante + Subir mueve los dos ejes a la vez; dos opuestos se anulan.
+// Frena igual que al soltar si el dedo sale del botón, si se cancela el toque, si la app pasa a segundo
+// plano o si la ventana pierde el foco.
+
+/** Velocidad de cada nivel, en fracción del máximo del rc (0,2 = rc 20). */
+const VELOCIDADES_MANDO = Object.freeze({ lenta: 0.2, normal: 0.35, rapida: 0.5 });
+
+/** Eje (como en DroneAdapter.actualizarEjes) y sentido de cada botón. */
+const EJES_BOTON = Object.freeze({
+    adelante: ['fb', 1], atras: ['fb', -1],
+    izquierda: ['lr', -1], derecha: ['lr', 1],
+    subir: ['ud', 1], bajar: ['ud', -1],
+    'girar-izq': ['yaw', -1], 'girar-der': ['yaw', 1],
+});
+
+/**
+ * Ejes en [-1, 1] para los botones apretados (función pura).
+ * @param {Iterable<string>} acciones nombres de EJES_BOTON
+ * @param {number} velocidad fracción del máximo (0 a 1)
+ * @returns {{lr:number, fb:number, ud:number, yaw:number}}
+ */
+function ejesDesdeBotones(acciones, velocidad) {
+    const v = Math.max(0, Math.min(1, Number(velocidad) || 0));
+    const ejes = { lr: 0, fb: 0, ud: 0, yaw: 0 };
+    for (const accion of new Set(acciones)) {
+        const def = EJES_BOTON[accion];
+        if (def) ejes[def[0]] += def[1] * v;
+    }
+    for (const k of Object.keys(ejes)) ejes[k] = Math.max(-1, Math.min(1, ejes[k])) || 0; // sin -0
+    return ejes;
+}
+
+// eslint-disable-next-line no-unused-vars
+class DronBotonesMovimiento {
+    /**
+     * @param {Object} config
+     * @param {HTMLElement} config.contenedor  Contiene los botones con data-mover="adelante" (etc.).
+     * @param {string} [config.velocidad]      'lenta' | 'normal' | 'rapida'
+     * @param {Document} [config.documento]    Para las pruebas (por defecto, document).
+     * @param {Window} [config.ventana]        Para las pruebas (por defecto, window).
+     */
+    constructor({ contenedor, velocidad = 'lenta', documento = document, ventana = window }) {
+        if (!contenedor) throw new Error('[Botones] Se requiere un elemento contenedor.');
+        this.contenedor = contenedor;
+        this.documento = documento;
+        this.ventana = ventana;
+        this.velocidad = VELOCIDADES_MANDO[velocidad] ? velocidad : 'lenta';
+        this.habilitado = true;
+        /** (ejes, acciones) => void. Se llama en cada cambio, también al soltar todo. */
+        this.onCambio = null;
+        this._toques = new Map(); // pointerId -> {accion, boton}
+        this._botones = Array.from(contenedor.querySelectorAll('[data-mover]'));
+
+        this._alApretar = (e) => this._apretar(e);
+        this._alMover = (e) => this._mover(e);
+        this._alSoltar = (e) => this._soltar(e.pointerId);
+        this._sinMenu = (e) => e.preventDefault();
+        this._alOcultar = () => { if (this.documento.visibilityState === 'hidden') this.soltarTodo(); };
+        this._alPerderFoco = () => this.soltarTodo();
+
+        for (const b of this._botones) {
+            b.addEventListener('pointerdown', this._alApretar);
+            b.addEventListener('pointermove', this._alMover);
+            for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, this._alSoltar);
+            b.addEventListener('contextmenu', this._sinMenu);
+        }
+        this.documento.addEventListener('visibilitychange', this._alOcultar);
+        this.ventana.addEventListener('blur', this._alPerderFoco);
+        this.ventana.addEventListener('pagehide', this._alPerderFoco);
+    }
+
+    /** Acciones apretadas ahora (sin repetir). */
+    acciones() {
+        return [...new Set([...this._toques.values()].map(t => t.accion))];
+    }
+
+    _apretar(e) {
+        const boton = e.currentTarget;
+        if (!this.habilitado || boton.disabled || this._toques.has(e.pointerId)) return;
+        e.preventDefault();
+        try { boton.setPointerCapture?.(e.pointerId); } catch (_) { /* el toque ya terminó */ }
+        this._toques.set(e.pointerId, { accion: boton.dataset.mover, boton });
+        boton.classList.add('cab-mantener--activo');
+        this._avisar();
+    }
+
+    /** Si el dedo sale del botón, frena igual que al soltar. */
+    _mover(e) {
+        const t = this._toques.get(e.pointerId);
+        if (!t) return;
+        const r = t.boton.getBoundingClientRect();
+        if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) this._soltar(e.pointerId);
+    }
+
+    _soltar(pointerId) {
+        const t = this._toques.get(pointerId);
+        if (!t) return;
+        this._toques.delete(pointerId);
+        try { t.boton.releasePointerCapture?.(pointerId); } catch (_) { /* ya liberado */ }
+        if (![...this._toques.values()].some(x => x.boton === t.boton)) t.boton.classList.remove('cab-mantener--activo');
+        this._avisar();
+    }
+
+    /** Suelta todos los botones (todos los ejes del mando a 0) y avisa. */
+    soltarTodo() {
+        const habia = this._toques.size > 0;
+        for (const id of [...this._toques.keys()]) {
+            const t = this._toques.get(id);
+            this._toques.delete(id);
+            try { t.boton.releasePointerCapture?.(id); } catch (_) { /* ya liberado */ }
+        }
+        for (const b of this._botones) b.classList.remove('cab-mantener--activo');
+        if (habia) this._avisar();
+    }
+
+    setVelocidad(nombre) {
+        if (!VELOCIDADES_MANDO[nombre]) return;
+        this.velocidad = nombre;
+        if (this._toques.size) this._avisar();
+    }
+
+    /** Sin habilitar (por ejemplo, en tierra), los botones no se pueden apretar. */
+    habilitar(si) {
+        this.habilitado = !!si;
+        if (!this.habilitado) this.soltarTodo();
+        for (const b of this._botones) {
+            if (b.dataset.bloqueado !== 'si') b.disabled = !this.habilitado;
+        }
+    }
+
+    /** Deshabilita estos botones (por ejemplo, los de avance mientras manda la inclinación) y los suelta. */
+    setBloqueados(lista = []) {
+        const bloqueados = new Set(lista);
+        for (const id of [...this._toques.keys()]) {
+            if (bloqueados.has(this._toques.get(id).accion)) this._soltar(id);
+        }
+        for (const b of this._botones) {
+            const bloq = bloqueados.has(b.dataset.mover);
+            b.dataset.bloqueado = bloq ? 'si' : 'no';
+            b.disabled = bloq || !this.habilitado;
+        }
+    }
+
+    _avisar() {
+        if (typeof this.onCambio !== 'function') return;
+        const acciones = this.acciones();
+        this.onCambio(ejesDesdeBotones(acciones, VELOCIDADES_MANDO[this.velocidad]), acciones);
+    }
+
+    destruir() {
+        this.soltarTodo();
+        this.onCambio = null;
+        for (const b of this._botones) {
+            b.removeEventListener('pointerdown', this._alApretar);
+            b.removeEventListener('pointermove', this._alMover);
+            for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.removeEventListener(ev, this._alSoltar);
+            b.removeEventListener('contextmenu', this._sinMenu);
+        }
+        this.documento.removeEventListener('visibilitychange', this._alOcultar);
+        this.ventana.removeEventListener('blur', this._alPerderFoco);
+        this.ventana.removeEventListener('pagehide', this._alPerderFoco);
+    }
+}
+DronBotonesMovimiento.VELOCIDADES = VELOCIDADES_MANDO;
+DronBotonesMovimiento.EJES_BOTON = EJES_BOTON;
+DronBotonesMovimiento.ejesDesdeBotones = ejesDesdeBotones;
+
+// En Node (pruebas automáticas) se exporta como módulo; en el navegador quedan como globales
+if (typeof module !== 'undefined' && module.exports) module.exports = { DronJoystick, DronBotonesMovimiento };

@@ -238,6 +238,14 @@ const DronAdaptadores = (() => {
             if ('yaw' in ejes) this.valoresRC.yaw      = a(ejes.yaw);
         }
 
+        /**
+         * Manda ya los ejes actuales, sin esperar al próximo ciclo del bucle (lo usan los botones al soltar,
+         * para frenar en el acto). Mismas condiciones que el bucle: en vuelo, sin pausa y sin failsafe.
+         */
+        enviarEjesYa() {
+            if (this.conectado && this.enVuelo && !this.rcPausado && !this.enviosSuspendidos) this._enviarEjes?.(this.valoresRC);
+        }
+
         /** Pone los cuatro ejes en cero. */
         detenerRC() {
             this.valoresRC = { roll: 0, pitch: 0, yaw: 0, throttle: 0 };
@@ -470,6 +478,10 @@ const DronAdaptadores = (() => {
             return (this.telemetria.altura || 0) >= 30
                 && ahora - this._motorAvanzoTs < 2500
                 && ahora - this.ultimaTelemetriaTs < 1500;
+        }
+
+        _enviarEjes(rc) {
+            this._enviarRC(rc);
         }
 
         _enviarRC(rc) {
