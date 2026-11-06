@@ -45,7 +45,7 @@ Celular (APK Capacitor 5, frontend local en https://localhost)
 - NO hay ESP32 en el dron. El celular habla directo con el Tello.
 - El módulo del dron funciona SIN internet y SIN cuenta:
   - En el login, el botón "Usar el dron sin cuenta" activa el flag `grupo5dron_modo_invitado` en localStorage.
-  - Con ese flag se puede entrar a dron, prueba Tello, sensores, config. del dron y acerca. Inicio redirige a la cabina; aula y admin mandan al login.
+  - Con ese flag se puede entrar al inicio (con las dos opciones: Dron entra directo, Aula lleva al login), dron, prueba Tello, sensores, config. del dron y acerca. Aula y admin mandan al login.
   - Una sesión cacheada vencida (sin conexión) también permite entrar al dron. Aula y admin siempre exigen sesión válida.
   - Iniciar o cerrar sesión borra el flag.
 - El APK no puede loguearse contra un servidor HTTP local: `network_security_config.xml` solo permite HTTP hacia 192.168.10.1 y la página es `https://localhost`. Para loguearse desde el APK hace falta un servidor HTTPS.
@@ -143,7 +143,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 
 - Auditoría completa hecha con Claude Code el 5/11. El detalle de lo que se encontró está en el historial (§3, puntos 12 y 13).
 - La "revisión antes del vuelo" (contrato JS-plugin centralizado, video agrupado ~30 ms, job "verificar") NO la llegó a aplicar Antigravity; la aplicó Claude Code en la Fase 1.
-- Fase 1 aplicada el 5/11 (sin commitear todavía; Luciano commitea, compila y prueba):
+- Fase 1 aplicada y commiteada el 5/11:
   - modo sin cuenta;
   - cabina rehecha: emergencia fija, horizontal con joystick | video | joystick, controles ≥ 44 px;
   - pasos y misiones funcionando, con el `rc` pausado durante las maniobras;
@@ -164,27 +164,27 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
   - `api.js`: timeout de 10 s y `signal`; un 401 con sesión dispara `grupo5dron:sesion-vencida`: en el aula va al login y en las pantallas del dron pasa a modo sin cuenta;
   - cambio obligatorio de contraseña (`#/cambiar-password`, `auth.php?action=cambiar_mi_password`), también accesible desde el menú de usuario;
   - `https://localhost` en `config.example.php`, y contraseña del seed corregida en el README y en `schema.sql`.
+- Fase 3 aplicada el 5/11 (verificada con Playwright a 360/390/412 en las dos orientaciones, con PHP + MySQL locales):
+  - modo sin cuenta: "Usar el dron sin cuenta" lleva al inicio con las dos opciones (Dron entra directo; Aula lleva al login); sin la tarjeta del ESP32;
+  - app.css: utilidades y `.alerta*` que faltaban, `[hidden]` global, `.campo__ayuda`, inputs y botones de modal de 44 px;
+  - contraste ≥ 4,5:1 (botones primario, peligro y éxito, y texto terciario `#8696ab`);
+  - header: botones de 44 px, badge compacto (solo el ícono en pantallas de 480 px o menos), título con "…";
+  - modal de perfiles con el componente `.modal-overlay` / `.modal`; Prueba Tello con controles de 44 px;
+  - Sensores: lectura en vivo del giroscopio (beta, gamma, alpha), con aviso si no llegan datos;
+  - Acerca: datos técnicos reales y solo los nombres de los integrantes (los roles los tiene que confirmar Luciano).
+- Observación para el compañero del aula (no se tocó): en `app.css`, `.dispositivo__botones` tiene padding con `max-height: 0`, así que las tarjetas de dispositivos cerradas muestran una franja de los botones.
 
 ## Próximos pasos (lista única)
 
 1. **Primera prueba real con el Tello.** Commit, APK de CI e instalación (si dice "App no instalada", desinstalar la anterior: cada build de CI firma con otra clave debug). Después: "Usar el dron sin cuenta", `#/prueba-tello` (command, battery?, streamon), "Copiar informe" y pegarlo. Luego la cabina: despegar, aterrizar, paso, freno, giroscopio, failsafe, emergencia.
 2. **Corregir lo que salga de esa prueba.** Lo más probable: red sin internet (`vincularRedWifi`), video en el WebView, si el `rc` interfiere con los pasos y la unidad de `vgx`/`vgy`.
 3. ~~Fase 2, funciones~~: hecha (ver "Estado").
-4. **Fase 3, interfaz fuera de la cabina:**
-   - modo sin cuenta: inicio con las dos opciones del informe ("Control del Dron" entra directo y "Control del Aula" lleva al login), en lugar de saltar a la cabina;
-   - clases que faltan en app.css (`alerta*`, `campo-formulario*`, utilidades);
-   - modal de perfiles sin overlay ni estilos;
-   - inputs de Prueba Tello y failsafe de 19 px;
-   - badge del header que se parte en 3 líneas y botones del header de menos de 44 px;
-   - tabla de Acerca que desborda;
-   - contraste;
-   - textos (Acerca menciona drones HTTP genéricos);
-   - diagnóstico de sensores con lecturas reales del giroscopio.
+4. ~~Fase 3, interfaz~~: hecha (ver "Estado").
 5. **Fase 4, limpieza:**
    - código muerto y CSS sin uso (`.dron-video`, `.joystick-*`, `.sensor-*`);
    - `console.log` de depuración;
    - `'use strict'` dentro de clases (joystick y giroscopio);
    - `mostrarToast` con `innerHTML`;
-   - service worker: no registrarlo en el APK, y las plantillas con `?v=Date.now()` llenan la caché.
-6. **Hosting:** subir el backend, importar `schema.sql`, crear `config.php` (con `https://localhost` en CORS) y cambiar las contraseñas del seed.
+   - service worker: no registrarlo en el APK; las plantillas con `?v=Date.now()` llenan la caché; subir `CACHE_NAME` (los cambios de las Fases 2 y 3 en CSS y páginas pueden quedar en caché en un navegador con la PWA instalada).
+6. **Hosting:** subir el backend, importar `schema.sql` y crear `config.php` (con `https://localhost` en CORS). Cada cuenta del seed pide cambiar `password` en su primer login.
 7. **Al final:** documentación (README, manual de usuario, manual del programador, API, plan de pruebas, limitaciones) y corrección del informe (por ejemplo, el LED IR figura en GPIO35, que es solo de entrada).

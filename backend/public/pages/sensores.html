@@ -23,6 +23,27 @@
         </p>
     </div>
 
+    <!-- Giroscopio en vivo: lectura real del sensor -->
+    <div class="sensor-panel" id="panel-giro-vivo">
+        <div class="sensor-panel__titulo">🧭 Giroscopio en vivo</div>
+        <div class="sensor-lectura">
+            <div class="sensor-lectura__item">
+                <div class="sensor-lectura__eje">Adelante / atrás</div>
+                <div class="sensor-lectura__valor" id="giro-beta">--</div>
+            </div>
+            <div class="sensor-lectura__item">
+                <div class="sensor-lectura__eje">Izquierda / derecha</div>
+                <div class="sensor-lectura__valor" id="giro-gamma">--</div>
+            </div>
+            <div class="sensor-lectura__item">
+                <div class="sensor-lectura__eje">Brújula</div>
+                <div class="sensor-lectura__valor" id="giro-alpha">--</div>
+            </div>
+        </div>
+        <p id="giro-estado" class="texto-xs texto-secundario mb-sm">Preparando el sensor...</p>
+        <button id="btn-giro-vivo" class="btn btn--secundario" hidden>▶ Ver lectura en vivo</button>
+    </div>
+
     <!-- Panel de resultados (se llena dinámicamente desde app.js) -->
     <div id="panel-resultados-sensores">
         <div class="cargando">

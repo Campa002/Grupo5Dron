@@ -1,126 +1,93 @@
 <div class="pagina-prueba-tello">
     <div class="flex justify-between items-center mb-md flex-wrap gap-sm">
         <div>
-            <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">📡 Prueba y Diagnóstico DJI Tello</h2>
-            <p class="texto-sm texto-secundario">Valida la conexión UDP con el dron antes de iniciar vuelo</p>
+            <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">🛰️ Prueba y diagnóstico del Tello</h2>
+            <p class="texto-sm texto-secundario">Probá la conexión UDP con el dron antes de volar.</p>
         </div>
-        <a href="#/dron" class="btn btn--secundario">← Volver a Cabina</a>
+        <a href="#/dron" class="btn btn--secundario">← Volver a la cabina</a>
     </div>
 
-    <!-- Advertencia de seguridad -->
     <div class="alerta alerta--info mb-md">
-        <span>⚠️ <strong>Aviso de Seguridad:</strong> Asegurate de que el celular esté conectado a la red Wi-Fi del Tello (SSID <code>TELLO-XXXXXX</code>, IP <code>192.168.10.1</code>) y de contar con espacio libre y seguro.</span>
+        <span>⚠️ Conectá el celular al WiFi del Tello (<code>TELLO-XXXXXX</code>, IP <code>192.168.10.1</code>) y dejá el dron apoyado en el piso. Estos comandos no lo hacen despegar.</span>
     </div>
 
-    <!-- Estado de enlace -->
+    <!-- Destino -->
     <div class="tarjeta mb-md">
-        <h3 class="texto-sm font-semibold texto-secundario mb-sm">🌐 Estado del Enlace</h3>
+        <h3 class="tarjeta__titulo">🌐 Destino</h3>
         <div class="flex gap-md flex-wrap items-center">
-            <div>
-                <span class="texto-xs texto-secundario block">IP Destino:</span>
-                <input type="text" id="tello-ip-prueba" class="campo-formulario__entrada" style="width:160px;" value="192.168.10.1">
+            <div class="campo" style="flex: 1 1 9rem; margin-bottom: 0;">
+                <label class="campo__label" for="tello-ip-prueba">IP del Tello</label>
+                <input type="text" id="tello-ip-prueba" class="campo__input" value="192.168.10.1" inputmode="decimal">
             </div>
-            <div>
-                <span class="texto-xs texto-secundario block">Puerto Comando:</span>
-                <input type="number" id="tello-puerto-prueba" class="campo-formulario__entrada" style="width:100px;" value="8889">
+            <div class="campo" style="flex: 0 1 7rem; margin-bottom: 0;">
+                <label class="campo__label" for="tello-puerto-prueba">Puerto</label>
+                <input type="number" id="tello-puerto-prueba" class="campo__input" value="8889">
             </div>
-            <div>
-                <span class="texto-xs texto-secundario block">Entorno:</span>
+            <div style="flex: 1 1 100%;">
+                <span class="campo__label">Entorno</span>
                 <span id="tello-entorno-badge" class="badge">Detectando...</span>
             </div>
         </div>
     </div>
 
-    <!-- Acciones de prueba -->
+    <!-- Comandos -->
     <div class="tarjeta mb-md">
-        <h3 class="texto-sm font-semibold texto-secundario mb-sm">🧪 Comandos de Validación</h3>
-        <div class="flex gap-sm flex-wrap mb-sm">
-            <button id="btn-tello-cmd" class="btn btn--primario">
-                1️⃣ Enviar "command" (Iniciar SDK)
-            </button>
-            <button id="btn-tello-bat" class="btn btn--secundario">
-                2️⃣ Consultar Batería ("battery?")
-            </button>
-            <button id="btn-tello-streamon" class="btn btn--secundario">
-                3️⃣ Activar Video ("streamon")
-            </button>
+        <h3 class="tarjeta__titulo">🧪 Comandos de prueba</h3>
+        <div class="grilla-prueba-tello mb-md">
+            <button id="btn-tello-cmd" class="btn btn--primario">1️⃣ "command" (modo SDK)</button>
+            <button id="btn-tello-bat" class="btn btn--secundario">2️⃣ "battery?" (batería)</button>
+            <button id="btn-tello-streamon" class="btn btn--secundario">3️⃣ "streamon" (video)</button>
         </div>
         <div class="flex gap-sm items-center">
-            <input type="text" id="tello-cmd-custom" class="campo-formulario__entrada" placeholder="Comando personalizado (ej: time?)" style="flex:1;">
+            <input type="text" id="tello-cmd-custom" class="campo__input" placeholder="Otro comando (ej: time?)" style="flex:1; min-width:0;" aria-label="Comando personalizado">
             <button id="btn-tello-custom" class="btn btn--secundario">Enviar</button>
         </div>
     </div>
 
     <!-- Consola de respuestas -->
     <div class="tarjeta mb-md">
-        <div class="flex justify-between items-center mb-xs">
-            <h3 class="texto-sm font-semibold texto-secundario">📟 Registro de Respuestas UDP</h3>
-            <button id="btn-limpiar-log-tello" class="btn btn--secundario texto-xs" style="padding: 2px 8px;">Limpiar</button>
+        <div class="flex justify-between items-center mb-sm gap-sm">
+            <h3 class="tarjeta__titulo" style="margin:0;">📟 Respuestas UDP</h3>
+            <button id="btn-limpiar-log-tello" class="btn btn--secundario">Limpiar</button>
         </div>
-        <pre id="tello-log-salida" style="background:#0a0e14; color:#38ef7d; font-family:monospace; font-size:12px; padding:12px; border-radius:8px; min-height:140px; max-height:220px; overflow-y:auto; white-space:pre-wrap;">Esperando comandos de prueba...</pre>
+        <pre id="tello-log-salida" class="consola-prueba">Esperando comandos de prueba...</pre>
     </div>
 
-    <!-- Panel Diagnóstico Completo -->
+    <!-- Diagnóstico -->
     <div class="tarjeta mb-md" id="panel-diagnostico-tello">
-        <div class="flex justify-between items-center mb-sm flex-wrap gap-xs">
-            <h3 class="texto-sm font-semibold texto-secundario">🛠️ Diagnóstico para Pruebas de Campo</h3>
-            <div class="flex gap-xs">
-                <button id="btn-ejecutar-diagnostico" class="btn btn--primario texto-xs">🔄 Diagnosticar Ahora</button>
-                <button id="btn-copiar-diagnostico" class="btn btn--secundario texto-xs">📋 Copiar informe</button>
+        <div class="flex justify-between items-center mb-sm flex-wrap gap-sm">
+            <h3 class="tarjeta__titulo" style="margin:0;">🛠️ Diagnóstico para la prueba de campo</h3>
+            <div class="flex gap-sm flex-wrap">
+                <button id="btn-ejecutar-diagnostico" class="btn btn--primario">🔄 Diagnosticar</button>
+                <button id="btn-copiar-diagnostico" class="btn btn--secundario">📋 Copiar informe</button>
             </div>
         </div>
 
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; font-size: 0.8rem;">
-            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
-                <span class="texto-secundario block">Plugin DronNative:</span>
-                <strong id="diag-plugin-info">No detectado</strong>
-            </div>
-            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
-                <span class="texto-secundario block">Red Wi-Fi Vinculada:</span>
-                <strong id="diag-wifi-status">Pendiente</strong>
-            </div>
-            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
-                <span class="texto-secundario block">Soporte WebCodecs:</span>
-                <strong id="diag-webcodecs-status">Verificando...</strong>
-            </div>
-            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
-                <span class="texto-secundario block">Comandos ("command" / "battery?"):</span>
-                <strong id="diag-latencia-cmd">Sin probar</strong>
-            </div>
-            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
-                <span class="texto-secundario block">Telemetría (8890):</span>
-                <strong id="diag-telemetria-pps">0 pps | Ninguna</strong>
-            </div>
-            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
-                <span class="texto-secundario block">Video (11111):</span>
-                <strong id="diag-video-bytes">0 bytes</strong>
-            </div>
-            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
-                <span class="texto-secundario block">API Base URL:</span>
-                <strong id="diag-api-url" style="word-break:break-all;">—</strong>
-            </div>
-            <div class="tarjeta" style="background:var(--color-fondo); padding:8px;">
-                <span class="texto-secundario block">Modo Conexión:</span>
-                <strong id="diag-conexion-estado">—</strong>
-            </div>
+        <div class="grilla-diagnostico">
+            <div class="dato-diagnostico"><span>Plugin DronNative</span><strong id="diag-plugin-info">No detectado</strong></div>
+            <div class="dato-diagnostico"><span>Red WiFi vinculada</span><strong id="diag-wifi-status">Pendiente</strong></div>
+            <div class="dato-diagnostico"><span>Soporte de video (WebCodecs)</span><strong id="diag-webcodecs-status">Verificando...</strong></div>
+            <div class="dato-diagnostico"><span>Respuestas ("command" / "battery?")</span><strong id="diag-latencia-cmd">Sin probar</strong></div>
+            <div class="dato-diagnostico"><span>Telemetría (UDP 8890)</span><strong id="diag-telemetria-pps">0 pps</strong></div>
+            <div class="dato-diagnostico"><span>Video (UDP 11111)</span><strong id="diag-video-bytes">0 bytes</strong></div>
+            <div class="dato-diagnostico"><span>URL de la API</span><strong id="diag-api-url" style="word-break:break-all;">—</strong></div>
+            <div class="dato-diagnostico"><span>Sesión</span><strong id="diag-conexion-estado">—</strong></div>
         </div>
 
-        <div class="mt-xs">
-            <span class="texto-xs texto-secundario block">WebView / UserAgent:</span>
-            <code id="diag-user-agent" style="font-size:10px; display:block; padding:4px; background:var(--color-fondo); border-radius:4px; word-break:break-all;"></code>
-        </div>
-
-        <!-- Área de texto oculta para respaldo de portapapeles -->
-        <textarea id="diag-textarea-respaldo" style="position:absolute; left:-9999px; opacity:0;"></textarea>
-
-        <!-- Registro de últimos 20 errores -->
         <div class="mt-sm">
-            <div class="flex justify-between items-center mb-xs">
-                <span class="texto-xs font-semibold texto-secundario">Últimos 20 errores:</span>
-                <button id="btn-limpiar-errores-diag" class="btn btn--secundario texto-xs" style="padding:1px 6px;">Borrar</button>
+            <span class="texto-xs texto-secundario block">WebView / UserAgent</span>
+            <code id="diag-user-agent" class="texto-xs" style="display:block; padding: var(--espacio-xs); background: var(--color-fondo); border-radius: var(--radio-sm); word-break: break-all;"></code>
+        </div>
+
+        <!-- Área de texto oculta para copiar el informe si el portapapeles falla -->
+        <textarea id="diag-textarea-respaldo" aria-hidden="true" tabindex="-1" style="position:absolute; left:-9999px; opacity:0;"></textarea>
+
+        <div class="mt-md">
+            <div class="flex justify-between items-center mb-xs gap-sm">
+                <span class="texto-sm font-semibold texto-secundario">Últimos 20 errores</span>
+                <button id="btn-limpiar-errores-diag" class="btn btn--secundario">Borrar</button>
             </div>
-            <pre id="diag-errores-salida" style="background:#0a0e14; color:#ef4444; font-family:monospace; font-size:11px; padding:8px; border-radius:6px; max-height:110px; overflow-y:auto; white-space:pre-wrap;">Sin errores registrados.</pre>
+            <pre id="diag-errores-salida" class="consola-prueba consola-prueba--errores">Sin errores registrados.</pre>
         </div>
     </div>
 </div>
-

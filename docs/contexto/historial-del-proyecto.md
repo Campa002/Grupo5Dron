@@ -85,6 +85,15 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - cambio obligatorio de la contraseña temporal del seed (endpoint `cambiar_mi_password`);
     - plantilla de comandos fuera del formulario;
     - CORS con `https://localhost` en el ejemplo y contraseña del seed bien documentada.
+15. **Fase 3 con Claude Code (5/11).** Interfaz:
+    - inicio con las dos opciones del informe también en modo sin cuenta;
+    - clases CSS que faltaban y `[hidden]` global;
+    - contraste ≥ 4,5:1;
+    - header con botones de 44 px y badge compacto;
+    - modal de perfiles con el componente común;
+    - Prueba Tello y formularios con controles de 44 px;
+    - giroscopio en vivo en Sensores;
+    - Acerca con datos técnicos reales (pines GPIO25/19/4, sin "MVC" ni "drones HTTP") y sin los roles inventados de los integrantes.
 
 ## 4. Hardware
 

@@ -213,8 +213,8 @@ const Auth = (() => {
         // Usar el dron sin cuenta (por ejemplo, conectado al WiFi del Tello, sin internet)
         document.getElementById('btn-modo-invitado')?.addEventListener('click', () => {
             activarModoInvitado();
-            App.mostrarToast('Modo dron sin cuenta: el aula y la administración requieren iniciar sesión.', 'info', 5000);
-            window.location.hash = '#/dron';
+            App.mostrarToast('Modo sin cuenta: podés usar el dron; el aula y la administración requieren iniciar sesión.', 'info', 5000);
+            window.location.hash = '#/inicio';
         });
 
         form.addEventListener('submit', async (e) => {

@@ -17,7 +17,7 @@
             Módulos principales
         </h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: var(--espacio-md);">
-            <a href="#/aula" class="acceso tarjeta--acento" style="min-height: 12rem; border-width: 2px;">
+            <a href="#/aula" id="inicio-acceso-aula" class="acceso tarjeta--acento" style="min-height: 12rem; border-width: 2px;">
                 <span class="acceso__icono">🎛️</span>
                 <span class="acceso__titulo" style="font-size: var(--tamano-xl);">Control del Aula</span>
                 <span class="acceso__desc">Control de luces, ventiladores, aire acondicionado, proyector y relé</span>
@@ -41,6 +41,11 @@
                 <span class="acceso__titulo">Diagnóstico Sensores</span>
                 <span class="acceso__desc">Giroscopio y orientación móvil</span>
             </a>
+            <a href="#/prueba-tello" class="acceso">
+                <span class="acceso__icono" style="font-size: 2.2rem;">🛰️</span>
+                <span class="acceso__titulo">Prueba Tello</span>
+                <span class="acceso__desc">Conexión, telemetría y video del Tello</span>
+            </a>
             <a href="#/config-dron" class="acceso">
                 <span class="acceso__icono" style="font-size: 2.2rem;">🔧</span>
                 <span class="acceso__titulo">Config. Dron</span>
@@ -60,7 +65,7 @@
     </div>
 
     <!-- Estado del sistema y ESP32 -->
-    <div class="tarjeta">
+    <div class="tarjeta" id="inicio-tarjeta-esp32">
         <div class="flex justify-between items-center mb-sm">
             <div class="tarjeta__titulo" style="margin-bottom: 0;">⚡ Estado del ESP32 del Aula</div>
             <button class="btn btn--secundario btn--icono" onclick="Aula.actualizarEstadoEsp32 ? Aula.actualizarEstadoEsp32() : location.reload()" title="Actualizar">🔄</button>

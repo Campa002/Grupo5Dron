@@ -211,17 +211,6 @@ const ConfigDron = (() => {
                 </div>
             </div>
 
-            <!-- Modal de edición -->
-            <div id="modal-perfil" class="modal" style="display:none;" aria-modal="true" role="dialog" aria-labelledby="modal-perfil-titulo">
-                <div class="modal__overlay" id="modal-perfil-overlay"></div>
-                <div class="modal__contenido tarjeta" style="max-width:520px; width:94%;">
-                    <div class="modal__header">
-                        <h3 id="modal-perfil-titulo" class="modal__titulo">Perfil de dron</h3>
-                        <button id="btn-cerrar-modal-perfil" class="modal__btn-cerrar" aria-label="Cerrar">✕</button>
-                    </div>
-                    <div id="modal-perfil-body" class="modal__cuerpo"></div>
-                </div>
-            </div>
         </div>`;
     }
 
@@ -287,21 +276,32 @@ const ConfigDron = (() => {
     // Modal de creación / edición (solo perfiles del servidor)
     // ----------------------------------------------------------------
 
-    function _abrirModalPerfil(contenedor, perfil) {
-        const modal = contenedor.querySelector('#modal-perfil');
-        const titulo = contenedor.querySelector('#modal-perfil-titulo');
-        const body = contenedor.querySelector('#modal-perfil-body');
-        if (!modal || !body) return;
+    function _cerrarModalPerfil() {
+        document.getElementById('modal-perfil')?.remove();
+    }
 
-        titulo.textContent = perfil ? 'Editar perfil de dron' : 'Nuevo perfil de dron';
-        body.innerHTML = _formularioPerfil(perfil);
-        modal.style.display = 'flex';
+    function _abrirModalPerfil(contenedor, perfil) {
+        _cerrarModalPerfil();
+        const overlay = document.createElement('div');
+        overlay.id = 'modal-perfil';
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = `
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-perfil-titulo">
+                <div class="modal__header">
+                    <h3 id="modal-perfil-titulo" class="modal__titulo">${perfil ? 'Editar perfil de dron' : 'Nuevo perfil de dron'}</h3>
+                    <button type="button" class="modal__cerrar" id="btn-cerrar-modal-perfil" aria-label="Cerrar">&times;</button>
+                </div>
+                <div class="modal__body" id="modal-perfil-body">${_formularioPerfil(perfil)}</div>
+            </div>`;
+        document.body.appendChild(overlay);
+        const body = overlay.querySelector('#modal-perfil-body');
         body.querySelector('#campo-nombre-perfil')?.focus();
 
-        const cerrar = () => { modal.style.display = 'none'; };
-        contenedor.querySelector('#btn-cerrar-modal-perfil').onclick = cerrar;
-        contenedor.querySelector('#modal-perfil-overlay').onclick = cerrar;
-        body.querySelector('#btn-cancelar-perfil').onclick = cerrar;
+        overlay.querySelector('#btn-cerrar-modal-perfil').onclick = _cerrarModalPerfil;
+        overlay.onclick = (e) => { if (e.target === overlay) _cerrarModalPerfil(); };
+        body.querySelector('#btn-cancelar-perfil').onclick = _cerrarModalPerfil;
+        // Si se navega a otra pantalla con el modal abierto, se cierra
+        window.addEventListener('hashchange', _cerrarModalPerfil, { once: true });
         body.querySelector('#form-perfil').addEventListener('submit', async (e) => {
             e.preventDefault();
             await _guardarPerfil(contenedor, body, perfil ? perfil.id : null);
@@ -390,7 +390,7 @@ const ConfigDron = (() => {
                 await API.perfilesDron.crear(datos);
                 App.mostrarToast('Perfil creado.', 'exito');
             }
-            contenedor.querySelector('#modal-perfil').style.display = 'none';
+            _cerrarModalPerfil();
             await inicializar(contenedor);
         } catch (err) {
             mostrarError('No se pudo guardar: ' + (err.message || 'error desconocido'));

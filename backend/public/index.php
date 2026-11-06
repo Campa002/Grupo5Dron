@@ -41,10 +41,10 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
             </button>
             <h1 class="header__titulo">
                 <span class="header__titulo-icono">⚡</span>
-                Control de Sistemas y Dron
+                <span class="header__titulo-texto">Control de Sistemas y Dron</span>
             </h1>
             <div class="header__acciones">
-                <span id="indicador-offline" class="badge badge--advertencia" style="display:none; font-size:0.75rem;">📡 Modo sin conexión</span>
+                <span id="indicador-offline" class="badge badge--advertencia header__badge" style="display:none;" title="Modo sin conexión"><span id="indicador-offline-icono" aria-hidden="true">📡</span><span id="indicador-offline-texto" class="header__badge-texto">Modo sin conexión</span></span>
                 <span id="indicador-esp32" class="indicador indicador--offline" title="ESP32 desconectado">
                     <span class="indicador__punto"></span>
                     <span class="indicador__texto">ESP32</span>

@@ -20,8 +20,11 @@ const App = (() => {
     // Número de navegación: si llega otra mientras esta espera, esta se abandona
     let navegacionActual = 0;
 
-    // Rutas permitidas en el modo "dron sin cuenta"
-    const RUTAS_SIN_CUENTA = ['dron', 'prueba-tello', 'sensores', 'config-dron', 'acerca'];
+    // Pantallas del módulo del dron (si la sesión vence en una de estas, se sigue en modo sin cuenta)
+    const RUTAS_DRON = ['dron', 'prueba-tello', 'sensores', 'config-dron', 'acerca'];
+
+    // Rutas permitidas en el modo "dron sin cuenta": el inicio (con las dos opciones) y las del dron
+    const RUTAS_SIN_CUENTA = ['inicio', ...RUTAS_DRON];
 
     /**
      * Muestra una notificación emergente (Toast) en pantalla.
@@ -152,14 +155,10 @@ const App = (() => {
             return;
         }
 
-        // Modo dron sin cuenta: solo las pantallas del dron
+        // Modo dron sin cuenta: inicio y pantallas del dron; el aula y la administración van al login
         if (invitado && destino !== 'login' && !RUTAS_SIN_CUENTA.includes(destino)) {
-            if (destino === 'inicio') {
-                window.location.hash = '#/dron';
-            } else {
-                mostrarToast('El aula y la administración requieren iniciar sesión.', 'advertencia');
-                window.location.hash = '#/login';
-            }
+            mostrarToast('El aula y la administración requieren iniciar sesión.', 'advertencia');
+            window.location.hash = '#/login';
             return;
         }
 
@@ -247,6 +246,8 @@ const App = (() => {
         const btnUsuario = document.getElementById('btn-usuario');
         const indicadorEsp = document.getElementById('indicador-esp32');
         const indicadorOffline = document.getElementById('indicador-offline');
+        const iconoOffline = document.getElementById('indicador-offline-icono');
+        const textoOffline = document.getElementById('indicador-offline-texto');
 
         if (destino === 'login') {
             document.body.classList.add('pantalla-login');
@@ -260,7 +261,11 @@ const App = (() => {
             if (btnUsuario) btnUsuario.style.visibility = 'visible';
             if (indicadorEsp) indicadorEsp.style.display = invitado ? 'none' : 'flex';
             if (indicadorOffline) {
-                indicadorOffline.textContent = invitado ? '🚁 Sin cuenta' : '📡 Modo sin conexión';
+                const texto = invitado ? 'Sin cuenta' : 'Modo sin conexión';
+                if (iconoOffline) iconoOffline.textContent = invitado ? '🚁' : '📡';
+                if (textoOffline) textoOffline.textContent = texto;
+                indicadorOffline.title = texto;
+                indicadorOffline.setAttribute('aria-label', texto);
                 indicadorOffline.style.display = (invitado || esOffline) ? 'inline-flex' : 'none';
             }
         }
@@ -277,7 +282,7 @@ const App = (() => {
         if (!API.estaAutenticado()) return;
         Auth.cerrarSesionLocal();
         const ruta = window.location.hash.replace(/^#\/?/, '').split('?')[0].trim() || 'inicio';
-        if (RUTAS_SIN_CUENTA.includes(ruta)) {
+        if (RUTAS_DRON.includes(ruta)) {
             Auth.activarModoInvitado();
             actualizarEncabezado(ruta);
             mostrarToast('Tu sesión venció. Seguís usando el dron en modo sin cuenta; para el aula, iniciá sesión de nuevo.', 'advertencia', 7000);
@@ -340,7 +345,7 @@ const App = (() => {
             case 'sensores': {
                 const contenedorSens = document.getElementById('app-contenido');
                 if (typeof Sensores !== 'undefined' && contenedorSens) {
-                    await inicializarPaginaSensores(contenedorSens);
+                    limpiezaPaginaActual = inicializarPaginaSensores(contenedorSens);
                 }
                 break;
             }
@@ -377,6 +382,24 @@ const App = (() => {
     async function inicializarPaginaInicio(usuario) {
         const elemNombre = document.getElementById('inicio-nombre-usuario');
         const elemRol = document.getElementById('inicio-rol-usuario');
+
+        // Modo sin cuenta: las dos opciones del informe; el aula lleva al login
+        if (!usuario && Auth.esModoInvitado()) {
+            if (elemNombre) elemNombre.textContent = 'invitado/a';
+            if (elemRol) {
+                elemRol.textContent = '🚁 Sin cuenta';
+                elemRol.className = 'badge badge--info';
+            }
+            const accesoAula = document.getElementById('inicio-acceso-aula');
+            if (accesoAula) {
+                accesoAula.href = '#/login';
+                const desc = accesoAula.querySelector('.acceso__desc');
+                if (desc) desc.textContent = 'Requiere iniciar sesión: te lleva al login.';
+            }
+            const tarjetaEsp = document.getElementById('inicio-tarjeta-esp32');
+            if (tarjetaEsp) tarjetaEsp.hidden = true;
+            return;
+        }
 
         if (elemNombre && usuario) {
             elemNombre.textContent = usuario.nombre || 'Usuario';
@@ -491,40 +514,36 @@ const App = (() => {
     }
 
     /**
-     * Inicializa la vista de Diagnóstico de Sensores (/pages/sensores.html).
+     * Inicializa la vista de Diagnóstico de Sensores (/pages/sensores.html):
+     * diagnóstico de disponibilidad y lectura en vivo del giroscopio.
      * @param {HTMLElement} contenedor
+     * @returns {Function} limpieza que deja de escuchar el sensor al salir de la página
      */
-    async function inicializarPaginaSensores(contenedor) {
-        if (!contenedor) return;
-        // El HTML ya fue inyectado por el router; activar diagnóstico
-        const btnDiagnosticar = contenedor.querySelector('#btn-diagnosticar-sensores');
-        const panelResultados = contenedor.querySelector('#panel-resultados-sensores');
-        if (!btnDiagnosticar || !panelResultados) return;
+    function inicializarPaginaSensores(contenedor) {
+        const q = sel => contenedor.querySelector(sel);
+        const btnDiagnosticar = q('#btn-diagnosticar-sensores');
+        const panelResultados = q('#panel-resultados-sensores');
+        const btnVivo = q('#btn-giro-vivo');
+        const estadoVivo = q('#giro-estado');
+        let escuchando = false;
+        let lecturas = 0;
+        let timerSinDatos = null;
 
         async function ejecutarDiagnostico() {
+            if (!btnDiagnosticar || !panelResultados) return;
             btnDiagnosticar.disabled = true;
             btnDiagnosticar.textContent = 'Diagnosticando...';
             panelResultados.innerHTML = '<div class="cargando"><div class="cargando__spinner"></div><p>Verificando sensores...</p></div>';
 
-            await Sensores.diagnosticar((nombre, resultado) => {
-                // Actualizar cada fila a medida que llega
-                const fila = panelResultados.querySelector(`[data-sensor="${nombre}"]`);
-                if (fila) {
-                    const iconoEl = fila.querySelector('.sensor-icono-estado');
-                    if (iconoEl) iconoEl.textContent = '✓';
-                }
-            });
-
+            await Sensores.diagnosticar();
             const resumen = Sensores.obtenerResumen();
             panelResultados.innerHTML = resumen.map(s => `
-                <div class="tarjeta flex items-start gap-md mb-sm" data-sensor="${s.nombre.toLowerCase().replace(/ /g, '_')}">
+                <div class="tarjeta flex items-start gap-md mb-sm">
                     <span style="font-size:1.75rem; flex-shrink:0;">${s.icono}</span>
-                    <div style="flex:1;">
-                        <div class="flex justify-between items-center">
+                    <div style="flex:1; min-width:0;">
+                        <div class="flex justify-between items-center gap-sm flex-wrap">
                             <strong class="texto-sm">${s.nombre}</strong>
-                            <span class="badge ${s.ok ? 'badge--exito' : 'badge--error'} sensor-icono-estado">
-                                ${s.ok ? '✓ ' + s.estado : '✗ ' + s.estado}
-                            </span>
+                            <span class="badge ${s.ok ? 'badge--exito' : 'badge--error'}">${s.ok ? '✓ ' + s.estado : '✗ ' + s.estado}</span>
                         </div>
                         <p class="texto-xs texto-secundario mt-xs">${s.detalle}</p>
                     </div>
@@ -535,9 +554,55 @@ const App = (() => {
             btnDiagnosticar.textContent = '🔄 Repetir diagnóstico';
         }
 
-        btnDiagnosticar.addEventListener('click', ejecutarDiagnostico);
-        // Ejecutar automáticamente al abrir la pantalla
-        await ejecutarDiagnostico();
+        // ---- Giroscopio en vivo ----
+        const fmt = v => (typeof v === 'number' ? `${v.toFixed(1)}°` : '--');
+        function onOrientacion(ev) {
+            if (typeof ev.beta !== 'number' && typeof ev.gamma !== 'number') return; // evento sin datos (PC)
+            lecturas++;
+            q('#giro-beta').textContent = fmt(ev.beta);
+            q('#giro-gamma').textContent = fmt(ev.gamma);
+            q('#giro-alpha').textContent = fmt(ev.alpha);
+            if (lecturas === 1 && estadoVivo) estadoVivo.textContent = '✓ Recibiendo datos reales del sensor. Inclinate para ver cómo cambian.';
+        }
+
+        async function iniciarLecturaVivo() {
+            if (escuchando || !estadoVivo) return;
+            if (typeof DeviceOrientationEvent === 'undefined') {
+                estadoVivo.textContent = '✗ Este navegador no da acceso al giroscopio.';
+                return;
+            }
+            // iOS 13+ pide permiso con un toque del usuario
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    if (await DeviceOrientationEvent.requestPermission() !== 'granted') {
+                        estadoVivo.textContent = '✗ Permiso del giroscopio denegado.';
+                        return;
+                    }
+                } catch (_) {
+                    estadoVivo.textContent = 'Tocá "Ver lectura en vivo" para dar permiso al giroscopio.';
+                    if (btnVivo) btnVivo.hidden = false;
+                    return;
+                }
+            }
+            window.addEventListener('deviceorientation', onOrientacion);
+            escuchando = true;
+            if (btnVivo) btnVivo.hidden = true;
+            estadoVivo.textContent = 'Esperando datos del sensor...';
+            timerSinDatos = setTimeout(() => {
+                if (!lecturas) estadoVivo.textContent = '✗ No llegan datos: este dispositivo no tiene giroscopio o el navegador no lo expone (en una PC es normal).';
+            }, 2500);
+        }
+
+        btnDiagnosticar?.addEventListener('click', ejecutarDiagnostico);
+        btnVivo?.addEventListener('click', iniciarLecturaVivo);
+        ejecutarDiagnostico();
+        // Arranca solo; si el navegador exige un toque para dar permiso (iOS), aparece el botón
+        iniciarLecturaVivo();
+
+        return () => {
+            clearTimeout(timerSinDatos);
+            window.removeEventListener('deviceorientation', onOrientacion);
+        };
     }
 
     /**

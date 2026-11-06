@@ -25,7 +25,7 @@
     /* Texto */
     --color-texto:              #e2e8f0;
     --color-texto-secundario:   #94a3b8;
-    --color-texto-terciario:    #64748b;
+    --color-texto-terciario:    #8696ab; /* 5,2:1 sobre --color-superficie */
     --color-texto-invertido:    #0a1628;
 
     /* Estados */
@@ -149,8 +149,9 @@ img { max-width: 100%; height: auto; }
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex-shrink: 0;
 }
 .header__btn-menu:hover { background: var(--color-acento-suave); }
 
@@ -176,6 +177,9 @@ img { max-width: 100%; height: auto; }
 .header__menu-icono::after  { top: 6px; }
 
 .header__titulo {
+    flex: 1;
+    min-width: 0;
+    margin: 0 var(--espacio-sm);
     font-size: var(--tamano-base);
     font-weight: 600;
     display: flex;
@@ -188,14 +192,30 @@ img { max-width: 100%; height: auto; }
 .header__titulo-icono {
     font-size: var(--tamano-xl);
 }
+.header__titulo-texto {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
 .header__acciones {
     display: flex;
     align-items: center;
     gap: var(--espacio-sm);
+    flex-shrink: 0;
+}
+.header__badge {
+    white-space: nowrap;
+    gap: 0.25rem;
 }
 
 .header__btn-usuario {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
     background: none;
     border: none;
     color: var(--color-texto);
@@ -429,7 +449,8 @@ img { max-width: 100%; height: auto; }
 }
 
 .btn--primario {
-    background: linear-gradient(135deg, var(--color-acento), var(--color-acento-hover));
+    /* #2563eb → #1d4ed8: texto blanco con contraste de 5,2:1 o más */
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
     color: white;
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
@@ -449,7 +470,8 @@ img { max-width: 100%; height: auto; }
 }
 
 .btn--peligro {
-    background: linear-gradient(135deg, var(--color-error), #dc2626);
+    /* #dc2626 → #b91c1c: texto blanco con contraste de 4,8:1 o más */
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
     color: white;
 }
 
@@ -472,7 +494,8 @@ img { max-width: 100%; height: auto; }
 }
 
 .btn--exito {
-    background: linear-gradient(135deg, var(--color-exito), #16a34a);
+    /* #15803d → #166534: texto blanco con contraste de 5:1 o más */
+    background: linear-gradient(135deg, #15803d, #166534);
     color: white;
 }
 
@@ -489,6 +512,7 @@ img { max-width: 100%; height: auto; }
 .btn--icono {
     width: 2.75rem;
     height: 2.75rem;
+    flex-shrink: 0;
     padding: 0;
     border-radius: var(--radio-md);
     font-size: var(--tamano-xl);
@@ -507,6 +531,7 @@ img { max-width: 100%; height: auto; }
 }
 .campo__input {
     width: 100%;
+    min-height: 2.75rem; /* área táctil de 44 px */
     padding: 0.65rem 0.85rem;
     font-family: var(--fuente-principal);
     font-size: var(--tamano-base);
@@ -1101,6 +1126,11 @@ select.campo__input {
     font-weight: 600;
 }
 .modal__cerrar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
     background: none;
     border: none;
     color: var(--color-texto-terciario);
@@ -1155,6 +1185,13 @@ body.rol-docente .solo-docente { display: block; }
 
 /* --- Responsive --- */
 @media (max-width: 480px) {
+    /* En pantallas angostas el badge del header muestra solo el ícono */
+    .header__badge-texto {
+        display: none;
+    }
+    .header__titulo-icono {
+        display: none;
+    }
     .dron-joysticks {
         flex-direction: column;
         align-items: center;
@@ -1214,6 +1251,57 @@ body.rol-docente .solo-docente { display: block; }
 .justify-center { justify-content: center; }
 .flex-wrap { flex-wrap: wrap; }
 .oculto { display: none !important; }
+[hidden] { display: none !important; }
+.texto-base { font-size: var(--tamano-base); }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.block { display: block; }
+.mt-xs { margin-top: var(--espacio-xs); }
+.mb-xs { margin-bottom: var(--espacio-xs); }
+.mb-sm { margin-bottom: var(--espacio-sm); }
+.ml-sm { margin-left: var(--espacio-sm); }
+.gap-xs { gap: var(--espacio-xs); }
+.gap-md { gap: var(--espacio-md); }
+.items-start { align-items: flex-start; }
+
+/* --- Alertas (avisos dentro de una página) --- */
+.alerta {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--espacio-sm);
+    padding: var(--espacio-sm) var(--espacio-md);
+    border: 1px solid;
+    border-radius: var(--radio-md);
+    font-size: var(--tamano-sm);
+    line-height: 1.5;
+    color: var(--color-texto);
+}
+.alerta--info        { background: var(--color-celeste-suave);      border-color: var(--color-celeste); }
+.alerta--advertencia { background: var(--color-advertencia-fondo);  border-color: var(--color-advertencia); }
+.alerta--error       { background: var(--color-error-fondo);        border-color: var(--color-error); }
+
+/* Texto de ayuda debajo de un campo de formulario */
+.campo__ayuda {
+    display: block;
+    margin-top: var(--espacio-xs);
+    font-size: var(--tamano-xs);
+    color: var(--color-texto-secundario);
+}
+
+/* Lista de integrantes (Acerca) */
+.lista-integrantes {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: var(--espacio-sm);
+}
+.lista-integrantes li {
+    padding: var(--espacio-sm) var(--espacio-md);
+    background: var(--color-fondo);
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-md);
+    font-weight: 600;
+}
 
 /* ============================================================
    Cabina de vuelo del dron (#/dron)
@@ -1558,4 +1646,51 @@ body.en-cabina .toast { pointer-events: none; }
         aspect-ratio: auto;
     }
     .cab-lado { justify-content: space-between; }
+}
+
+/* ============================================================
+   Prueba Tello (#/prueba-tello)
+   ============================================================ */
+.pagina-prueba-tello .grilla-prueba-tello {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: var(--espacio-sm);
+}
+.pagina-prueba-tello .consola-prueba {
+    min-height: 8rem;
+    max-height: 14rem;
+    overflow-y: auto;
+    padding: var(--espacio-sm) var(--espacio-md);
+    background: #050b16;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-md);
+    color: #86efac;
+    font-family: var(--fuente-mono);
+    font-size: var(--tamano-xs);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.pagina-prueba-tello .consola-prueba--errores {
+    min-height: 3rem;
+    max-height: 8rem;
+    color: #fca5a5;
+}
+.pagina-prueba-tello .grilla-diagnostico {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: var(--espacio-sm);
+}
+.pagina-prueba-tello .dato-diagnostico {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: var(--espacio-sm);
+    background: var(--color-fondo);
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-md);
+    font-size: var(--tamano-sm);
+}
+.pagina-prueba-tello .dato-diagnostico span {
+    font-size: var(--tamano-xs);
+    color: var(--color-texto-secundario);
 }
