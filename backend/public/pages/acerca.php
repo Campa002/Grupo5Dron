@@ -1,12 +1,9 @@
 <div class="acerca-pagina">
-    <div class="mb-lg">
-        <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">
-            Acerca del Proyecto
-        </h2>
-        <p class="texto-sm texto-secundario">
-            Control de Sistemas del Aula y Vuelo de Dron WiFi
-        </p>
-    </div>
+    <header class="encabezado">
+        <p class="etiqueta etiqueta--linea">Grupo 5 · 7° 2°</p>
+        <h2 class="titulo-grande">Acerca del proyecto</h2>
+        <p class="bajada">Control de sistemas del aula y vuelo de un dron WiFi desde el celular.</p>
+    </header>
 
     <!-- Ficha institucional -->
     <div class="tarjeta mb-md tarjeta--acento">

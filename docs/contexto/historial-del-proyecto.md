@@ -138,6 +138,10 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - En el APK no hay PHP: `build-apk.js` copia las páginas con el mismo nombre y les quita cualquier bloque PHP; si quedara alguno, el build falla.
     - Capacitor 5.7.8 sirve los archivos con extensión desde los assets (no cae en index.html). El content-type de `.php` lo decide Android (`URLConnection.guessContentTypeFromName`); a `fetch().text()` no le importa. `cargarPlantilla` además rechaza una respuesta que sea una página completa.
     - Verificado emulando a Capacitor (www/ generado, rutas sin "." → index.html) con tres content-types distintos para `.php`.
+24. **Primera prueba del APK en un celular (6/11): Samsung Galaxy A06, Android 16, sin el dron.** Plugin 2.1.0 activo, WebCodecs H.264 960x720, modelo OK, TensorFlow en WebGL. Tres problemas y sus arreglos:
+    - Detección: casi nunca veía personas (~5 FPS, ~190 ms). COCO-SSD reduce todo a 300×300 sin respetar la proporción: la cámara vertical (9:16) le llegaba aplastada. Ahora se completa a un cuadrado con bordes (de 1:1 a 4:3 se usa tal cual: el Tello no cambia). En la PC sube la confianza (81 → 95 %) pero también detectaba estirada, y con texturas de 16 bits forzadas también detecta: la causa en el A06 hay que confirmarla con la miniatura "lo que ve el modelo" (modo técnico) y el brillo del cuadro. El ancho de análisis (300/320/480) y el modelo en float16 no cambian los FPS en la PC; float16 da las mismas detecciones con la mitad de tamaño (18 → 9 MB), pero no se aplicó porque no mejora los FPS.
+    - Interfaz minimalista con el estilo de racvision.org (proyecto RAC del grupo) y nuestros colores. Lo de diagnóstico pasó a un "Modo técnico" (Config. Dron, arranca apagado). "Mis objetos" se oculta hasta S4. Sensores ya no muestra GPS, vibración, red ni pantalla.
+    - El A06 no tiene giroscopio ni magnetómetro: deviceorientation llega vacío. La inclinación ahora sale del acelerómetro (accelerationIncludingGravity, filtrada) si en 0,7 s no hay orientación; sin giro vertical. Con giroscopio todo sigue igual.
 
 ## 4. Hardware
 

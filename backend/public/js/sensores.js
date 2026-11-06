@@ -2,100 +2,62 @@
  * Módulo Diagnóstico de Sensores — Grupo 5: Control de Sistemas y Dron
  * EEST N° 1 de Vicente López "Eduardo Ader" — 7° 2°
  *
- * Verifica la disponibilidad y funcionamiento de los sensores del dispositivo
- * necesarios para la operación del dron:
- *  - DeviceOrientation (giroscopio / acelerómetro)
- *  - Geolocalización GPS
- *  - Cámara trasera
- *  - Vibración (Vibration API)
- *  - Conectividad (Network Information API)
- *  - Pantalla de alta densidad (DPR)
- *
- * Todos los diagnósticos son no bloqueantes y se ejecutan en paralelo.
+ * Verifica los sensores del celular que usa el dron (se muestra en el modo técnico de Sensores):
+ *  - Giroscopio y acelerómetro: se escuchan los eventos de verdad durante 1,5 s. Que exista la API
+ *    (DeviceOrientationEvent) no alcanza: en un celular sin giroscopio existe igual, pero no trae datos.
+ *  - Cámara trasera.
  */
 
 // eslint-disable-next-line no-unused-vars
 const Sensores = (() => {
     'use strict';
 
-    // ----------------------------------------------------------------
-    // Resultados de diagnóstico
-    // ----------------------------------------------------------------
-
-    /**
-     * Estado interno de los sensores. Se actualiza en cada llamada a diagnosticar().
-     */
     const estado = {
-        giroscopio:    { disponible: null, permiso: null, error: null },
-        gps:           { disponible: null, permiso: null, precision: null, error: null },
-        camara:        { disponible: null, resolucion: null, error: null },
-        vibracion:     { disponible: null },
-        red:           { disponible: null, tipo: null, velocidadBajaEstimada: null },
-        pantalla:      { dpr: null, resolucion: null },
+        giroscopio:   { disponible: null, detalle: '' },
+        acelerometro: { disponible: null, detalle: '' },
+        camara:       { disponible: null, resolucion: null, error: null },
     };
 
-    // ----------------------------------------------------------------
-    // Diagnóstico individual de cada sensor
-    // ----------------------------------------------------------------
-
-    async function diagnosticarGiroscopio() {
-        if (typeof DeviceOrientationEvent === 'undefined') {
-            estado.giroscopio = { disponible: false, permiso: null, error: 'API no disponible' };
-            return;
-        }
-
-        estado.giroscopio.disponible = true;
-
-        // iOS 13+ requiere permiso explícito
-        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            try {
-                // No llamamos requestPermission acá para no interrumpir el flujo sin gesto de usuario.
-                // Simplemente marcamos que el permiso es necesario y desconocido.
-                estado.giroscopio.permiso = 'requiere_gesto_usuario';
-            } catch (err) {
-                estado.giroscopio.permiso = 'error';
-                estado.giroscopio.error   = err.message;
-            }
-        } else {
-            // Android / Desktop: no requiere permiso explícito
-            estado.giroscopio.permiso = 'automatico';
-        }
+    /**
+     * Escucha deviceorientation y devicemotion y anota qué llega con datos.
+     * Hay giroscopio si llega orientación con números o si devicemotion trae rotationRate.
+     */
+    function sondearMovimiento(ms = 1500) {
+        const visto = { orientacion: false, gravedad: false, rotacion: false, eventos: 0 };
+        if (typeof window === 'undefined') return Promise.resolve(visto);
+        const enOrientacion = (ev) => {
+            visto.eventos++;
+            if (typeof ev.beta === 'number' && typeof ev.gamma === 'number') visto.orientacion = true;
+        };
+        const enMovimiento = (ev) => {
+            visto.eventos++;
+            const g = ev.accelerationIncludingGravity;
+            if (g && typeof g.x === 'number' && typeof g.z === 'number') visto.gravedad = true;
+            const r = ev.rotationRate;
+            if (r && (typeof r.alpha === 'number' || typeof r.beta === 'number')) visto.rotacion = true;
+        };
+        window.addEventListener('deviceorientation', enOrientacion);
+        window.addEventListener('devicemotion', enMovimiento);
+        return new Promise(resolve => setTimeout(() => {
+            window.removeEventListener('deviceorientation', enOrientacion);
+            window.removeEventListener('devicemotion', enMovimiento);
+            resolve(visto);
+        }, ms));
     }
 
-    async function diagnosticarGPS() {
-        if (!navigator.geolocation) {
-            estado.gps = { disponible: false, permiso: null, precision: null, error: 'API no disponible' };
-            return;
-        }
-        estado.gps.disponible = true;
-
-        // Verificar permiso sin disparar el diálogo (si navigator.permissions está disponible)
-        if (navigator.permissions) {
-            try {
-                const perm = await navigator.permissions.query({ name: 'geolocation' });
-                estado.gps.permiso = perm.state; // 'granted' | 'denied' | 'prompt'
-            } catch (_) {
-                estado.gps.permiso = 'desconocido';
-            }
-        } else {
-            estado.gps.permiso = 'desconocido';
-        }
-
-        // Si tiene permiso, obtener una lectura para medir precisión
-        if (estado.gps.permiso === 'granted') {
-            try {
-                const pos = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, {
-                        timeout: 5000,
-                        maximumAge: 10000,
-                        enableHighAccuracy: true,
-                    });
-                });
-                estado.gps.precision = Math.round(pos.coords.accuracy);
-            } catch (err) {
-                estado.gps.error = err.message;
-            }
-        }
+    async function diagnosticarMovimiento() {
+        const v = await sondearMovimiento();
+        const giro = v.orientacion || v.rotacion;
+        estado.giroscopio = {
+            disponible: giro,
+            detalle: giro ? 'Llegan datos de orientación: el control por inclinación usa el giroscopio.'
+                : (v.gravedad ? 'No disponible: se usa el acelerómetro para la inclinación (sin giro sobre el eje vertical).'
+                    : 'No llegan datos (en una PC es normal).'),
+        };
+        estado.acelerometro = {
+            disponible: v.gravedad,
+            detalle: v.gravedad ? 'Llegan datos de aceleración con gravedad.' : 'No llegan datos.',
+        };
     }
 
     async function diagnosticarCamara() {
@@ -106,17 +68,10 @@ const Sensores = (() => {
 
         try {
             const dispositivos = await navigator.mediaDevices.enumerateDevices();
-            const camTrasera = dispositivos.some(d =>
-                d.kind === 'videoinput' && (d.label.toLowerCase().includes('back') ||
-                d.label.toLowerCase().includes('trasera') ||
-                d.label.toLowerCase().includes('rear') ||
-                d.label === '') // En Android, sin permiso no hay label pero la cámara existe
-            );
             const hayVideo = dispositivos.some(d => d.kind === 'videoinput');
-            estado.camara.disponible = hayVideo;
+            estado.camara = { disponible: hayVideo, resolucion: null, error: null };
 
-            // Intentar obtener la resolución máxima sin abrir un stream real
-            // (esto sólo funciona si ya hay permiso de cámara)
+            // Resolución máxima (abre la cámara un instante; si no hay permiso, se informa)
             if (hayVideo) {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({
@@ -131,8 +86,8 @@ const Sensores = (() => {
                             const cfg = track.getSettings();
                             estado.camara.resolucion = `${cfg.width || '?'}×${cfg.height || '?'}`;
                         }
-                        stream.getTracks().forEach(t => t.stop());
                     }
+                    stream.getTracks().forEach(t => t.stop());
                 } catch (_) {
                     estado.camara.resolucion = 'sin permiso';
                 }
@@ -142,130 +97,46 @@ const Sensores = (() => {
         }
     }
 
-    function diagnosticarVibracion() {
-        estado.vibracion.disponible = 'vibrate' in navigator;
-    }
-
-    function diagnosticarRed() {
-        const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-        if (!conn) {
-            estado.red = { disponible: false, tipo: null, velocidadBajaEstimada: null };
-            return;
-        }
-        estado.red.disponible = true;
-        estado.red.tipo       = conn.effectiveType || conn.type || 'desconocido';
-        // 'slow-2g' y '2g' se consideran lentos para streaming de video
-        estado.red.velocidadBajaEstimada = ['slow-2g', '2g'].includes(conn.effectiveType);
-    }
-
-    function diagnosticarPantalla() {
-        estado.pantalla.dpr        = window.devicePixelRatio || 1;
-        estado.pantalla.resolucion = `${window.screen.width}×${window.screen.height}`;
-    }
-
-    // ----------------------------------------------------------------
-    // API pública
-    // ----------------------------------------------------------------
-
     /**
-     * Ejecuta todos los diagnósticos en paralelo y devuelve el estado completo.
-     * @returns {Promise<Object>} Copia del estado completo.
+     * Ejecuta los diagnósticos en paralelo.
+     * @returns {Promise<Object>} copia del estado
      */
     async function diagnosticar() {
-        diagnosticarVibracion();
-        diagnosticarRed();
-        diagnosticarPantalla();
-        await Promise.allSettled([diagnosticarGiroscopio(), diagnosticarGPS(), diagnosticarCamara()]);
-        return obtenerEstado();
-    }
-
-    /**
-     * Devuelve una copia del estado de todos los sensores.
-     * @returns {Object}
-     */
-    function obtenerEstado() {
+        await Promise.allSettled([diagnosticarMovimiento(), diagnosticarCamara()]);
         return JSON.parse(JSON.stringify(estado));
     }
 
     /**
-     * Devuelve un resumen legible para mostrar en la UI.
-     * El ícono es HTML (ícono propio de app.css); el giroscopio conserva su emoji de brújula.
+     * Resumen para la interfaz. El ícono es HTML (ícono propio de app.css); el giroscopio conserva su brújula.
      * @returns {Array<{ nombre: string, icono: string, estado: string, detalle: string, ok: boolean }>}
      */
     function obtenerResumen() {
+        const disp = d => (d === true ? 'Disponible' : d === false ? 'No disponible' : 'Desconocido');
         return [
             {
-                nombre:  'Giroscopio / Acelerómetro',
-                icono:   '🧭',
-                ok:      estado.giroscopio.disponible === true,
-                estado:  _textoDisponibilidad(estado.giroscopio.disponible),
-                detalle: estado.giroscopio.disponible
-                    ? `Permiso: ${_textoPermiso(estado.giroscopio.permiso)}`
-                    : (estado.giroscopio.error || 'No soportado'),
+                nombre: 'Giroscopio',
+                icono: '🧭',
+                ok: estado.giroscopio.disponible === true,
+                estado: disp(estado.giroscopio.disponible),
+                detalle: estado.giroscopio.detalle,
             },
             {
-                nombre:  'GPS',
-                icono:   '<span class="ico ico--ubicacion" aria-hidden="true"></span>',
-                ok:      estado.gps.disponible === true,
-                estado:  _textoDisponibilidad(estado.gps.disponible),
-                detalle: estado.gps.disponible
-                    ? `Permiso: ${_textoPermiso(estado.gps.permiso)}` +
-                      (estado.gps.precision !== null ? `, precisión: ±${estado.gps.precision} m` : '')
-                    : (estado.gps.error || 'No soportado'),
+                nombre: 'Acelerómetro',
+                icono: '<span class="ico ico--sensores" aria-hidden="true"></span>',
+                ok: estado.acelerometro.disponible === true,
+                estado: disp(estado.acelerometro.disponible),
+                detalle: estado.acelerometro.detalle,
             },
             {
-                nombre:  'Cámara',
-                icono:   '<span class="ico ico--camara" aria-hidden="true"></span>',
-                ok:      estado.camara.disponible === true,
-                estado:  _textoDisponibilidad(estado.camara.disponible),
+                nombre: 'Cámara',
+                icono: '<span class="ico ico--camara" aria-hidden="true"></span>',
+                ok: estado.camara.disponible === true,
+                estado: disp(estado.camara.disponible),
                 detalle: estado.camara.disponible
                     ? (estado.camara.resolucion ? `Resolución: ${estado.camara.resolucion}` : 'Disponible')
                     : (estado.camara.error || 'No detectada'),
             },
-            {
-                nombre:  'Vibración',
-                icono:   '<span class="ico ico--vibracion" aria-hidden="true"></span>',
-                ok:      estado.vibracion.disponible === true,
-                estado:  _textoDisponibilidad(estado.vibracion.disponible),
-                detalle: estado.vibracion.disponible ? 'Vibration API disponible' : 'No soportada',
-            },
-            {
-                nombre:  'Conexión de Red',
-                icono:   '<span class="ico ico--red" aria-hidden="true"></span>',
-                ok:      estado.red.disponible !== false,
-                estado:  estado.red.disponible ? 'Disponible' : 'Desconocida',
-                detalle: estado.red.tipo
-                    ? `Tipo: ${estado.red.tipo}` +
-                      (estado.red.velocidadBajaEstimada ? ' (velocidad baja)' : '')
-                    : 'Network Information API no disponible',
-            },
-            {
-                nombre:  'Pantalla',
-                icono:   '<span class="ico ico--pantalla" aria-hidden="true"></span>',
-                ok:      true,
-                estado:  'Detectada',
-                detalle: `${estado.pantalla.resolucion || '?'}, DPR: ${estado.pantalla.dpr || '?'}`,
-            },
         ];
-    }
-
-    function _textoDisponibilidad(disponible) {
-        if (disponible === true)  return 'Disponible';
-        if (disponible === false) return 'No disponible';
-        return 'Desconocido';
-    }
-
-    function _textoPermiso(permiso) {
-        const mapa = {
-            granted:                'Otorgado',
-            denied:                 'Denegado',
-            prompt:                 'Pendiente',
-            automatico:             'Automático',
-            requiere_gesto_usuario: 'Requiere acción',
-            desconocido:            'Desconocido',
-            error:                  'Error',
-        };
-        return mapa[permiso] || (permiso || 'Desconocido');
     }
 
     return {

@@ -1,8 +1,9 @@
 <div class="login-contenedor">
     <form id="form-login" class="login-form tarjeta" novalidate>
         <div class="login-form__logo"><span class="ico ico--rayo" aria-hidden="true"></span></div>
+        <p class="etiqueta texto-centro">EEST N° 1 · Vicente López</p>
         <h2 class="login-form__titulo">Grupo 5</h2>
-        <p class="login-form__subtitulo">Control de Sistemas y Dron — EEST N° 1</p>
+        <p class="login-form__subtitulo">Control de sistemas y dron</p>
 
         <div id="aviso-offline-login" class="alerta alerta--advertencia mb-md" style="display:none; font-size:0.85rem;">
             <span class="ico ico--alerta" aria-hidden="true"></span> El primer ingreso requiere conexión a internet para autenticar con el servidor.

@@ -32,8 +32,8 @@ const DronSeguimiento = (() => {
         // Detección
         claseObjetivo: 'person',
         umbralConfianza: 0.5,          // score mínimo de COCO-SSD
-        anchoAnalisis: 480,            // la inferencia se hace sobre una imagen de este ancho (menos = más rápido en el celular,
-                                       // pero en 320 se pierden personas lejanas chicas; medido el 6/11 con COCO-SSD lite)
+        anchoAnalisis: 480,            // ancho de la imagen que se le pasa al modelo (el modelo la reduce a 300×300 igual;
+                                       // medido el 6/11 en la PC: 300, 320 y 480 tardan lo mismo y detectan lo mismo)
         fpsMin: 5,
         fpsMax: 10,
         // Selector
@@ -97,10 +97,11 @@ const DronSeguimiento = (() => {
         alturaMinCm:          { grupo: 'Control real (etapa S3)', etiqueta: 'Altura mínima', unidad: 'cm', min: 30, max: 500, paso: 10 },
         alturaMaxCm:          { grupo: 'Control real (etapa S3)', etiqueta: 'Altura máxima', unidad: 'cm', min: 50, max: 1000, paso: 10 },
         bateriaMin:           { grupo: 'Control real (etapa S3)', etiqueta: 'Batería mínima', unidad: '%', min: 10, max: 90, paso: 5 },
-        confirmacionUmbral:   { grupo: 'Mis objetos (etapa S4)', etiqueta: 'Similitud mínima por detección', unidad: '%', escala: 100, min: 0.5, max: 0.99, paso: 0.01 },
-        confirmacionVentana:  { grupo: 'Mis objetos (etapa S4)', etiqueta: 'Detecciones seguidas para confirmar', unidad: '', min: 2, max: 20, paso: 1 },
-        perdidaVentana:       { grupo: 'Mis objetos (etapa S4)', etiqueta: 'Ventana para darlo por perdido', unidad: 'detecciones', min: 2, max: 15, paso: 1 },
-        perdidaMinimo:        { grupo: 'Mis objetos (etapa S4)', etiqueta: 'Fallas dentro de la ventana para perderlo', unidad: '', min: 1, max: 15, paso: 1 },
+        // "etapa: 'S4'": no se muestran en pantalla hasta esa etapa (siguen validándose si están guardados)
+        confirmacionUmbral:   { grupo: 'Mis objetos (etapa S4)', etapa: 'S4', etiqueta: 'Similitud mínima por detección', unidad: '%', escala: 100, min: 0.5, max: 0.99, paso: 0.01 },
+        confirmacionVentana:  { grupo: 'Mis objetos (etapa S4)', etapa: 'S4', etiqueta: 'Detecciones seguidas para confirmar', unidad: '', min: 2, max: 20, paso: 1 },
+        perdidaVentana:       { grupo: 'Mis objetos (etapa S4)', etapa: 'S4', etiqueta: 'Ventana para darlo por perdido', unidad: 'detecciones', min: 2, max: 15, paso: 1 },
+        perdidaMinimo:        { grupo: 'Mis objetos (etapa S4)', etapa: 'S4', etiqueta: 'Fallas dentro de la ventana para perderlo', unidad: '', min: 1, max: 15, paso: 1 },
     });
 
     /**
@@ -419,6 +420,36 @@ const DronSeguimiento = (() => {
     }
 
     // ================================================================
+    // Marco de la imagen analizada (puro)
+    // COCO-SSD reduce TODA imagen a 300×300 sin respetar la proporción. Una imagen vertical del celular
+    // (9:16) le llegaba aplastada casi al doble y las personas bajaban mucho de confianza. Por eso:
+    //  - vertical o cuadrada → se completa a un cuadrado con bordes negros a los costados;
+    //  - entre 1:1 y 4:3 (el Tello es 4:3) → se usa tal cual;
+    //  - más ancha que 4:3 → bordes arriba y abajo hasta 4:3.
+    // Medido el 6/11 en la PC con fotos verticales: confianza 81 % → 95 % y 82 % → 87 %, sin perder personas.
+    // ================================================================
+    function marcoAnalisis(fw, fh, anchoMax) {
+        const a = fw / fh;
+        const t = limitar(a, 1, 4 / 3);                       // proporción del lienzo
+        const cw = Math.max(1, Math.round(Math.min(anchoMax, Math.max(fw, fh * t))));
+        const ch = Math.max(1, Math.round(cw / t));
+        let dw = cw;
+        let dh = ch;
+        if (a < t) dw = Math.round(ch * a);                     // bordes a los costados
+        else if (a > t) dh = Math.round(cw / a);                // bordes arriba y abajo
+        return { cw, ch, dx: Math.round((cw - dw) / 2), dy: Math.round((ch - dh) / 2), dw, dh, bordes: dw !== cw || dh !== ch };
+    }
+
+    /** Pasa un recuadro del lienzo analizado (px) a coordenadas normalizadas de la imagen original, recortado a [0, 1]. */
+    function recuadroEnFuente([bx, by, bw, bh], m) {
+        const x0 = limitar((bx - m.dx) / m.dw, 0, 1);
+        const y0 = limitar((by - m.dy) / m.dh, 0, 1);
+        const x1 = limitar((bx + bw - m.dx) / m.dw, 0, 1);
+        const y1 = limitar((by + bh - m.dy) / m.dh, 0, 1);
+        return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    }
+
+    // ================================================================
     // Visión (navegador): COCO-SSD sobre una imagen reducida
     // ================================================================
     class Vision {
@@ -426,8 +457,15 @@ const DronSeguimiento = (() => {
             this.a = ajustes;
             this.modelo = null;
             this.backend = null;
+            this.gpu = null;          // datos de WebGL para el modo técnico
             this.canvas = null;
             this.ctx = null;
+            this.marco = null;        // último marco usado (para la miniatura y el panel)
+            this.fuenteW = 0;
+            this.fuenteH = 0;
+            this.brillo = null;       // brillo medio (0-255) de la imagen analizada: ~0 = le llega negro
+            this._muestra = null;
+            this._cuadros = 0;
         }
 
         async cargar() {
@@ -438,33 +476,63 @@ const DronSeguimiento = (() => {
             try { if (tf.getBackend() !== 'webgl') await tf.setBackend('webgl'); } catch (_) { /* sin WebGL */ }
             await tf.ready();
             this.backend = tf.getBackend();
+            if (this.backend === 'webgl') {
+                try {
+                    this.gpu = { version: tf.env().getNumber('WEBGL_VERSION'), float32: tf.env().getBool('WEBGL_RENDER_FLOAT32_CAPABLE') };
+                } catch (_) { /* sin datos */ }
+            }
             this.modelo = await cocoSsd.load({ modelUrl: './libs/coco-ssd/model.json' });
             this.canvas = document.createElement('canvas');
             this.ctx = this.canvas.getContext('2d', { willReadFrequently: false });
+            this._muestra = document.createElement('canvas');
+            this._muestra.width = 16; this._muestra.height = 16;
             // Calentamiento: la primera inferencia compila los shaders y es lenta
             this.canvas.width = 64; this.canvas.height = 48;
             await this.modelo.detect(this.canvas);
             return { backend: this.backend };
         }
 
-        /** @returns {Promise<{ms:number, candidatos:Array}|null>} null si la fuente no tiene imagen */
+        /** Brillo medio de la parte con imagen (cada 5 cuadros: leer píxeles frena la GPU). */
+        _medirBrillo(m) {
+            if (this._cuadros++ % 5 !== 0) return;
+            try {
+                const c = this._muestra.getContext('2d', { willReadFrequently: true });
+                c.drawImage(this.canvas, m.dx, m.dy, m.dw, m.dh, 0, 0, 16, 16);
+                const d = c.getImageData(0, 0, 16, 16).data;
+                let suma = 0;
+                for (let i = 0; i < d.length; i += 4) suma += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+                this.brillo = Math.round(suma / (d.length / 4));
+            } catch (_) {
+                this.brillo = null;
+            }
+        }
+
+        /**
+         * @returns {Promise<{ms:number, candidatos:Array, crudos:Array}|null>} null si la fuente no tiene imagen.
+         * candidatos: normalizados a la imagen original; crudos: en píxeles del lienzo analizado (miniatura).
+         */
         async detectar(fuente) {
             const fw = fuente.videoWidth || fuente.width || 0;
             const fh = fuente.videoHeight || fuente.height || 0;
             if (fw < 32 || fh < 32) return null;
-            const w = Math.min(this.a.anchoAnalisis, fw);
-            const h = Math.round(w * fh / fw);
-            if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
-            this.ctx.drawImage(fuente, 0, 0, w, h);
+            const m = marcoAnalisis(fw, fh, this.a.anchoAnalisis);
+            if (this.canvas.width !== m.cw || this.canvas.height !== m.ch) { this.canvas.width = m.cw; this.canvas.height = m.ch; }
+            if (m.bordes) {
+                this.ctx.fillStyle = '#000';
+                this.ctx.fillRect(0, 0, m.cw, m.ch);
+            }
+            this.ctx.drawImage(fuente, m.dx, m.dy, m.dw, m.dh);
+            this.marco = m;
+            this.fuenteW = fw;
+            this.fuenteH = fh;
+            this._medirBrillo(m);
             const t0 = performance.now();
             const preds = await this.modelo.detect(this.canvas, 20, Math.min(0.3, this.a.umbralConfianza));
             const ms = performance.now() - t0;
             return {
                 ms,
-                candidatos: preds.map(p => ({
-                    clase: p.class, score: p.score,
-                    x: p.bbox[0] / w, y: p.bbox[1] / h, w: p.bbox[2] / w, h: p.bbox[3] / h,
-                })),
+                crudos: preds,
+                candidatos: preds.map(p => ({ clase: p.class, score: p.score, ...recuadroEnFuente(p.bbox, m) })),
             };
         }
     }
@@ -479,11 +547,13 @@ const DronSeguimiento = (() => {
          * @param {HTMLCanvasElement} [opciones.canvasDebug] canvas superpuesto para dibujar los recuadros
          * @param {Object} [opciones.ajustes] ajustes que pisan los guardados
          * @param {Function} [opciones.obtenerContexto] () => {enVuelo, alturaCm, bateria, telemetriaOk} (para el registro y las condiciones)
+         * @param {HTMLCanvasElement} [opciones.miniatura] canvas donde se dibuja "lo que ve el modelo" (solo si está visible)
          */
-        constructor({ videoEl, canvasDebug = null, ajustes = {}, obtenerContexto = null }) {
+        constructor({ videoEl, canvasDebug = null, ajustes = {}, obtenerContexto = null, miniatura = null }) {
             if (!videoEl) throw new Error('[Seguimiento] Se requiere un elemento <video> o <canvas>.');
             this.fuente = videoEl;
             this.canvasDebug = canvasDebug;
+            this.miniatura = miniatura;
             this._ajustesExtra = ajustes;
             this.ajustes = ajustesActuales(ajustes);
             this.obtenerContexto = obtenerContexto;
@@ -568,7 +638,17 @@ const DronSeguimiento = (() => {
                 objetivo: this.seguidor?.selector.objetivo ? { ...this.seguidor.selector.objetivo } : null,
                 candidatos: this._contarValidos(this._ultimosCandidatos),
                 condiciones: this.condiciones(),
+                imagen: this._infoImagen(),
+                imagenNegra: this.vision.brillo !== null && this.vision.brillo < 6,
+                gpu: this.vision.gpu,
             };
+        }
+
+        /** Tamaño de la cámara, del lienzo analizado y brillo (para el modo técnico). */
+        _infoImagen() {
+            const v = this.vision;
+            if (!v.marco) return null;
+            return { fuente: `${v.fuenteW}×${v.fuenteH}`, analizada: `${v.marco.cw}×${v.marco.ch}`, bordes: v.marco.bordes, brillo: v.brillo };
         }
 
         /** Detecciones de la clase buscada que superan el umbral de confianza. */
@@ -597,6 +677,7 @@ const DronSeguimiento = (() => {
                 enVuelo: ctx.enVuelo ?? null,
                 alturaCm: Number.isFinite(ctx.alturaCm) ? Math.round(ctx.alturaCm) : null,
                 bateria: Number.isFinite(ctx.bateria) ? Math.round(ctx.bateria) : null,
+                brillo: this.vision.brillo,
             });
             if (this.registro.length > 3000) this.registro.shift(); // ~5 min a 10 FPS
         }
@@ -604,13 +685,19 @@ const DronSeguimiento = (() => {
         /** Registro en CSV (para "Copiar registro"). */
         registroCSV() {
             const r3 = v => (v === null || v === undefined ? '' : Math.round(v * 1000) / 1000);
-            const filas = ['t_ms;estado;personas;inferencia_ms;fps;obj_cx;obj_cy;obj_alto;obj_score;cmd_giro;cmd_altura;cmd_avance;en_vuelo;altura_cm;bateria'];
+            const img = this._infoImagen();
+            const filas = [
+                // Primera línea: con qué imagen se trabajó (para leer el registro de un celular a distancia)
+                `# camara ${img?.fuente || '?'} · analizada ${img?.analizada || '?'}${img?.bordes ? ' con bordes' : ''} · backend ${this.vision.backend || '?'}`
+                    + (this.vision.gpu ? ` · WebGL ${this.vision.gpu.version} float32 ${this.vision.gpu.float32 ? 'sí' : 'no'}` : ''),
+                't_ms;estado;personas;inferencia_ms;fps;obj_cx;obj_cy;obj_alto;obj_score;cmd_giro;cmd_altura;cmd_avance;en_vuelo;altura_cm;bateria;brillo',
+            ];
             for (const e of this.registro) {
                 filas.push([
                     e.t, e.estado, e.candidatos, e.inferenciaMs ?? '', e.fps,
                     r3(e.objetivo?.cx), r3(e.objetivo?.cy), r3(e.objetivo?.h), r3(e.objetivo?.score),
                     r3(e.comando.yaw), r3(e.comando.ud), r3(e.comando.fb),
-                    e.enVuelo === null ? '' : (e.enVuelo ? 1 : 0), e.alturaCm ?? '', e.bateria ?? '',
+                    e.enVuelo === null ? '' : (e.enVuelo ? 1 : 0), e.alturaCm ?? '', e.bateria ?? '', e.brillo ?? '',
                 ].join(';'));
             }
             return filas.join('\n');
@@ -628,6 +715,7 @@ const DronSeguimiento = (() => {
                     this._ultimosCandidatos = r.candidatos;
                     this.seguidor.procesarDeteccion(r.candidatos, t);
                     this._dibujar(r.candidatos);
+                    this._dibujarMiniatura(r.crudos);
                 } else {
                     this._ultimosCandidatos = [];
                     this.seguidor.procesarDeteccion([], t);
@@ -690,6 +778,32 @@ const DronSeguimiento = (() => {
             ctx.stroke();
         }
 
+        /**
+         * Miniatura de "lo que ve el modelo": el lienzo analizado tal cual (con los bordes) y todas sus
+         * detecciones, también las de otras clases y las de poca confianza. Solo si la miniatura está visible.
+         */
+        _dibujarMiniatura(crudos) {
+            const mini = this.miniatura;
+            const v = this.vision;
+            if (!mini || !mini.isConnected || mini.offsetParent === null || !v.marco) return;
+            const ancho = Math.round(mini.clientWidth * (globalThis.devicePixelRatio || 1)) || 160;
+            const escala = ancho / v.marco.cw;
+            const alto = Math.max(1, Math.round(v.marco.ch * escala));
+            if (mini.width !== ancho || mini.height !== alto) { mini.width = ancho; mini.height = alto; }
+            const ctx = mini.getContext('2d');
+            ctx.drawImage(v.canvas, 0, 0, ancho, alto);
+            ctx.lineWidth = 2;
+            ctx.font = `600 ${Math.max(10, Math.round(ancho / 22))}px system-ui, sans-serif`;
+            for (const p of crudos || []) {
+                const esObjetivo = p.class === this.ajustes.claseObjetivo;
+                ctx.strokeStyle = esObjetivo ? (p.score >= this.ajustes.umbralConfianza ? '#22c55e' : '#f59e0b') : 'rgba(203, 213, 225, 0.8)';
+                const [x, y, w, h] = p.bbox.map(n => n * escala);
+                ctx.strokeRect(x, y, w, h);
+                ctx.fillStyle = ctx.strokeStyle;
+                ctx.fillText(`${p.class === 'person' ? 'persona' : p.class} ${Math.round(p.score * 100)}%`, x + 2, Math.max(10, y - 3));
+            }
+        }
+
         _limpiarDebug() {
             const cv = this.canvasDebug;
             if (cv) cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
@@ -712,14 +826,29 @@ const DronSeguimiento = (() => {
         }
     }
 
-    /** Panel con backend, FPS, demora, estado y condiciones del control real (el comando lo muestra el cartel de abajo). */
+    /**
+     * Estado corto para la etiqueta sobre la imagen (como las de RAC): texto y color del punto.
+     * @returns {{texto:string, color:string}}
+     */
+    function estadoCorto(info) {
+        if (info.imagenNegra) return { texto: 'Sin imagen de la cámara', color: 'error' };
+        switch (info.estado) {
+            case 'buscando': return { texto: 'Buscando persona', color: 'acento' };
+            case 'siguiendo': return { texto: 'Persona fijada', color: 'exito' };
+            case 'perdiendo': return { texto: 'Perdiéndola', color: 'advertencia' };
+            case 'perdido': return { texto: 'Persona perdida', color: 'error' };
+            default: return { texto: 'Seguimiento apagado', color: '' };
+        }
+    }
+
+    /**
+     * Panel detallado (modo técnico): backend, FPS, demora, estado, imagen analizada y condiciones del control real.
+     * El comando lo muestra el cartel "ENSAYO" sobre el video. Se ubica con la clase .panel-seguimiento de app.css.
+     */
     class Panel {
         constructor(contenedor) {
             this.el = document.createElement('div');
             this.el.className = 'panel-seguimiento';
-            this.el.style.cssText = 'position:absolute; top:0.5rem; left:0.5rem; max-width:calc(100% - 1rem); padding:0.25rem 0.5rem;'
-                + ' border-radius:0.375rem; background:rgba(5,11,22,0.75); color:#e2e8f0; font:600 0.625rem/1.4 system-ui, sans-serif;'
-                + ' pointer-events:none; z-index:2;';
             contenedor.appendChild(this.el);
             this._ultimo = 0;
         }
@@ -734,13 +863,16 @@ const DronSeguimiento = (() => {
             const lineaReal = !cond ? '' : cond.ok ? 'Control real (S3): se cumplen las condiciones'
                 : `Control real (S3): falta ${cond.motivos[0]}${cond.motivos.length > 1 ? ` (+${cond.motivos.length - 1})` : ''}`;
             const demora = info.edadMs !== null ? ` · hace ${info.edadMs} ms` : '';
+            const img = info.imagen;
+            const gpu = info.gpu ? ` · WebGL ${info.gpu.version}, float32 ${info.gpu.float32 ? 'sí' : 'no'}` : '';
             const lineas = [
                 `Visión: ${backend} · ${info.fps} FPS · ${info.inferenciaMs ?? '--'} ms${demora}`,
                 `Estado: ${nombres[info.estado] || info.estado} · personas: ${info.candidatos}`,
+                img ? `Imagen: cámara ${img.fuente} → modelo ${img.analizada}${img.bordes ? ' con bordes' : ''} · brillo ${img.brillo ?? '--'}${gpu}` : '',
+                info.imagenNegra ? 'ATENCIÓN: al modelo le llega una imagen negra' : '',
                 lineaReal,
             ].filter(Boolean);
             this.el.textContent = lineas.join('\n');
-            this.el.style.whiteSpace = 'pre-line';
         }
 
         destruir() {
@@ -781,6 +913,9 @@ const DronSeguimiento = (() => {
     Seguimiento.guardarAjustes = guardarAjustes;
     Seguimiento.restaurarAjustes = restaurarAjustes;
     Seguimiento.textoEnsayo = textoEnsayo;
+    Seguimiento.estadoCorto = estadoCorto;
+    Seguimiento.marcoAnalisis = marcoAnalisis;
+    Seguimiento.recuadroEnFuente = recuadroEnFuente;
     Seguimiento.Panel = Panel;
     Seguimiento.copiarTexto = copiarTexto;
     return Seguimiento;

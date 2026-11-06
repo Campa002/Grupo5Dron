@@ -107,7 +107,7 @@ docs/contexto/    informe, historial, reportes
   - MySQL: base `grupo5dron_db` importada desde `backend/sql/schema.sql`; `backend/config/config.php` local con root sin contraseña.
 - Usuarios del seed: la contraseña de todos es `password` y tienen `debe_cambiar_password = 1`: la app obliga a cambiarla en el primer login (`auth.php?action=cambiar_mi_password`). Para volver al estado inicial de la base local, reimportá `schema.sql`.
 - CORS: `config.php` tiene que incluir `https://localhost` en `cors_origenes` (ya está en `config.example.php`) para que el APK pueda usar la API.
-- Pruebas automáticas: `node --test tests/seguimiento.test.js` (selector y controlador del seguimiento con recorridos sintéticos).
+- Pruebas automáticas: `node --test tests/seguimiento.test.js tests/inclinacion.test.js` (seguimiento con recorridos sintéticos, marco con bordes de la imagen analizada, inclinación por acelerómetro con eventos simulados).
 - Pruebas en navegador: Playwright con Microsoft Edge del sistema (`chromium.launch({ channel: 'msedge' })`). Para el TelloAdapter sin dron, se puede inyectar un mock de `window.Capacitor.Plugins.DronNative` que respete el contrato de arriba.
 - APK: se compila en GitHub Actions en cada push a `main`. Artefacto: `Grupo5Dron-app-debug`.
 - Firma del APK debug:
@@ -135,6 +135,8 @@ docs/contexto/    informe, historial, reportes
   - el seguimiento está SOLO EN ENSAYO (calcula y muestra, no envía) hasta la etapa S3, después de la primera prueba con el Tello;
   - el aterrizaje al salir de la cabina en vuelo.
 - Interfaz en español, tema oscuro con azul institucional, sin violetas.
+- Diseño (estilo de racvision.org, con nuestros colores): una etiqueta chica arriba de cada título (`.etiqueta`), títulos en mayúsculas (`.titulo-grande`, `.bloque__titulo`), bloques numerados "01 —" (`.bloque`), pares de botones (`.par-botones`), datos en grande (`.dato-grande`) y estados sobre la imagen (`.sobre-imagen` + `.chip`). Poco texto en la vista normal.
+- Modo técnico: lo que sirve para diagnosticar va con la clase `solo-tecnico` (oculta salvo `body.modo-tecnico`). Se activa en Config. Dron (`App.modoTecnico()`, `App.cambiarModoTecnico()`, clave `grupo5dron_modo_tecnico`) y arranca apagado. Lo oculto sigue funcionando (por ejemplo, el failsafe).
 - Sin emojis en la interfaz (el único que queda es 🧭 del giroscopio). Íconos: SVG propios en `app.css` (bloque "ÍCONOS PROPIOS", clases `.ico .ico--nombre`, color `currentColor`), desde JS con `App.icono(nombre)`, `App.textoConIcono(el, nombre, texto)` y `App.textoConPunto(el, color, texto)` para estados. Íconos decorativos con `aria-hidden` y siempre con texto visible o `aria-label`.
 - Git: Luciano hace commit y push salvo que te pida lo contrario. Nunca uses `git push --force` ni `git reset --hard`.
 - No escribas documentación final salvo que te lo pida (se hace al final del proyecto).
@@ -148,6 +150,14 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 - Consistente: mismos colores (variables de app.css), mismos componentes y textos en español claro en todas las pantallas.
 - Robusto: errores de red con mensajes entendibles, nada que quede colgado esperando para siempre, estados de carga visibles.
 - Limpio: sin código muerto, sin funciones duplicadas, sin `console.log` de depuración sueltos, sin archivos referenciados que no existen.
+
+## Estado al 6/11/2026
+
+- Primera prueba del APK en un Samsung Galaxy A06 (Android 16, sin dron, sin giroscopio ni magnetómetro). Arreglos del 6/11 (historial §3, punto 24):
+  - Detección: la imagen que va al modelo respeta la proporción (vertical → cuadrado con bordes; 4:3 del Tello sin cambios). `Seguimiento.marcoAnalisis`. Miniatura "lo que ve el modelo", brillo del cuadro y datos de WebGL en el modo técnico; el CSV trae una primera línea con cámara, imagen analizada y backend. La caja de la demo toma la proporción de la cámara.
+  - Interfaz minimalista con modo técnico. Inicio: solo Aula y Dron. Cabina: estados, batería y altura sobre el video. Sensores: inclinación y detección. Prueba Tello: cinco pasos y "Listo para volar" o qué falta. "Mis objetos" oculto hasta S4.
+  - Inclinación: `LectorInclinacion` (dron-giroscopio.js) usa deviceorientation y, si no llega con datos, el acelerómetro; sin giro vertical y con aviso. El diagnóstico de Sensores escucha los eventos de verdad.
+- Sin probar en el celular: si la detección mejora en el A06 y qué muestra la miniatura; el respaldo por acelerómetro con el sensor real (signos de adelante/atrás y costados).
 
 ## Estado al 5/11/2026
 
@@ -210,6 +220,9 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 
 1. **Primera prueba real con el Tello.** Commit, APK de CI e instalación. Con el secreto de firma cargado, los APK nuevos se instalan encima. La primera vez con la clave fija hay que desinstalar la versión anterior. Después: "Usar el dron sin cuenta", `#/prueba-tello` (command, battery?, streamon), "Copiar informe" y pegarlo. Luego la cabina: despegar, aterrizar, paso, freno, giroscopio, failsafe, emergencia.
 2. **Corregir lo que salga de esa prueba.** Lo más probable: red sin internet (`vincularRedWifi`), video en el WebView, si el `rc` interfiere con los pasos y la unidad de `vgx`/`vgy`.
+   - Detección en el A06: con el modo técnico, mirar la miniatura "lo que ve el modelo" y el brillo. Si la imagen llega rotada o negra, corregir la captura del cuadro.
+   - Para decidir con Luciano (cambia el vuelo): en horizontal, la inclinación usa beta → avance y gamma → lateral en coordenadas del teléfono, que acostado quedan rotadas 90°. No se tocó.
+   - Opcional: modelo en float16 (9 MB en vez de 18, mismas detecciones, mismos FPS en la PC).
 3. ~~Fase 2, funciones~~: hecha (ver "Estado").
 4. ~~Fase 3, interfaz~~: hecha (ver "Estado").
 5. ~~Fase 4, limpieza~~: hecha (ver "Estado").

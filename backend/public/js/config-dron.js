@@ -185,34 +185,52 @@ const ConfigDron = (() => {
     function _plantillaBase(permisos) {
         return `
         <div class="config-dron-pagina">
-            <div class="flex justify-between items-center mb-md flex-wrap gap-sm">
-                <div>
-                    <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">Configuración del dron</h2>
-                    <p class="texto-sm texto-secundario">
-                        Elegí el perfil que usa la cabina. Los perfiles se guardan en el teléfono para funcionar sin internet.
-                    </p>
-                </div>
-                ${permisos.editar ? `<button id="btn-nuevo-perfil" class="btn btn--primario">${App.icono('mas')} Nuevo perfil</button>` : ''}
-            </div>
+            <header class="encabezado">
+                <p class="etiqueta etiqueta--linea">Configuración</p>
+                <h2 class="titulo-grande">Config. del dron</h2>
+                <p class="bajada">Elegí con qué dron vuela la cabina. Se guarda en el teléfono y funciona sin internet.</p>
+            </header>
 
-            <p id="config-dron-origen" class="texto-xs texto-secundario mb-md" hidden></p>
-            <div id="config-dron-contenido"></div>
+            <!-- 01 — Perfil -->
+            <section class="bloque">
+                <p class="etiqueta">01 — Perfil</p>
+                <h3 class="bloque__titulo">Dron de la cabina</h3>
+                <p id="config-dron-origen" class="texto-xs texto-secundario mb-md" hidden></p>
+                <div id="config-dron-contenido"></div>
+                ${permisos.editar ? `<button id="btn-nuevo-perfil" class="btn btn--secundario mt-md">${App.icono('mas')} Nuevo perfil</button>` : ''}
+            </section>
 
-            <!-- Failsafe configurable -->
-            <div class="tarjeta mt-lg">
-                <h3 class="texto-sm texto-secundario" style="font-weight:600; margin-bottom: var(--espacio-xs);">Failsafe de seguridad (telemetría UDP 8890)</h3>
-                <p class="texto-xs texto-secundario" style="margin-bottom: var(--espacio-sm);">
-                    Tiempo máximo sin recibir telemetría antes de frenar y aterrizar automáticamente.
+            <!-- 02 — Modo técnico -->
+            <section class="bloque">
+                <p class="etiqueta">02 — Diagnóstico</p>
+                <h3 class="bloque__titulo">Modo técnico</h3>
+                <p class="bloque__texto">
+                    Muestra lo que sirve para diagnosticar: el registro UDP, el detalle del seguimiento, lo que ve el modelo,
+                    el registro CSV y los ajustes avanzados. Arranca apagado.
+                </p>
+                <label class="switch" for="switch-modo-tecnico">
+                    <input type="checkbox" id="switch-modo-tecnico">
+                    <span class="switch__control" aria-hidden="true"></span>
+                    <span class="switch__label">Mostrar el modo técnico</span>
+                </label>
+            </section>
+
+            <!-- 03 — Failsafe (modo técnico; el failsafe está siempre activo) -->
+            <section class="bloque solo-tecnico">
+                <p class="etiqueta">03 — Seguridad</p>
+                <h3 class="bloque__titulo">Failsafe de telemetría</h3>
+                <p class="bloque__texto">
+                    Siempre está activo. Tiempo máximo sin recibir telemetría (UDP 8890) antes de frenar y aterrizar.
                 </p>
                 <div class="flex items-center gap-sm flex-wrap">
-                    <input type="number" id="input-failsafe-timeout" class="campo__input" style="width:8rem;" min="1000" max="30000" step="500" value="3500">
+                    <input type="number" id="input-failsafe-timeout" class="campo__input" style="width:8rem;" min="1000" max="30000" step="500" value="3500" aria-label="Tiempo del failsafe en milisegundos">
                     <span class="texto-xs texto-secundario">ms (1000 a 30000; por defecto 3500)</span>
                     <button id="btn-guardar-failsafe" class="btn btn--secundario">Guardar</button>
                 </div>
-            </div>
+            </section>
 
-            <!-- Ajustes del seguimiento (se guardan en el teléfono) -->
-            <div class="tarjeta mt-lg" id="ajustes-seguimiento"></div>
+            <!-- 04 — Ajustes del seguimiento (modo técnico; se guardan en el teléfono) -->
+            <section class="bloque solo-tecnico" id="ajustes-seguimiento"></section>
 
         </div>`;
     }
@@ -263,12 +281,12 @@ const ConfigDron = (() => {
                     ${permisos.eliminar ? `<button class="btn btn--secundario btn--icono btn-eliminar-perfil" data-id="${_esc(id)}" data-nombre="${_esc(perfil.nombre)}" aria-label="Eliminar perfil">${App.icono('borrar')}</button>` : ''}
                 </div>` : ''}
             </div>
-            <div class="flex gap-sm flex-wrap mb-md">
+            <div class="flex gap-sm flex-wrap mb-md solo-tecnico">
                 <span class="badge badge--info">${esTello ? 'DJI Tello' : 'Simulador'}</span>
                 <span class="badge ${perfil.local ? 'badge--exito' : 'badge--advertencia'}">${perfil.local ? 'Local' : 'Servidor'}</span>
             </div>
             ${perfil.descripcion ? `<p class="texto-sm texto-secundario mb-md">${_esc(perfil.descripcion)}</p>` : ''}
-            ${esTello ? `<p class="texto-xs texto-secundario mb-md">IP: <code>${_esc(p.ip)}</code> · Puerto de comandos: <code>${_esc(String(p.puerto_comando))}</code></p>` : ''}
+            ${esTello ? `<p class="texto-xs texto-secundario mb-md solo-tecnico">IP: <code>${_esc(p.ip)}</code> · Puerto de comandos: <code>${_esc(String(p.puerto_comando))}</code></p>` : ''}
             <button class="btn ${esActivo ? 'btn--secundario' : 'btn--primario'} btn--bloque btn-seleccionar-perfil" data-id="${_esc(id)}" ${esActivo ? 'disabled' : ''}>
                 ${esActivo ? App.icono('check') + ' Seleccionado' : 'Seleccionar'}
             </button>
@@ -429,11 +447,15 @@ const ConfigDron = (() => {
         const actuales = DronSeguimiento.ajustesActuales();
         const redondear = v => Math.round(v * 10000) / 10000;
         const grupos = {};
-        for (const [clave, r] of Object.entries(R)) (grupos[r.grupo] = grupos[r.grupo] || []).push([clave, r]);
+        for (const [clave, r] of Object.entries(R)) {
+            if (r.etapa === 'S4') continue; // "Mis objetos": se muestran recién en la etapa S4
+            (grupos[r.grupo] = grupos[r.grupo] || []).push([clave, r]);
+        }
 
         caja.innerHTML = `
-            <h3 class="texto-sm texto-secundario" style="font-weight:600; margin-bottom: var(--espacio-xs);">Ajustes del seguimiento</h3>
-            <p class="texto-xs texto-secundario mb-md">
+            <p class="etiqueta">04 — Seguimiento</p>
+            <h3 class="bloque__titulo">Ajustes del seguimiento</h3>
+            <p class="bloque__texto">
                 Se guardan en este teléfono y se aplican la próxima vez que actives el ensayo.
                 Por ahora el seguimiento funciona solo en ensayo (no envía comandos al dron).
             </p>
@@ -487,6 +509,15 @@ const ConfigDron = (() => {
         }
 
         _renderizarAjustesSeguimiento(contenedor);
+
+        const sw = contenedor.querySelector('#switch-modo-tecnico');
+        if (sw) {
+            sw.checked = App.modoTecnico();
+            sw.addEventListener('change', () => {
+                App.cambiarModoTecnico(sw.checked);
+                App.mostrarToast(sw.checked ? 'Modo técnico activado.' : 'Modo técnico apagado.', 'info');
+            });
+        }
 
         const inputTimeout = contenedor.querySelector('#input-failsafe-timeout');
         if (inputTimeout) inputTimeout.value = localStorage.getItem('grupo5dron_failsafe_timeout_ms') || '3500';

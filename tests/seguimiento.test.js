@@ -303,12 +303,75 @@ test('registro por cuadro: CSV con detección, comando y telemetría', () => {
         seg._registrar(t, { ms: 20, candidatos: [{ ...persona(0.8, 0.5, 0.45) }] });
     }
     const filas = seg.registroCSV().split('\n');
-    assert.equal(filas.length, 5);
-    assert.ok(filas[0].startsWith('t_ms;estado;personas;inferencia_ms'));
-    const ultima = filas[4].split(';');
+    assert.equal(filas.length, 6);
+    assert.ok(filas[0].startsWith('# camara'), 'primera línea: con qué imagen se trabajó');
+    assert.ok(filas[1].startsWith('t_ms;estado;personas;inferencia_ms'));
+    assert.ok(filas[1].endsWith(';brillo'));
+    const ultima = filas[5].split(';');
     assert.equal(ultima[1], 'siguiendo');
     assert.equal(ultima[2], '1');
     assert.equal(ultima[12], '1');   // en vuelo
     assert.equal(ultima[13], '120'); // altura
     assert.equal(ultima[14], '77');  // batería
+});
+
+// ---------------------------------------------------------------
+// Marco de la imagen analizada (el modelo reescala todo a 300×300)
+// ---------------------------------------------------------------
+
+test('marco: imagen vertical del celular → cuadrado con bordes a los costados, sin deformar', () => {
+    const m = Seguimiento.marcoAnalisis(720, 1280, 480);
+    assert.equal(m.cw, 480);
+    assert.equal(m.ch, 480);
+    assert.equal(m.dh, 480);
+    assert.equal(m.dw, 270);             // 480 × 720/1280
+    assert.equal(m.dx, 105);
+    assert.equal(m.dy, 0);
+    assert.equal(m.bordes, true);
+    assert.ok(Math.abs(m.dw / m.dh - 720 / 1280) < 0.01, 'misma proporción que la cámara');
+});
+
+test('marco: el video del Tello (4:3) se usa tal cual, como antes', () => {
+    const m = Seguimiento.marcoAnalisis(960, 720, 480);
+    assert.deepEqual(m, { cw: 480, ch: 360, dx: 0, dy: 0, dw: 480, dh: 360, bordes: false });
+});
+
+test('marco: más ancha que 4:3 (16:9) → bordes arriba y abajo hasta 4:3', () => {
+    const m = Seguimiento.marcoAnalisis(1280, 720, 480);
+    assert.equal(m.cw, 480);
+    assert.equal(m.ch, 360);
+    assert.equal(m.dh, 270);
+    assert.equal(m.dy, 45);
+    assert.equal(m.bordes, true);
+});
+
+test('marco: una imagen chica no se agranda', () => {
+    const m = Seguimiento.marcoAnalisis(64, 48, 480);
+    assert.equal(m.cw, 64);
+    assert.equal(m.ch, 48);
+});
+
+test('recuadros: del lienzo con bordes a la imagen original, recortados a [0, 1]', () => {
+    const m = Seguimiento.marcoAnalisis(720, 1280, 480); // contenido: x de 105 a 375
+    // Persona que ocupa toda la parte con imagen
+    const r = Seguimiento.recuadroEnFuente([105, 0, 270, 480], m);
+    assert.ok(Math.abs(r.x) < 1e-9 && Math.abs(r.w - 1) < 1e-9 && Math.abs(r.h - 1) < 1e-9);
+    // Mitad derecha del contenido, mitad de abajo
+    const r2 = Seguimiento.recuadroEnFuente([240, 240, 135, 240], m);
+    assert.ok(Math.abs(r2.x - 0.5) < 1e-9 && Math.abs(r2.y - 0.5) < 1e-9 && Math.abs(r2.w - 0.5) < 1e-9);
+    // Un recuadro que se mete en el borde negro queda recortado a la imagen
+    const r3 = Seguimiento.recuadroEnFuente([60, 100, 100, 100], m);
+    assert.equal(r3.x, 0);
+    assert.ok(Math.abs(r3.w - 55 / 270) < 1e-9);
+});
+
+test('ajustes de "Mis objetos" marcados para la etapa S4 (no se muestran todavía)', () => {
+    const s4 = Object.entries(Seguimiento.RANGOS).filter(([, r]) => r.etapa === 'S4').map(([k]) => k).sort();
+    assert.deepEqual(s4, ['confirmacionUmbral', 'confirmacionVentana', 'perdidaMinimo', 'perdidaVentana']);
+});
+
+test('estado corto para la etiqueta sobre la imagen', () => {
+    assert.equal(Seguimiento.estadoCorto({ estado: 'siguiendo' }).texto, 'Persona fijada');
+    assert.equal(Seguimiento.estadoCorto({ estado: 'buscando' }).texto, 'Buscando persona');
+    assert.equal(Seguimiento.estadoCorto({ estado: 'siguiendo', imagenNegra: true }).texto, 'Sin imagen de la cámara');
 });

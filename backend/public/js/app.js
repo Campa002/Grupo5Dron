@@ -26,6 +26,23 @@ const App = (() => {
     // Rutas permitidas en el modo "dron sin cuenta": el inicio (con las dos opciones) y las del dron
     const RUTAS_SIN_CUENTA = ['inicio', ...RUTAS_DRON];
 
+    // Modo técnico: muestra lo que sirve para diagnosticar (elementos .solo-tecnico). Arranca apagado.
+    const CLAVE_MODO_TECNICO = 'grupo5dron_modo_tecnico';
+
+    /** @returns {boolean} true si el modo técnico está activado en este teléfono */
+    function modoTecnico() {
+        try { return localStorage.getItem(CLAVE_MODO_TECNICO) === '1'; } catch (_) { return false; }
+    }
+
+    /** Activa o desactiva el modo técnico (se guarda en el teléfono y se aplica al instante). */
+    function cambiarModoTecnico(activo) {
+        try {
+            if (activo) localStorage.setItem(CLAVE_MODO_TECNICO, '1');
+            else localStorage.removeItem(CLAVE_MODO_TECNICO);
+        } catch (_) { /* sin almacenamiento: vale hasta cerrar la app */ }
+        document.body.classList.toggle('modo-tecnico', !!activo);
+    }
+
     /**
      * Muestra una notificación emergente (Toast) en pantalla.
      * 
@@ -576,10 +593,11 @@ const App = (() => {
     }
 
     /**
-     * Inicializa la vista de Diagnóstico de Sensores (/pages/sensores.php):
-     * diagnóstico de disponibilidad y lectura en vivo del giroscopio.
+     * Inicializa la vista de Sensores (/pages/sensores.php):
+     * inclinación en vivo (giroscopio o, si no hay, acelerómetro), demo de detección con la cámara y,
+     * en el modo técnico, el diagnóstico de los sensores.
      * @param {HTMLElement} contenedor
-     * @returns {Function} limpieza que deja de escuchar el sensor al salir de la página
+     * @returns {Function} limpieza que deja de escuchar los sensores y apaga la cámara al salir de la página
      */
     function inicializarPaginaSensores(contenedor) {
         const q = sel => contenedor.querySelector(sel);
@@ -587,9 +605,8 @@ const App = (() => {
         const panelResultados = q('#panel-resultados-sensores');
         const btnVivo = q('#btn-giro-vivo');
         const estadoVivo = q('#giro-estado');
-        let escuchando = false;
-        let lecturas = 0;
-        let timerSinDatos = null;
+        const fuenteVivo = q('#giro-fuente');
+        let lector = null;
 
         async function ejecutarDiagnostico() {
             if (!btnDiagnosticar || !panelResultados) return;
@@ -598,6 +615,7 @@ const App = (() => {
             panelResultados.innerHTML = '<div class="cargando"><div class="cargando__spinner"></div><p>Verificando sensores...</p></div>';
 
             await Sensores.diagnosticar();
+            if (!contenedor.isConnected) return;
             const resumen = Sensores.obtenerResumen();
             panelResultados.innerHTML = resumen.map(s => `
                 <div class="tarjeta flex items-start gap-md mb-sm">
@@ -607,7 +625,7 @@ const App = (() => {
                             <strong class="texto-sm">${s.nombre}</strong>
                             <span class="badge ${s.ok ? 'badge--exito' : 'badge--error'}">${icono(s.ok ? 'check' : 'cruz')}${s.estado}</span>
                         </div>
-                        <p class="texto-xs texto-secundario mt-xs">${s.detalle}</p>
+                        <p class="texto-xs texto-secundario mt-xs">${escaparHtml(s.detalle)}</p>
                     </div>
                 </div>
             `).join('');
@@ -616,55 +634,65 @@ const App = (() => {
             textoConIcono(btnDiagnosticar, 'recargar', 'Repetir diagnóstico');
         }
 
-        // ---- Giroscopio en vivo ----
-        const fmt = v => (typeof v === 'number' ? `${v.toFixed(1)}°` : '--');
-        function onOrientacion(ev) {
-            if (typeof ev.beta !== 'number' && typeof ev.gamma !== 'number') return; // evento sin datos (PC)
-            lecturas++;
-            q('#giro-beta').textContent = fmt(ev.beta);
-            q('#giro-gamma').textContent = fmt(ev.gamma);
-            q('#giro-alpha').textContent = fmt(ev.alpha);
-            if (lecturas === 1) textoConIcono(estadoVivo, 'check', 'Recibiendo datos reales del sensor. Inclinate para ver cómo cambian.');
+        // ---- Inclinación en vivo: del giroscopio o, si el celular no tiene, del acelerómetro ----
+        const fmt = v => (typeof v === 'number' ? `${v.toFixed(0)}°` : '--');
+        let lecturas = 0;
+
+        function iniciarLecturaVivo() {
+            if (lector || !estadoVivo) return;
+            lector = new DronGiroscopio.LectorInclinacion({
+                onLectura: ({ beta, gamma, alpha }) => {
+                    lecturas++;
+                    q('#giro-beta').textContent = fmt(beta);
+                    q('#giro-gamma').textContent = fmt(gamma);
+                    q('#giro-alpha').textContent = alpha === null ? 'No disp.' : fmt(alpha);
+                    if (lecturas === 1) textoConIcono(estadoVivo, 'check', 'Recibiendo datos reales. Inclinate para ver cómo cambian.');
+                },
+                onFuente: (fuente) => {
+                    if (fuenteVivo) fuenteVivo.textContent = DronGiroscopio.textoFuente(fuente);
+                    if (fuente === 'ninguno') textoConIcono(estadoVivo, 'cruz', 'Sin datos de inclinación.');
+                },
+            });
+            lector.iniciar();
+            estadoVivo.textContent = 'Esperando datos del sensor...';
         }
 
-        async function iniciarLecturaVivo() {
-            if (escuchando || !estadoVivo) return;
-            if (typeof DeviceOrientationEvent === 'undefined') {
-                textoConIcono(estadoVivo, 'cruz', 'Este navegador no da acceso al giroscopio.');
-                return;
-            }
-            // iOS 13+ pide permiso con un toque del usuario
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        /** Algunos navegadores piden permiso (iOS 13+ con un toque). Si hace falta el toque, aparece el botón. */
+        async function pedirPermisoYLeer() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 try {
                     if (await DeviceOrientationEvent.requestPermission() !== 'granted') {
-                        textoConIcono(estadoVivo, 'cruz', 'Permiso del giroscopio denegado.');
+                        textoConIcono(estadoVivo, 'cruz', 'Permiso de los sensores denegado.');
                         return;
                     }
                 } catch (_) {
-                    estadoVivo.textContent = 'Tocá "Ver lectura en vivo" para dar permiso al giroscopio.';
+                    estadoVivo.textContent = 'Tocá "Ver lectura en vivo" para dar permiso a los sensores.';
                     if (btnVivo) btnVivo.hidden = false;
                     return;
                 }
             }
-            window.addEventListener('deviceorientation', onOrientacion);
-            escuchando = true;
             if (btnVivo) btnVivo.hidden = true;
-            estadoVivo.textContent = 'Esperando datos del sensor...';
-            timerSinDatos = setTimeout(() => {
-                if (!lecturas) textoConIcono(estadoVivo, 'cruz', 'No llegan datos: este dispositivo no tiene giroscopio o el navegador no lo expone (en una PC es normal).');
-            }, 2500);
+            iniciarLecturaVivo();
         }
 
-        // ---- Demo del seguimiento con la cámara (misma tubería que la cabina, solo ensayo) ----
+        // ---- Demo de detección con la cámara (misma tubería que la cabina, solo ensayo) ----
         const btnDemo = q('#btn-demo-seg');
         const btnCopiarDemo = q('#btn-demo-seg-copiar');
         const cajaDemo = q('#demo-seg-caja');
         const videoDemo = q('#demo-seg-video');
         const estadoDemo = q('#demo-seg-estado');
+        const chipDemo = q('#demo-seg-chip');
         let demo = null;
         let panelDemo = null;
         let camara = null;
         let paginaCerrada = false;
+
+        /** La caja toma la proporción real de la cámara (vertical en el celular): sin franjas negras a los costados. */
+        function ajustarProporcion() {
+            const w = videoDemo.videoWidth;
+            const h = videoDemo.videoHeight;
+            if (w > 0 && h > 0) cajaDemo.style.setProperty('--proporcion', String(w / h));
+        }
 
         function detenerDemo() {
             demo?.desactivar();
@@ -674,6 +702,7 @@ const App = (() => {
             camara = null;
             if (videoDemo) videoDemo.srcObject = null;
             if (cajaDemo) cajaDemo.hidden = true;
+            if (chipDemo) { chipDemo.hidden = true; delete chipDemo.dataset.texto; }
             if (btnDemo) { textoConIcono(btnDemo, 'play', 'Probar con la cámara'); btnDemo.disabled = false; }
         }
 
@@ -701,8 +730,11 @@ const App = (() => {
             videoDemo.srcObject = camara;
             cajaDemo.hidden = false;
             try { await videoDemo.play(); } catch (_) { /* se reproduce igual al tener datos */ }
+            ajustarProporcion();
 
-            if (!demo) demo = new DronSeguimiento({ videoEl: videoDemo, canvasDebug: q('#demo-seg-canvas') });
+            if (!demo) {
+                demo = new DronSeguimiento({ videoEl: videoDemo, canvasDebug: q('#demo-seg-canvas'), miniatura: q('#demo-seg-miniatura') });
+            }
             if (!demo.modeloCargado) {
                 estadoDemo.textContent = 'Cargando el modelo de detección...';
                 const res = await demo.inicializar();
@@ -710,10 +742,16 @@ const App = (() => {
                 if (!res.ok) { textoConIcono(estadoDemo, 'cruz', `No se pudo cargar el modelo: ${res.error}`); detenerDemo(); return; }
                 estadoDemo.textContent = res.aviso || '';
             }
-            panelDemo = new DronSeguimiento.Panel(cajaDemo);
+            panelDemo = new DronSeguimiento.Panel(q('#demo-seg-panel'));
             demo.onComando = (cmd, info) => {
                 q('#demo-seg-cartel').textContent = DronSeguimiento.textoEnsayo(cmd, info);
                 panelDemo?.actualizar(info);
+                const e = DronSeguimiento.estadoCorto(info);
+                if (chipDemo && chipDemo.dataset.texto !== e.texto) {
+                    textoConPunto(chipDemo, e.color, e.texto);
+                    chipDemo.dataset.texto = e.texto;
+                }
+                if (chipDemo) chipDemo.hidden = false;
             };
             demo.activar();
             textoConIcono(btnDemo, 'detener', 'Detener');
@@ -721,6 +759,8 @@ const App = (() => {
             btnCopiarDemo.hidden = false;
         }
 
+        videoDemo?.addEventListener('loadedmetadata', ajustarProporcion);
+        videoDemo?.addEventListener('resize', ajustarProporcion); // el celular giró
         btnDemo?.addEventListener('click', () => (camara ? detenerDemo() : iniciarDemo()));
         btnCopiarDemo?.addEventListener('click', async () => {
             const filas = demo?.registro.length || 0;
@@ -730,15 +770,16 @@ const App = (() => {
         });
 
         btnDiagnosticar?.addEventListener('click', ejecutarDiagnostico);
-        btnVivo?.addEventListener('click', iniciarLecturaVivo);
-        ejecutarDiagnostico();
-        // Arranca solo; si el navegador exige un toque para dar permiso (iOS), aparece el botón
-        iniciarLecturaVivo();
+        btnVivo?.addEventListener('click', pedirPermisoYLeer);
+        // El diagnóstico abre la cámara un instante: solo en el modo técnico
+        if (modoTecnico()) ejecutarDiagnostico();
+        // La lectura arranca sola; si el navegador exige un toque para dar permiso (iOS), aparece el botón
+        pedirPermisoYLeer();
 
         return () => {
             paginaCerrada = true;
-            clearTimeout(timerSinDatos);
-            window.removeEventListener('deviceorientation', onOrientacion);
+            lector?.detener();
+            lector = null;
             detenerDemo(); // apaga la cámara al salir de la pantalla
         };
     }
@@ -843,9 +884,10 @@ const App = (() => {
             badge.style.color = tieneNativo ? 'var(--color-exito)' : 'var(--color-advertencia)';
         }
 
+        /** @returns {Promise<{respuesta:string, error:string|null, ms:number}|undefined>} */
         async function enviarPrueba(cmd) {
             cmd = (cmd || '').trim();
-            if (!cmd) return;
+            if (!cmd) return undefined;
             const ip = ipInput?.value?.trim() || '192.168.10.1';
             const puerto = parseInt(puertoInput?.value, 10) || 8889;
             agregarLog('tx', `"${cmd}" -> ${ip}:${puerto}`);
@@ -868,6 +910,130 @@ const App = (() => {
                 registrarError(`"${cmd}" respondió "${respuesta}"${error ? ' (' + error + ')' : ''}`);
             }
             actualizarUIResumen();
+            return { respuesta: String(respuesta ?? ''), error, ms };
+        }
+
+        // ---- Prueba en pasos numerados con un resultado claro (vista normal) ----
+        const PASOS = ['app', 'command', 'bateria', 'telemetria', 'video'];
+        const BATERIA_MINIMA = 20;
+        const resultadoPasos = {};
+        let probando = false;
+
+        function marcarPaso(id, color, texto) {
+            const el = q(`#paso-${id}`);
+            if (!el) return;
+            textoConPunto(el, color, texto);
+            el.closest('.paso-prueba')?.setAttribute('data-estado', color || '');
+            resultadoPasos[id] = texto;
+        }
+
+        function mostrarResultado(ok, titulo, detalle) {
+            const caja = q('#resultado-prueba');
+            if (!caja) return;
+            caja.className = `resultado-prueba ${ok === null ? '' : ok ? 'resultado-prueba--ok' : 'resultado-prueba--falta'}`;
+            caja.replaceChildren();
+            const t = document.createElement('span');
+            t.className = 'resultado-prueba__titulo';
+            t.textContent = titulo;
+            caja.append(t);
+            if (detalle) {
+                const d = document.createElement('span');
+                d.className = 'resultado-prueba__detalle';
+                d.textContent = detalle;
+                caja.append(d);
+            }
+        }
+
+        /** Espera hasta `ms` a que `condicion()` sea verdadera (o a que se cierre la página). */
+        async function esperarHasta(condicion, ms) {
+            const fin = Date.now() + ms;
+            while (Date.now() < fin && !paginaCerrada) {
+                if (condicion()) return true;
+                await new Promise(r => setTimeout(r, 200));
+            }
+            return condicion();
+        }
+
+        async function probarTodo() {
+            if (probando) return;
+            probando = true;
+            const btn = q('#btn-probar-todo');
+            if (btn) btn.disabled = true;
+            PASOS.forEach(p => marcarPaso(p, '', 'Sin probar'));
+            mostrarResultado(null, 'Probando...', 'No muevas el celular ni el dron.');
+            const faltas = [];
+            const avisos = [];
+            const terminar = () => {
+                if (faltas.length) mostrarResultado(false, 'Todavía no', `Falta: ${faltas.join('; ')}.`);
+                else mostrarResultado(true, 'Listo para volar', avisos.length ? `Ojo: ${avisos.join('; ')}.` : 'El dron responde, informa la batería y manda telemetría y video.');
+                probando = false;
+                if (btn) btn.disabled = false;
+            };
+
+            // 01 — App y WiFi del Tello
+            if (!tieneNativo) {
+                marcarPaso('app', 'error', 'Estás en el navegador: el navegador no puede hablar con el dron.');
+                faltas.push('abrir la app instalada en el celular');
+                terminar();
+                return;
+            }
+            marcarPaso('app', 'acento', 'Vinculando el WiFi del Tello...');
+            const red = await DN.vincularRedWifi();
+            if (paginaCerrada) return;
+            estadoDiag.wifi = red.vinculada ? `Vinculada (${red.motivo || 'OK'})` : `NO vinculada (${red.motivo || 'sin motivo'})`;
+            if (red.vinculada) marcarPaso('app', 'exito', 'WiFi del Tello vinculado.');
+            else marcarPaso('app', 'advertencia', `WiFi sin vincular (${red.motivo || 'sin motivo'}). Se prueba igual.`);
+
+            // 02 — Respuesta del dron
+            marcarPaso('command', 'acento', 'Enviando "command"...');
+            const rc = await enviarPrueba('command');
+            if (paginaCerrada) return;
+            if (!rc || !DronAdaptadores.esOk(rc.respuesta)) {
+                marcarPaso('command', 'error', `No respondió (${rc?.respuesta || 'sin respuesta'}). Prendé el dron y conectá el celular a su WiFi TELLO-XXXXXX.`);
+                faltas.push('que el dron responda');
+                terminar();
+                return;
+            }
+            marcarPaso('command', 'exito', `Respondió "ok" en ${rc.ms} ms.`);
+
+            // 03 — Batería
+            marcarPaso('bateria', 'acento', 'Preguntando la batería...');
+            const rb = await enviarPrueba('battery?');
+            if (paginaCerrada) return;
+            const bat = parseInt(rb?.respuesta, 10);
+            if (!Number.isFinite(bat)) {
+                marcarPaso('bateria', 'advertencia', `No la informó (${rb?.respuesta || 'sin respuesta'}).`);
+                avisos.push('no se pudo leer la batería');
+            } else if (bat < BATERIA_MINIMA) {
+                marcarPaso('bateria', 'error', `${bat} %: muy baja para volar.`);
+                faltas.push(`cargar la batería (${bat} %)`);
+            } else {
+                marcarPaso('bateria', 'exito', `${bat} %.`);
+            }
+
+            // 04 — Telemetría (la cabina no deja despegar sin ella)
+            marcarPaso('telemetria', 'acento', 'Esperando telemetría (puerto 8890)...');
+            const llegoTel = await esperarHasta(() => estadoDiag.telemetriaTotal > 0, 3000);
+            if (paginaCerrada) return;
+            if (llegoTel) marcarPaso('telemetria', 'exito', 'Llega telemetría.');
+            else {
+                marcarPaso('telemetria', 'error', 'No llega. Sin telemetría la cabina no deja despegar.');
+                faltas.push('que llegue la telemetría');
+            }
+
+            // 05 — Video (no impide volar)
+            marcarPaso('video', 'acento', 'Pidiendo el video ("streamon")...');
+            const bytesAntes = estadoDiag.totalBytesVideo;
+            const rv = await enviarPrueba('streamon');
+            if (paginaCerrada) return;
+            const llegoVideo = DronAdaptadores.esOk(rv?.respuesta) && await esperarHasta(() => estadoDiag.totalBytesVideo > bytesAntes, 3000);
+            if (paginaCerrada) return;
+            if (llegoVideo) marcarPaso('video', 'exito', 'Llega video.');
+            else {
+                marcarPaso('video', 'advertencia', 'No llega video. Se puede volar, pero sin imagen ni seguimiento.');
+                avisos.push('no llega video');
+            }
+            terminar();
         }
 
         async function abrirEscuchas() {
@@ -1002,6 +1168,7 @@ const App = (() => {
         q('#btn-limpiar-log-tello')?.addEventListener('click', () => {
             if (logBox) logBox.textContent = 'Consola limpia. Lista para nuevas pruebas.';
         });
+        q('#btn-probar-todo')?.addEventListener('click', probarTodo);
         q('#btn-ejecutar-diagnostico')?.addEventListener('click', ejecutarDiagnosticoCompleto);
         q('#btn-verificar-modelo')?.addEventListener('click', verificarModelo);
         q('#btn-limpiar-errores-diag')?.addEventListener('click', () => {
@@ -1015,6 +1182,9 @@ const App = (() => {
                 'INFORME DE DIAGNÓSTICO — GRUPO 5 DRON',
                 `Fecha y hora: ${new Date().toLocaleString()}`,
                 '========================================',
+                `Resultado: ${q('#resultado-prueba')?.textContent.trim() || 'sin probar'}`,
+                ...PASOS.map((p, i) => `  0${i + 1}. ${q(`#paso-${p}`)?.closest('.paso-prueba')?.querySelector('.paso-prueba__nombre')?.textContent || p}: ${resultadoPasos[p] || 'Sin probar'}`),
+                '----------------------------------------',
                 `• Plugin DronNative:     ${estadoDiag.pluginInfo}`,
                 `• Red WiFi vinculada:    ${estadoDiag.wifi}`,
                 `• Soporte WebCodecs:     ${estadoDiag.webCodecs}`,
@@ -1028,6 +1198,7 @@ const App = (() => {
                 `• Sesión:                ${estadoDiag.modoSesion}`,
                 `• WebView / UserAgent:   ${estadoDiag.userAgent}`,
                 `• Modelo de seguimiento: ${estadoDiag.modelo}`,
+                `• Modo técnico:          ${modoTecnico() ? 'activado' : 'apagado'}`,
                 ...estadoDiag.modeloDetalle.map(l => `    ${l}`),
                 '----------------------------------------',
                 'ÚLTIMOS ERRORES REGISTRADOS:',
@@ -1065,6 +1236,8 @@ const App = (() => {
      * Inicialización global de la aplicación.
      */
     async function iniciar() {
+        document.body.classList.toggle('modo-tecnico', modoTecnico());
+
         // Enlazar eventos del menú lateral
         const btnMenu = document.getElementById('btn-menu');
         if (btnMenu) {
@@ -1141,5 +1314,7 @@ const App = (() => {
         icono,
         textoConIcono,
         textoConPunto,
+        modoTecnico,
+        cambiarModoTecnico,
     };
 })();

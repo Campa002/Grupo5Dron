@@ -1,55 +1,48 @@
 <div class="inicio-pagina">
-    <div class="flex justify-between items-center mb-lg flex-wrap gap-sm">
-        <div>
-            <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">
-                Hola, <span id="inicio-nombre-usuario">Usuario</span>
-            </h2>
-            <p class="texto-sm texto-secundario">
-                Panel centralizado — EEST N° 1 "Eduardo Ader"
-            </p>
-        </div>
-        <span id="inicio-rol-usuario" class="badge badge--info">Rol</span>
+    <header class="encabezado">
+        <p class="etiqueta etiqueta--linea">Grupo 5 · EEST N° 1 Vicente López</p>
+        <h2 class="titulo-grande">Control de sistemas y dron</h2>
+        <p class="bajada">
+            Hola, <span id="inicio-nombre-usuario">Usuario</span> <span id="inicio-rol-usuario" class="badge badge--info">Rol</span>
+        </p>
+    </header>
+
+    <!-- Las dos opciones del informe -->
+    <div class="inicio-opciones mb-lg">
+        <a href="#/aula" id="inicio-acceso-aula" class="opcion">
+            <span class="etiqueta">01 — Aula</span>
+            <span class="opcion__icono"><span class="ico ico--aula" aria-hidden="true"></span></span>
+            <span class="opcion__titulo">Control del Aula</span>
+            <span class="acceso__desc opcion__desc">Luces, ventiladores, aire y proyectores por infrarrojo.</span>
+            <span class="opcion__ir">Entrar <span class="ico ico--ir" aria-hidden="true"></span></span>
+        </a>
+        <a href="#/dron" class="opcion">
+            <span class="etiqueta">02 — Dron</span>
+            <span class="opcion__icono"><span class="ico ico--dron" aria-hidden="true"></span></span>
+            <span class="opcion__titulo">Control del Dron</span>
+            <span class="opcion__desc">Video, joysticks, inclinación del celular y seguimiento.</span>
+            <span class="opcion__ir">Entrar <span class="ico ico--ir" aria-hidden="true"></span></span>
+        </a>
     </div>
 
-    <!-- Dos accesos principales grandes -->
-    <div class="mb-lg">
-        <h3 class="texto-sm texto-secundario mb-sm" style="text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">
-            Módulos principales
-        </h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: var(--espacio-md);">
-            <a href="#/aula" id="inicio-acceso-aula" class="acceso tarjeta--acento" style="min-height: 12rem; border-width: 2px;">
-                <span class="acceso__icono"><span class="ico ico--aula" aria-hidden="true"></span></span>
-                <span class="acceso__titulo" style="font-size: var(--tamano-xl);">Control del Aula</span>
-                <span class="acceso__desc">Control de luces, ventiladores, aire acondicionado, proyector y relé</span>
-            </a>
-            <a href="#/dron" class="acceso tarjeta--acento" style="min-height: 12rem; border-width: 2px;">
-                <span class="acceso__icono"><span class="ico ico--dron" aria-hidden="true"></span></span>
-                <span class="acceso__titulo" style="font-size: var(--tamano-xl);">Control del Dron</span>
-                <span class="acceso__desc">Cabina de vuelo, joystick doble virtual, giroscopio y telemetría</span>
-            </a>
-        </div>
-    </div>
-
-    <!-- Accesos secundarios -->
-    <div class="mb-lg">
-        <h3 class="texto-sm texto-secundario mb-sm" style="text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">
-            Herramientas y configuración
-        </h3>
-        <div class="grilla-accesos">
+    <!-- Modo técnico: accesos a las herramientas y estado del ESP32 -->
+    <div class="solo-tecnico">
+        <p class="etiqueta">Modo técnico</p>
+        <div class="grilla-accesos mb-lg">
             <a href="#/sensores" class="acceso">
                 <span class="acceso__icono" style="font-size: 2.2rem;"><span class="ico ico--sensores" aria-hidden="true"></span></span>
-                <span class="acceso__titulo">Diagnóstico Sensores</span>
-                <span class="acceso__desc">Giroscopio y orientación móvil</span>
+                <span class="acceso__titulo">Sensores</span>
+                <span class="acceso__desc">Inclinación y detección</span>
             </a>
             <a href="#/prueba-tello" class="acceso">
                 <span class="acceso__icono" style="font-size: 2.2rem;"><span class="ico ico--senal" aria-hidden="true"></span></span>
                 <span class="acceso__titulo">Prueba Tello</span>
-                <span class="acceso__desc">Conexión, telemetría y video del Tello</span>
+                <span class="acceso__desc">Conexión, telemetría y video</span>
             </a>
             <a href="#/config-dron" class="acceso">
                 <span class="acceso__icono" style="font-size: 2.2rem;"><span class="ico ico--llave-ajuste" aria-hidden="true"></span></span>
                 <span class="acceso__titulo">Config. Dron</span>
-                <span class="acceso__desc">Perfiles y protocolos de conexión</span>
+                <span class="acceso__desc">Perfiles y ajustes</span>
             </a>
             <a href="#/admin" class="acceso solo-admin">
                 <span class="acceso__icono" style="font-size: 2.2rem;"><span class="ico ico--engranaje" aria-hidden="true"></span></span>
@@ -62,16 +55,16 @@
                 <span class="acceso__desc">Integrantes Grupo 5 y docentes</span>
             </a>
         </div>
-    </div>
 
-    <!-- Estado del sistema y ESP32 -->
-    <div class="tarjeta" id="inicio-tarjeta-esp32">
-        <div class="flex justify-between items-center mb-sm">
-            <div class="tarjeta__titulo" style="margin-bottom: 0;">Estado del ESP32 del Aula</div>
-            <button class="btn btn--secundario btn--icono" onclick="Aula.actualizarEstadoEsp32 ? Aula.actualizarEstadoEsp32() : location.reload()" title="Actualizar" aria-label="Actualizar"><span class="ico ico--recargar" aria-hidden="true"></span></button>
-        </div>
-        <div id="inicio-esp32-resumen" class="texto-sm texto-secundario">
-            Consultando estado del microcontrolador...
+        <!-- Estado del ESP32 del aula -->
+        <div class="tarjeta" id="inicio-tarjeta-esp32">
+            <div class="flex justify-between items-center mb-sm">
+                <div class="tarjeta__titulo" style="margin-bottom: 0;">Estado del ESP32 del Aula</div>
+                <button class="btn btn--secundario btn--icono" onclick="Aula.actualizarEstadoEsp32 ? Aula.actualizarEstadoEsp32() : location.reload()" title="Actualizar" aria-label="Actualizar"><span class="ico ico--recargar" aria-hidden="true"></span></button>
+            </div>
+            <div id="inicio-esp32-resumen" class="texto-sm texto-secundario">
+                Consultando estado del microcontrolador...
+            </div>
         </div>
     </div>
 </div>

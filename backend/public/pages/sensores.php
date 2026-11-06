@@ -1,77 +1,76 @@
-<!-- Vista de diagnóstico de sensores — Grupo 5: Control de Sistemas y Dron -->
+<!-- Vista de Sensores — Grupo 5: Control de Sistemas y Dron -->
 <div class="sensores-pagina">
-    <div class="flex justify-between items-center mb-md flex-wrap gap-sm">
-        <div>
-            <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">
-                Diagnóstico de Sensores
-            </h2>
-            <p class="texto-sm texto-secundario">
-                Verificación de los sensores del dispositivo necesarios para operar el dron.
-            </p>
-        </div>
-        <button id="btn-diagnosticar-sensores" class="btn btn--primario">
-            <span class="ico ico--buscar" aria-hidden="true"></span> Ejecutar diagnóstico
-        </button>
-    </div>
+    <header class="encabezado">
+        <p class="etiqueta etiqueta--linea">Sensores del celular</p>
+        <h2 class="titulo-grande">Sensores</h2>
+        <p class="bajada">Probá la inclinación y la detección de personas antes de volar. No hace falta el dron.</p>
+    </header>
 
-    <!-- Aviso de privacidad -->
-    <div class="tarjeta tarjeta--acento mb-md" style="padding: var(--espacio-sm) var(--espacio-md);">
-        <p class="texto-xs texto-secundario">
-            <span class="ico ico--info" aria-hidden="true"></span> El diagnóstico verifica la disponibilidad de los sensores sin transmitir datos personales.
-            La solicitud de permisos (GPS, cámara) se realiza sólo si ya fueron otorgados previamente;
-            en caso contrario, sólo se reporta el estado como "pendiente".
-        </p>
-    </div>
-
-    <!-- Giroscopio en vivo: lectura real del sensor -->
-    <div class="sensor-panel" id="panel-giro-vivo">
-        <div class="sensor-panel__titulo">🧭 Giroscopio en vivo</div>
-        <div class="sensor-lectura">
-            <div class="sensor-lectura__item">
-                <div class="sensor-lectura__eje">Adelante / atrás</div>
-                <div class="sensor-lectura__valor" id="giro-beta">--</div>
+    <!-- 01 — Inclinación en vivo (giroscopio o, si no hay, acelerómetro) -->
+    <section class="bloque" id="panel-giro-vivo">
+        <p class="etiqueta">01 — Inclinación</p>
+        <h3 class="bloque__titulo">🧭 Inclinación en vivo</h3>
+        <div class="datos-grandes">
+            <div class="dato-grande">
+                <span class="dato-grande__valor" id="giro-beta">--</span>
+                <span class="dato-grande__etq">Adelante / atrás</span>
             </div>
-            <div class="sensor-lectura__item">
-                <div class="sensor-lectura__eje">Izquierda / derecha</div>
-                <div class="sensor-lectura__valor" id="giro-gamma">--</div>
+            <div class="dato-grande">
+                <span class="dato-grande__valor" id="giro-gamma">--</span>
+                <span class="dato-grande__etq">Costados</span>
             </div>
-            <div class="sensor-lectura__item">
-                <div class="sensor-lectura__eje">Brújula</div>
-                <div class="sensor-lectura__valor" id="giro-alpha">--</div>
+            <div class="dato-grande">
+                <span class="dato-grande__valor" id="giro-alpha">--</span>
+                <span class="dato-grande__etq">Giro (brújula)</span>
             </div>
         </div>
+        <p id="giro-fuente" class="texto-sm mb-xs">Buscando el sensor de inclinación...</p>
         <p id="giro-estado" class="texto-xs texto-secundario mb-sm">Preparando el sensor...</p>
         <button id="btn-giro-vivo" class="btn btn--secundario" hidden><span class="ico ico--play" aria-hidden="true"></span> Ver lectura en vivo</button>
-    </div>
+    </section>
 
-    <!-- Demo del seguimiento con la cámara del celular (misma lógica que la cabina, en ensayo) -->
-    <div class="sensor-panel" id="panel-demo-seguimiento">
-        <div class="sensor-panel__titulo">Demo de seguimiento con la cámara</div>
-        <p class="texto-xs texto-secundario mb-sm">
-            Usa la cámara del celular con la misma lógica que la cabina, en modo ensayo: detecta a la persona,
-            calcula el giro, la altura y el avance que mandaría al dron, y los muestra. No necesita el dron.
+    <!-- 02 — Demo de detección con la cámara (misma lógica que la cabina, en ensayo) -->
+    <section class="bloque" id="panel-demo-seguimiento">
+        <p class="etiqueta">02 — Detección</p>
+        <h3 class="bloque__titulo">Detección con la cámara</h3>
+        <p class="bloque__texto">
+            Detecta a la persona y calcula lo que haría el dron, en ensayo: muestra el comando, no lo envía.
         </p>
-        <div id="demo-seg-caja" hidden
-            style="position:relative; width:100%; aspect-ratio:4/3; max-height:55vh; margin-bottom: var(--espacio-sm); background:#000; border:1px solid var(--color-borde); border-radius: var(--radio-lg); overflow:hidden;">
-            <video id="demo-seg-video" playsinline muted
-                style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain;"></video>
-            <canvas id="demo-seg-canvas"
-                style="position:absolute; inset:0; width:100%; height:100%; object-fit:contain; pointer-events:none;"></canvas>
-            <div id="demo-seg-cartel"
-                style="position:absolute; left:0.5rem; right:0.5rem; bottom:0.5rem; padding:0.25rem 0.5rem; border-radius:0.375rem; background:rgba(5,11,22,0.8); color:#fbbf24; font-size:0.75rem; font-weight:600; text-align:center; pointer-events:none;"></div>
+        <div id="demo-seg-caja" class="caja-video" hidden>
+            <video id="demo-seg-video" playsinline muted></video>
+            <canvas id="demo-seg-canvas"></canvas>
+            <div class="sobre-imagen">
+                <div class="sobre-imagen__grupo">
+                    <span id="demo-seg-chip" class="chip" hidden></span>
+                </div>
+            </div>
+            <div id="demo-seg-cartel" class="cartel-ensayo"></div>
         </div>
-        <div class="flex gap-sm flex-wrap">
+        <!-- Modo técnico: lo que ve el modelo y el detalle -->
+        <div class="detalle-seguimiento solo-tecnico mb-sm">
+            <figure class="miniatura-modelo">
+                <canvas id="demo-seg-miniatura" width="160" height="120"></canvas>
+                <figcaption>Lo que ve el modelo</figcaption>
+            </figure>
+            <div id="demo-seg-panel" class="detalle-seguimiento__panel" data-vacio="Probá con la cámara para ver el detalle."></div>
+        </div>
+        <div class="par-botones">
             <button id="btn-demo-seg" class="btn btn--primario"><span class="ico ico--play" aria-hidden="true"></span> Probar con la cámara</button>
-            <button id="btn-demo-seg-copiar" class="btn btn--secundario" hidden><span class="ico ico--copiar" aria-hidden="true"></span> Copiar registro</button>
+            <button id="btn-demo-seg-copiar" class="btn btn--secundario solo-tecnico" hidden><span class="ico ico--copiar" aria-hidden="true"></span> Copiar registro</button>
         </div>
         <p id="demo-seg-estado" class="texto-xs texto-secundario mt-sm"></p>
-    </div>
+    </section>
 
-    <!-- Panel de resultados (se llena dinámicamente desde app.js) -->
-    <div id="panel-resultados-sensores">
-        <div class="cargando">
-            <div class="cargando__spinner"></div>
-            <p>Iniciando diagnóstico...</p>
+    <!-- Modo técnico: diagnóstico de los sensores -->
+    <section class="bloque solo-tecnico">
+        <p class="etiqueta">Modo técnico</p>
+        <h3 class="bloque__titulo">Diagnóstico de sensores</h3>
+        <p class="bloque__texto">Escucha los sensores de verdad: que el navegador tenga la función no alcanza.</p>
+        <button id="btn-diagnosticar-sensores" class="btn btn--secundario mb-md">
+            <span class="ico ico--buscar" aria-hidden="true"></span> Ejecutar diagnóstico
+        </button>
+        <div id="panel-resultados-sensores">
+            <p class="texto-xs texto-secundario">Sin diagnosticar.</p>
         </div>
-    </div>
+    </section>
 </div>

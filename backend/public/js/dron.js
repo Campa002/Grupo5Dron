@@ -158,11 +158,13 @@ const Dron = (() => {
         window.addEventListener('resize', _onResize);
 
         _giroscopio = new DronGiroscopio({ onChange: _onGiroscopioCambio });
+        _giroscopio.onFuente = _onFuenteInclinacion;
 
         if (typeof DronSeguimiento !== 'undefined') {
             _seguimiento = new DronSeguimiento({
                 videoEl: _q('#canvas-video'),
                 canvasDebug: _q('#canvas-seguimiento'),
+                miniatura: _q('#cab-miniatura'),
                 // Para el registro por cuadro y las condiciones del control real
                 obtenerContexto: () => ({
                     enVuelo: !!_adaptador?.enVuelo,
@@ -374,7 +376,7 @@ const Dron = (() => {
         on('#btn-cerrar-aviso-fijo', _ocultarAvisoFijo);
         on('#btn-calibrar-giro', () => {
             _giroscopio?.calibrar();
-            App.mostrarToast('Giroscopio calibrado: la posición actual del teléfono es el "centro".', 'info');
+            App.mostrarToast('Inclinación calibrada: la posición actual del teléfono es el "centro".', 'info');
         });
 
         // Movimientos por paso
@@ -673,6 +675,8 @@ const Dron = (() => {
         _panelSeguimiento?.destruir();
         _panelSeguimiento = null;
         _mostrarEnsayo('');
+        const chip = _q('#cab-chip-seguimiento');
+        if (chip) chip.hidden = true;
         _actualizarBotonSeguimiento();
     }
 
@@ -695,14 +699,26 @@ const Dron = (() => {
             _modoGiro = true;
             _adaptador?.actualizarEjes({ lr: 0, fb: 0 });
             _joystickDer?.centrar();
-            App.mostrarToast('Giroscopio activado: inclinate para controlar avance y lateral.', 'exito');
+            App.mostrarToast('Control por inclinación activado: inclinate para controlar avance y lateral.', 'exito');
         } else {
-            let msg = 'No se pudo activar el giroscopio.';
-            if (resultado.motivo === 'permiso_denegado') msg = 'Permiso del giroscopio denegado. Habilitalo en los ajustes.';
-            if (resultado.motivo === 'no_disponible') msg = 'Este dispositivo no tiene giroscopio.';
+            let msg = 'No se pudo activar el control por inclinación.';
+            if (resultado.motivo === 'permiso_denegado') msg = 'Permiso de los sensores denegado. Habilitalo en los ajustes.';
+            if (resultado.motivo === 'no_disponible') msg = 'Este dispositivo no tiene sensores de inclinación.';
             App.mostrarToast(msg, 'advertencia');
         }
         _actualizarBotonGiro();
+    }
+
+    /** El lector decidió de qué sensor sale la inclinación. Con giroscopio no se avisa nada (es lo de siempre). */
+    function _onFuenteInclinacion(fuente) {
+        if (!_modoGiro) return;
+        if (fuente === 'acelerometro') {
+            App.mostrarToast('Este celular no tiene giroscopio: la inclinación se calcula con el acelerómetro. ' +
+                'El giro sobre el eje vertical no se puede medir: girá con el joystick izquierdo.', 'advertencia', 8000);
+        } else if (fuente === 'ninguno') {
+            _apagarGiro(); // sus ejes vuelven a cero
+            App.mostrarToast('No llegan datos de inclinación: este dispositivo no los da. Usá los joysticks.', 'advertencia', 7000);
+        }
     }
 
     function _onGiroscopioCambio({ pitch, roll }) {
@@ -718,7 +734,7 @@ const Dron = (() => {
     function _actualizarBotonGiro() {
         const btn = _q('#btn-toggle-giro');
         if (!btn) return;
-        btn.textContent = _modoGiro ? '🧭 Giro: ON' : '🧭 Giro: OFF';
+        btn.textContent = _modoGiro ? '🧭 Inclinación: ON' : '🧭 Inclinación: OFF';
         btn.classList.toggle('cab-activo', _modoGiro);
     }
 
@@ -747,7 +763,7 @@ const Dron = (() => {
         _modoSeguimiento = true;
         _seguimiento.onComando = _onSeguimientoComando;
         _panelSeguimiento?.destruir();
-        _panelSeguimiento = new DronSeguimiento.Panel(_q('.cab-video'));
+        _panelSeguimiento = new DronSeguimiento.Panel(_q('#cab-panel-seg'));
         _seguimiento.onEstado = (nuevo) => {
             if (_modoSeguimiento && nuevo === 'perdido') App.mostrarToast('Seguimiento: se perdió a la persona. Comando: quieto.', 'advertencia', 5000);
         };
@@ -764,6 +780,15 @@ const Dron = (() => {
         if (!_modoSeguimiento) return;
         _mostrarEnsayo(DronSeguimiento.textoEnsayo(cmd, info));
         _panelSeguimiento?.actualizar(info);
+        const chip = _q('#cab-chip-seguimiento');
+        if (chip) {
+            const e = DronSeguimiento.estadoCorto(info);
+            if (chip.dataset.texto !== e.texto) {
+                App.textoConPunto(chip, e.color, e.texto);
+                chip.dataset.texto = e.texto;
+            }
+            chip.hidden = false;
+        }
     }
 
     /** Copia el registro por cuadro del último ensayo (CSV separado por ";"). */
@@ -961,19 +986,13 @@ const Dron = (() => {
     function _plantillaCabina() {
         return `
         <div class="dron-pagina cabina">
-            <!-- Barra superior: estado y telemetría -->
+            <!-- Barra superior: nombre del perfil (y en el modo técnico, más telemetría) -->
             <div class="cab-barra">
                 <button id="btn-cab-menu" class="cab-btn-menu" aria-label="Abrir menú">${App.icono('menu')}</button>
-                <div class="cab-estado">
-                    <span id="estado-conexion"><span class="punto punto--advertencia" aria-hidden="true"></span>Conectando...</span>
-                    <span id="estado-telemetria" class="cab-sin-tel" hidden><span class="punto punto--alerta" aria-hidden="true"></span>Sin telemetría</span>
-                    <span class="cab-perfil">Perfil: <strong id="nombre-perfil-activo">—</strong></span>
-                </div>
-                <div class="cab-telemetria" id="panel-telemetria">
-                    <div class="cab-dato"><b><span id="tel-bateria-icono" class="punto" aria-hidden="true"></span><span id="tel-bateria-valor">--%</span></b><small>Batería</small></div>
-                    <div class="cab-dato"><b id="tel-altura-valor">-- cm</b><small>Altura</small></div>
-                    <div class="cab-dato"><b id="tel-velocidad-valor">-- cm/s</b><small>Velocidad</small></div>
-                    <div class="cab-dato"><b id="tel-tiempo-valor">-- s</b><small>Motores</small></div>
+                <p class="etiqueta cab-titulo">Cabina · <span id="nombre-perfil-activo">—</span></p>
+                <div class="cab-datos-tecnicos solo-tecnico" id="panel-telemetria">
+                    <span>Velocidad <b id="tel-velocidad-valor">-- cm/s</b></span>
+                    <span>Motores <b id="tel-tiempo-valor">-- s</b></span>
                 </div>
             </div>
 
@@ -1004,13 +1023,24 @@ const Dron = (() => {
                     <canvas id="canvas-video" width="960" height="720"></canvas>
                     <canvas id="canvas-seguimiento"></canvas>
                     <div id="overlay-video-off" class="cab-video__aviso">Sin señal de video</div>
-                    <div id="cab-ensayo" hidden
-                        style="position:absolute; left:0.5rem; right:0.5rem; bottom:0.5rem; padding:0.25rem 0.5rem; border-radius:0.375rem; background:rgba(5,11,22,0.8); color:#fbbf24; font-size:0.75rem; font-weight:600; text-align:center; pointer-events:none;"></div>
+                    <!-- Estados sobre la imagen -->
+                    <div class="sobre-imagen">
+                        <div class="sobre-imagen__grupo">
+                            <span id="estado-conexion" class="chip"><span class="punto punto--advertencia" aria-hidden="true"></span>Conectando...</span>
+                            <span id="estado-telemetria" class="chip chip--alerta" hidden><span class="punto punto--alerta" aria-hidden="true"></span>Sin telemetría</span>
+                            <span id="cab-chip-seguimiento" class="chip" hidden></span>
+                        </div>
+                        <div class="sobre-imagen__grupo sobre-imagen__grupo--der">
+                            <span class="chip chip--dato" title="Batería"><span id="tel-bateria-icono" class="punto" aria-hidden="true"></span><span class="chip__etq">Bat.</span><span id="tel-bateria-valor">--%</span></span>
+                            <span class="chip chip--dato" title="Altura"><span class="chip__etq">Alt.</span><span id="tel-altura-valor">-- cm</span></span>
+                        </div>
+                    </div>
+                    <div id="cab-ensayo" class="cartel-ensayo" hidden></div>
                 </div>
 
                 <div class="cab-lado cab-lado--der">
                     <div class="cab-botones">
-                        <button id="btn-toggle-giro" class="btn btn--secundario">🧭 Giro: OFF</button>
+                        <button id="btn-toggle-giro" class="btn btn--secundario">🧭 Inclinación: OFF</button>
                         <button id="btn-toggle-seguimiento" class="btn btn--secundario">${App.icono('objetivo')} Ensayo: OFF</button>
                     </div>
                     <div class="cab-joystick">
@@ -1020,15 +1050,28 @@ const Dron = (() => {
                 </div>
             </div>
 
+            <!-- Modo técnico: detalle del seguimiento, lo que ve el modelo y el registro -->
+            <section class="cab-panel solo-tecnico">
+                <p class="etiqueta">Modo técnico · Seguimiento</p>
+                <div class="detalle-seguimiento">
+                    <figure class="miniatura-modelo">
+                        <canvas id="cab-miniatura" width="160" height="120"></canvas>
+                        <figcaption>Lo que ve el modelo</figcaption>
+                    </figure>
+                    <div id="cab-panel-seg" class="detalle-seguimiento__panel" data-vacio="Activá el ensayo para ver el detalle."></div>
+                </div>
+                <button id="btn-copiar-registro-seg" class="btn btn--secundario mt-sm" hidden>${App.icono('copiar')} Copiar registro</button>
+            </section>
+
             <div class="cab-acciones">
                 <button id="btn-reconectar" class="btn btn--primario" hidden>${App.icono('recargar')} Reconectar</button>
-                <button id="btn-calibrar-giro" class="btn btn--secundario">${App.icono('objetivo')} Calibrar giro</button>
-                <button id="btn-copiar-registro-seg" class="btn btn--secundario" hidden>${App.icono('copiar')} Copiar registro</button>
+                <button id="btn-calibrar-giro" class="btn btn--secundario">${App.icono('objetivo')} Calibrar inclinación</button>
                 <button id="btn-ir-config-dron" class="btn btn--secundario">${App.icono('llave-ajuste')} Config. dron</button>
             </div>
 
             <!-- Movimientos por paso -->
             <section class="cab-panel">
+                <p class="etiqueta">01 — Por pasos</p>
                 <h3 class="cab-panel__titulo">Movimientos por paso</h3>
                 <div class="cab-opciones">
                     <label>Distancia
@@ -1066,11 +1109,12 @@ const Dron = (() => {
                         <button id="btn-paso-girar-der" class="btn btn--secundario">${App.icono('girar-der')} Girar der.</button>
                     </div>
                 </div>
-                <p id="estado-paso-texto" class="cab-panel__estado">Listo para comandos. El botón rojo del centro frena (rc 0 0 0 0).</p>
+                <p id="estado-paso-texto" class="cab-panel__estado">Listo. El botón rojo del centro frena.</p>
             </section>
 
             <!-- Misiones -->
             <section class="cab-panel">
+                <p class="etiqueta">02 — Automático</p>
                 <h3 class="cab-panel__titulo">Misiones</h3>
                 <div class="cab-mision">
                     <select id="sel-mision-activa" class="cab-select" aria-label="Misión"></select>
@@ -1082,8 +1126,7 @@ const Dron = (() => {
             </section>
 
             <p class="cab-nota">
-                ${App.icono('escudo')} Vuelo supervisado obligatorio, con al menos 3×3 m libres de personas. Giroscopio y seguimiento arrancan apagados.
-                El seguimiento visual es EXPERIMENTAL: por ahora funciona solo en ensayo (muestra los comandos, no los envía).
+                ${App.icono('escudo')} Vuelo supervisado, con 3×3 m libres de personas. El seguimiento está en ensayo: muestra los comandos, no los envía.
             </p>
         </div>`;
     }
