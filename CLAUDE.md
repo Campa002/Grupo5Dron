@@ -181,6 +181,12 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
   - sin `'use strict'` dentro de clases, sin métodos ni opciones sin uso (giroscopio, joystick, sensores, seguimiento) y sin `console.log`/`console.info` de depuración.
 - Cuando cambie la lista de archivos de `sw.js` (`RECURSOS_ESTATICOS`), subí `CACHE_NAME`. Para cambios de contenido no hace falta: el service worker pide primero a la red.
 - `mostrarModalUsuario` (app.js) escapa el nombre, el email y el rol con `escaparHtml` antes de armar el modal.
+- Seguimiento, etapa S2 (6/11):
+  - Panel sobre el video (backend, FPS, demora, estado, personas y condiciones del control real); el comando lo muestra el cartel "ENSAYO".
+  - Ajustes editables en Config. del dron, guardados en el teléfono (`grupo5dron_seguimiento_ajustes`, rangos en `DronSeguimiento.RANGOS`). Incluyen los de "Mis objetos" con el criterio de RAC (75 % y 8 detecciones; pérdida 3 de 5).
+  - "📋 Copiar registro": CSV por cuadro con detección, comando y telemetría; hasta 3000 cuadros.
+  - Demo con la cámara del celular en Sensores: misma tubería y panel, en ensayo; apaga la cámara al salir.
+  - Capacitor 5.7.8 pide el permiso CAMERA en tiempo de ejecución para el WebView (`BridgeWebChromeClient.onPermissionRequest`).
 - Seguimiento, etapa S1 (6/11): `dron-seguimiento.js` es una sola tubería.
   - Visión: COCO-SSD sobre una imagen de 480 px, de 5 a 10 FPS sin superponer, con aviso si TensorFlow no usa WebGL.
   - Selector: fija la persona más grande, con premio por estar centrada; ignora las de menos del 12 % del alto; asocia con la última detección cruda y su velocidad; tolera pérdidas de 1,5 s; después solo retoma cerca de donde estaba durante 5 s.
@@ -201,7 +207,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 5. ~~Fase 4, limpieza~~: hecha (ver "Estado").
 6. **Seguimiento v2** (una sola tubería: candidatos → selector de objetivo → suavizado → controlador; ensayo y control real comparten todo):
    - ~~S1~~: hecha (ver "Estado"). Pasan a S3: cancelar el seguimiento real con cualquier toque de joystick y aplicar las condiciones de activación.
-   - S2: modo ensayo con panel (FPS, demora, backend, estado, comando); ajustes editables guardados en el teléfono (ganancias, zona muerta, velocidad máxima, distancia objetivo, umbral; confirmación tipo RAC: 75 % y 8 detecciones; pérdida: 3 de 5); "Copiar registro" por cuadro (sin método nativo nuevo); demo con la cámara del celular en Sensores (app.js, aprobado).
+   - ~~S2~~: hecha (ver "Estado").
    - Firma fija del APK debug (etapa aparte, al final de S2): keystore como secreto de GitHub en base64, nunca en el repo, con la clave por defecto si falta el secreto.
    - S3 (después de la primera prueba con el Tello): habilitar el control real (con cancelación por toque de joystick y las condiciones de activación) y ajustar ganancias con el dron.
    - S4 (después de la primera prueba): "Mis objetos" (MobileNet local para embeddings, IndexedDB, selector por objeto guardado y por toque con rastreador).

@@ -612,6 +612,80 @@ const App = (() => {
             }, 2500);
         }
 
+        // ---- Demo del seguimiento con la cámara (misma tubería que la cabina, solo ensayo) ----
+        const btnDemo = q('#btn-demo-seg');
+        const btnCopiarDemo = q('#btn-demo-seg-copiar');
+        const cajaDemo = q('#demo-seg-caja');
+        const videoDemo = q('#demo-seg-video');
+        const estadoDemo = q('#demo-seg-estado');
+        let demo = null;
+        let panelDemo = null;
+        let camara = null;
+        let paginaCerrada = false;
+
+        function detenerDemo() {
+            demo?.desactivar();
+            panelDemo?.destruir();
+            panelDemo = null;
+            camara?.getTracks().forEach(t => t.stop());
+            camara = null;
+            if (videoDemo) videoDemo.srcObject = null;
+            if (cajaDemo) cajaDemo.hidden = true;
+            if (btnDemo) { btnDemo.textContent = '▶ Probar con la cámara'; btnDemo.disabled = false; }
+        }
+
+        async function iniciarDemo() {
+            if (typeof DronSeguimiento === 'undefined' || !videoDemo) return;
+            if (!navigator.mediaDevices?.getUserMedia) {
+                estadoDemo.textContent = '✗ Este navegador no permite usar la cámara.';
+                return;
+            }
+            btnDemo.disabled = true;
+            estadoDemo.textContent = 'Pidiendo permiso para usar la cámara...';
+            try {
+                camara = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 960 }, height: { ideal: 720 } },
+                    audio: false,
+                });
+            } catch (e) {
+                estadoDemo.textContent = e?.name === 'NotAllowedError'
+                    ? '✗ Permiso de cámara denegado. Habilitalo en los ajustes del teléfono.'
+                    : `✗ No se pudo abrir la cámara: ${e?.message || e}`;
+                btnDemo.disabled = false;
+                return;
+            }
+            if (paginaCerrada) { detenerDemo(); return; }
+            videoDemo.srcObject = camara;
+            cajaDemo.hidden = false;
+            try { await videoDemo.play(); } catch (_) { /* se reproduce igual al tener datos */ }
+
+            if (!demo) demo = new DronSeguimiento({ videoEl: videoDemo, canvasDebug: q('#demo-seg-canvas') });
+            if (!demo.modeloCargado) {
+                estadoDemo.textContent = 'Cargando el modelo de detección...';
+                const res = await demo.inicializar();
+                if (paginaCerrada) { detenerDemo(); return; }
+                if (!res.ok) { estadoDemo.textContent = `✗ No se pudo cargar el modelo: ${res.error}`; detenerDemo(); return; }
+                estadoDemo.textContent = res.aviso || '';
+            }
+            panelDemo = new DronSeguimiento.Panel(cajaDemo);
+            demo.onComando = (cmd, info) => {
+                q('#demo-seg-cartel').textContent = DronSeguimiento.textoEnsayo(cmd, info);
+                panelDemo?.actualizar(info);
+            };
+            demo.activar();
+            btnDemo.textContent = '⏹ Detener';
+            btnDemo.disabled = false;
+            btnCopiarDemo.hidden = false;
+        }
+
+        btnDemo?.addEventListener('click', () => (camara ? detenerDemo() : iniciarDemo()));
+        btnCopiarDemo?.addEventListener('click', async () => {
+            const filas = demo?.registro.length || 0;
+            if (!filas) { mostrarToast('Todavía no hay registro.', 'info'); return; }
+            const ok = await DronSeguimiento.copiarTexto(demo.registroCSV());
+            mostrarToast(ok ? `📋 Registro copiado (${filas} cuadros).` : 'No se pudo copiar el registro.', ok ? 'exito' : 'advertencia');
+        });
+
         btnDiagnosticar?.addEventListener('click', ejecutarDiagnostico);
         btnVivo?.addEventListener('click', iniciarLecturaVivo);
         ejecutarDiagnostico();
@@ -619,8 +693,10 @@ const App = (() => {
         iniciarLecturaVivo();
 
         return () => {
+            paginaCerrada = true;
             clearTimeout(timerSinDatos);
             window.removeEventListener('deviceorientation', onOrientacion);
+            detenerDemo(); // apaga la cámara al salir de la pantalla
         };
     }
 

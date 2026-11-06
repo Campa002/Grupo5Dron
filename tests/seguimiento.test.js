@@ -263,3 +263,52 @@ test('entre dos personas del mismo tamaño elige la más centrada', () => {
     const reg = simular(2000, () => [persona(0.15, 0.5, 0.4), persona(0.55, 0.5, 0.4)]);
     assert.ok(Math.abs(ultimo(reg).objetivo.cx - 0.55) < 0.05);
 });
+
+test('validarAjustes: acepta valores en rango y rechaza los de afuera con un mensaje claro', () => {
+    const ok = Seguimiento.validarAjustes({ gananciaYaw: '0.8', alturaObjetivo: 0.5, toleranciaPerdidaMs: 2000 });
+    assert.equal(ok.ok, true);
+    assert.deepEqual(ok.ajustes, { gananciaYaw: 0.8, alturaObjetivo: 0.5, toleranciaPerdidaMs: 2000 });
+
+    const mal = Seguimiento.validarAjustes({ velMaxYaw: 0.9, umbralConfianza: 'abc', claveInventada: 5 });
+    assert.equal(mal.ok, false);
+    assert.ok(mal.errores.some(e => e.includes('Velocidad máxima de giro') && e.includes('entre 5 % y 50 %')), mal.errores.join(' | '));
+    assert.ok(mal.errores.some(e => e.includes('Confianza mínima') && e.includes('no es un número')));
+    assert.ok(!('claveInventada' in mal.ajustes));
+});
+
+test('validarAjustes: controles cruzados (altura mín < máx; fallas ≤ ventana)', () => {
+    assert.ok(Seguimiento.validarAjustes({ alturaMinCm: 200, alturaMaxCm: 150 }).errores.some(e => e.includes('altura mínima')));
+    assert.ok(Seguimiento.validarAjustes({ perdidaVentana: 3, perdidaMinimo: 5 }).errores.some(e => e.includes('fallas')));
+    assert.equal(Seguimiento.validarAjustes({ perdidaVentana: 5, perdidaMinimo: 3 }).ok, true);
+});
+
+test('los valores por defecto están dentro de sus propios rangos', () => {
+    const editables = Object.fromEntries(Object.keys(Seguimiento.RANGOS).map(k => [k, A[k]]));
+    const r = Seguimiento.validarAjustes(editables);
+    assert.equal(r.ok, true, r.errores.join(' | '));
+    assert.equal(A.confirmacionUmbral, 0.75, 'criterio tipo RAC: 75 %');
+    assert.equal(A.confirmacionVentana, 8, 'criterio tipo RAC: 8 detecciones');
+    assert.equal(A.perdidaVentana, 5);
+    assert.equal(A.perdidaMinimo, 3);
+});
+
+test('registro por cuadro: CSV con detección, comando y telemetría', () => {
+    const seg = new Seguimiento({ videoEl: { width: 960, height: 720 }, obtenerContexto: () => ({ enVuelo: true, alturaCm: 120, bateria: 77 }) });
+    seg.seguidor = new Seguimiento.Seguidor(A);
+    seg._tActivacion = 0;
+    for (let i = 0; i < 4; i++) {
+        const t = i * 125;
+        seg.seguidor.procesarDeteccion([persona(0.8, 0.5, 0.45)], t);
+        seg.seguidor.tickControl(t);
+        seg._registrar(t, { ms: 20, candidatos: [{ ...persona(0.8, 0.5, 0.45) }] });
+    }
+    const filas = seg.registroCSV().split('\n');
+    assert.equal(filas.length, 5);
+    assert.ok(filas[0].startsWith('t_ms;estado;personas;inferencia_ms'));
+    const ultima = filas[4].split(';');
+    assert.equal(ultima[1], 'siguiendo');
+    assert.equal(ultima[2], '1');
+    assert.equal(ultima[12], '1');   // en vuelo
+    assert.equal(ultima[13], '120'); // altura
+    assert.equal(ultima[14], '77');  // batería
+});

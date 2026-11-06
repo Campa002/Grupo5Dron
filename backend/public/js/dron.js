@@ -68,6 +68,7 @@ const Dron = (() => {
     let _joystickDer = null;
     let _giroscopio = null;
     let _seguimiento = null;
+    let _panelSeguimiento = null;
     let _video = null;
 
     let _modoGiro = false;
@@ -162,6 +163,13 @@ const Dron = (() => {
             _seguimiento = new DronSeguimiento({
                 videoEl: _q('#canvas-video'),
                 canvasDebug: _q('#canvas-seguimiento'),
+                // Para el registro por cuadro y las condiciones del control real
+                obtenerContexto: () => ({
+                    enVuelo: !!_adaptador?.enVuelo,
+                    alturaCm: _adaptador?.telemetria.altura ?? null,
+                    bateria: _adaptador?.telemetria.bateria ?? null,
+                    telemetriaOk: _hayTelemetria(),
+                }),
             });
         }
 
@@ -359,6 +367,7 @@ const Dron = (() => {
         on('#btn-emergencia', () => _emergencia('Parada de emergencia manual'));
         on('#btn-toggle-giro', _toggleGiroscopio);
         on('#btn-toggle-seguimiento', _toggleSeguimiento);
+        on('#btn-copiar-registro-seg', _copiarRegistroSeguimiento);
         on('#btn-reconectar', _conectar);
         on('#btn-ir-config-dron', () => { window.location.hash = '#/config-dron'; });
         on('#btn-cab-menu', () => App.abrirMenu());
@@ -661,6 +670,8 @@ const Dron = (() => {
         if (!_modoSeguimiento) return;
         _modoSeguimiento = false;
         _seguimiento?.desactivar();
+        _panelSeguimiento?.destruir();
+        _panelSeguimiento = null;
         _mostrarEnsayo('');
         _actualizarBotonSeguimiento();
     }
@@ -735,11 +746,15 @@ const Dron = (() => {
         }
         _modoSeguimiento = true;
         _seguimiento.onComando = _onSeguimientoComando;
+        _panelSeguimiento?.destruir();
+        _panelSeguimiento = new DronSeguimiento.Panel(_q('.cab-video'));
         _seguimiento.onEstado = (nuevo) => {
             if (_modoSeguimiento && nuevo === 'perdido') App.mostrarToast('Seguimiento: se perdió a la persona. Comando: quieto.', 'advertencia', 5000);
         };
         _seguimiento.activar();
         _mostrarEnsayo('ENSAYO · buscando una persona...');
+        const btnRegistro = _q('#btn-copiar-registro-seg');
+        if (btnRegistro) btnRegistro.hidden = false;
         App.mostrarToast('Ensayo de seguimiento: calcula y muestra los comandos, NO los envía al dron.', 'info', 6000);
         _actualizarBotonSeguimiento();
     }
@@ -747,14 +762,16 @@ const Dron = (() => {
     /** Muestra (sin enviar) el comando que calcula el seguimiento, 15 veces por segundo. */
     function _onSeguimientoComando(cmd, info) {
         if (!_modoSeguimiento) return;
-        const fmt = v => (v >= 0 ? '+' : '') + Math.round(v * 100);
-        const textos = {
-            buscando: 'ENSAYO · buscando una persona...',
-            siguiendo: `ENSAYO (no se envía) · giro ${fmt(cmd.yaw)} · altura ${fmt(cmd.ud)} · avance ${fmt(cmd.fb)}`,
-            perdiendo: `ENSAYO · perdiéndola: el comando baja a 0 · giro ${fmt(cmd.yaw)} · altura ${fmt(cmd.ud)} · avance ${fmt(cmd.fb)}`,
-            perdido: 'ENSAYO · persona perdida: comando quieto',
-        };
-        _mostrarEnsayo(textos[info.estado] || '');
+        _mostrarEnsayo(DronSeguimiento.textoEnsayo(cmd, info));
+        _panelSeguimiento?.actualizar(info);
+    }
+
+    /** Copia el registro por cuadro del último ensayo (CSV separado por ";"). */
+    async function _copiarRegistroSeguimiento() {
+        const filas = _seguimiento?.registro.length || 0;
+        if (!filas) { App.mostrarToast('Todavía no hay registro: activá el ensayo un rato.', 'info'); return; }
+        const ok = await DronSeguimiento.copiarTexto(_seguimiento.registroCSV());
+        App.mostrarToast(ok ? `📋 Registro copiado (${filas} cuadros).` : 'No se pudo copiar el registro.', ok ? 'exito' : 'advertencia');
     }
 
     function _mostrarEnsayo(texto) {
@@ -1001,6 +1018,7 @@ const Dron = (() => {
             <div class="cab-acciones">
                 <button id="btn-reconectar" class="btn btn--primario" hidden>🔄 Reconectar</button>
                 <button id="btn-calibrar-giro" class="btn btn--secundario">🎯 Calibrar giro</button>
+                <button id="btn-copiar-registro-seg" class="btn btn--secundario" hidden>📋 Copiar registro</button>
                 <button id="btn-ir-config-dron" class="btn btn--secundario">🔧 Config. dron</button>
             </div>
 
@@ -1079,6 +1097,7 @@ const Dron = (() => {
         _cancelarMisionFlag = true;
         if (_giroscopio) { _giroscopio.desactivar(); _giroscopio = null; }
         if (_seguimiento) { _seguimiento.desactivar(); _seguimiento = null; }
+        _panelSeguimiento = null;
         if (_joystickIzq) { _joystickIzq.destruir(); _joystickIzq = null; }
         if (_joystickDer) { _joystickDer.destruir(); _joystickDer = null; }
         if (_video) { _video.destruir(); _video = null; }

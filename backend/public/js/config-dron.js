@@ -211,6 +211,9 @@ const ConfigDron = (() => {
                 </div>
             </div>
 
+            <!-- Ajustes del seguimiento (se guardan en el teléfono) -->
+            <div class="tarjeta mt-lg" id="ajustes-seguimiento"></div>
+
         </div>`;
     }
 
@@ -415,10 +418,75 @@ const ConfigDron = (() => {
     // Eventos de la página
     // ----------------------------------------------------------------
 
+    // ----------------------------------------------------------------
+    // Ajustes del seguimiento (definidos en DronSeguimiento.RANGOS)
+    // ----------------------------------------------------------------
+
+    function _renderizarAjustesSeguimiento(contenedor) {
+        const caja = contenedor.querySelector('#ajustes-seguimiento');
+        if (!caja || typeof DronSeguimiento === 'undefined') return;
+        const R = DronSeguimiento.RANGOS;
+        const actuales = DronSeguimiento.ajustesActuales();
+        const redondear = v => Math.round(v * 10000) / 10000;
+        const grupos = {};
+        for (const [clave, r] of Object.entries(R)) (grupos[r.grupo] = grupos[r.grupo] || []).push([clave, r]);
+
+        caja.innerHTML = `
+            <h3 class="texto-sm texto-secundario" style="font-weight:600; margin-bottom: var(--espacio-xs);">🎯 Ajustes del seguimiento</h3>
+            <p class="texto-xs texto-secundario mb-md">
+                Se guardan en este teléfono y se aplican la próxima vez que actives el ensayo.
+                Por ahora el seguimiento funciona solo en ensayo (no envía comandos al dron).
+            </p>
+            ${Object.entries(grupos).map(([grupo, campos]) => `
+                <fieldset style="border:1px solid var(--color-borde); border-radius: var(--radio-md); padding: var(--espacio-sm) var(--espacio-md); margin-bottom: var(--espacio-md);">
+                    <legend class="texto-sm font-semibold" style="padding: 0 var(--espacio-xs);">${_esc(grupo)}</legend>
+                    <div style="display:grid; gap: var(--espacio-sm) var(--espacio-md); grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));">
+                        ${campos.map(([clave, r]) => `
+                            <label class="campo" style="margin:0;">
+                                <span class="campo__label">${_esc(r.etiqueta)}${r.unidad ? ` (${_esc(r.unidad)})` : ''}</span>
+                                <input class="campo__input" type="number" inputmode="decimal" data-ajuste="${clave}"
+                                    min="${redondear(r.min * (r.escala || 1))}" max="${redondear(r.max * (r.escala || 1))}" step="${redondear(r.paso * (r.escala || 1))}"
+                                    value="${redondear(actuales[clave] * (r.escala || 1))}">
+                            </label>`).join('')}
+                    </div>
+                </fieldset>`).join('')}
+            <div id="ajustes-seguimiento-errores" class="alerta alerta--error mb-md" hidden></div>
+            <div class="flex gap-sm flex-wrap">
+                <button id="btn-guardar-ajustes-seg" class="btn btn--primario">Guardar ajustes</button>
+                <button id="btn-restaurar-ajustes-seg" class="btn btn--secundario">Valores por defecto</button>
+            </div>`;
+
+        caja.querySelector('#btn-guardar-ajustes-seg').addEventListener('click', () => {
+            const valores = {};
+            caja.querySelectorAll('[data-ajuste]').forEach(input => {
+                const r = R[input.dataset.ajuste];
+                const n = input.value.trim() === '' ? NaN : Number(input.value) / (r.escala || 1);
+                valores[input.dataset.ajuste] = n;
+            });
+            const resultado = DronSeguimiento.validarAjustes(valores);
+            const errores = caja.querySelector('#ajustes-seguimiento-errores');
+            if (!resultado.ok) {
+                errores.textContent = resultado.errores.join(' ');
+                errores.hidden = false;
+                return;
+            }
+            errores.hidden = true;
+            DronSeguimiento.guardarAjustes(resultado.ajustes);
+            App.mostrarToast('Ajustes del seguimiento guardados. Se aplican al activar el ensayo.', 'exito');
+        });
+        caja.querySelector('#btn-restaurar-ajustes-seg').addEventListener('click', () => {
+            DronSeguimiento.restaurarAjustes();
+            _renderizarAjustesSeguimiento(contenedor);
+            App.mostrarToast('Ajustes del seguimiento en sus valores por defecto.', 'info');
+        });
+    }
+
     function _agregarEventos(contenedor, permisos) {
         if (permisos.editar) {
             contenedor.querySelector('#btn-nuevo-perfil')?.addEventListener('click', () => _abrirModalPerfil(contenedor, null));
         }
+
+        _renderizarAjustesSeguimiento(contenedor);
 
         const inputTimeout = contenedor.querySelector('#input-failsafe-timeout');
         if (inputTimeout) inputTimeout.value = localStorage.getItem('grupo5dron_failsafe_timeout_ms') || '3500';

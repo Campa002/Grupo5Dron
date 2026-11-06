@@ -72,6 +72,67 @@ const DronSeguimiento = (() => {
         perdidaMinimo: 3,
     });
 
+    /**
+     * Ajustes editables en pantalla (Config. del dron). Valores internos; "escala" es solo para mostrarlos
+     * (por ejemplo 0,45 se muestra como 45 %).
+     */
+    const RANGOS = Object.freeze({
+        umbralConfianza:      { grupo: 'Detección', etiqueta: 'Confianza mínima de la detección', unidad: '%', escala: 100, min: 0.3, max: 0.9, paso: 0.05 },
+        anchoAnalisis:        { grupo: 'Detección', etiqueta: 'Ancho de la imagen analizada', unidad: 'px', min: 240, max: 960, paso: 80 },
+        fpsMax:               { grupo: 'Detección', etiqueta: 'Detecciones por segundo (máximo)', unidad: 'FPS', min: 5, max: 15, paso: 1 },
+        alturaMinimaFijar:    { grupo: 'Detección', etiqueta: 'Tamaño mínimo para fijar a alguien', unidad: '% del alto', escala: 100, min: 0.05, max: 0.5, paso: 0.01 },
+        alturaObjetivo:       { grupo: 'Control', etiqueta: 'Distancia objetivo (alto del recuadro)', unidad: '% del alto', escala: 100, min: 0.15, max: 0.8, paso: 0.05 },
+        gananciaYaw:          { grupo: 'Control', etiqueta: 'Ganancia de giro', unidad: '', min: 0, max: 2, paso: 0.05 },
+        gananciaAltura:       { grupo: 'Control', etiqueta: 'Ganancia de altura', unidad: '', min: 0, max: 2, paso: 0.05 },
+        gananciaDistancia:    { grupo: 'Control', etiqueta: 'Ganancia de distancia', unidad: '', min: 0, max: 2, paso: 0.05 },
+        zonaMuertaX:          { grupo: 'Control', etiqueta: 'Zona muerta horizontal', unidad: '%', escala: 100, min: 0, max: 0.2, paso: 0.01 },
+        zonaMuertaY:          { grupo: 'Control', etiqueta: 'Zona muerta vertical', unidad: '%', escala: 100, min: 0, max: 0.2, paso: 0.01 },
+        zonaMuertaTamano:     { grupo: 'Control', etiqueta: 'Zona muerta de distancia', unidad: '%', escala: 100, min: 0, max: 0.2, paso: 0.01 },
+        velMaxYaw:            { grupo: 'Control', etiqueta: 'Velocidad máxima de giro', unidad: '%', escala: 100, min: 0.05, max: 0.5, paso: 0.05 },
+        velMaxAltura:         { grupo: 'Control', etiqueta: 'Velocidad máxima de altura', unidad: '%', escala: 100, min: 0.05, max: 0.5, paso: 0.05 },
+        velMaxAvance:         { grupo: 'Control', etiqueta: 'Velocidad máxima de avance', unidad: '%', escala: 100, min: 0.05, max: 0.5, paso: 0.05 },
+        aceleracionMax:       { grupo: 'Control', etiqueta: 'Aceleración máxima', unidad: '%/s', escala: 100, min: 0.1, max: 2, paso: 0.1 },
+        toleranciaPerdidaMs:  { grupo: 'Pérdida', etiqueta: 'Tiempo sin verla antes de darla por perdida', unidad: 'ms', min: 500, max: 5000, paso: 100 },
+        vencimientoComandoMs: { grupo: 'Pérdida', etiqueta: 'Vencimiento del comando (detección atrasada)', unidad: 'ms', min: 100, max: 2000, paso: 50 },
+        alturaMinCm:          { grupo: 'Control real (etapa S3)', etiqueta: 'Altura mínima', unidad: 'cm', min: 30, max: 500, paso: 10 },
+        alturaMaxCm:          { grupo: 'Control real (etapa S3)', etiqueta: 'Altura máxima', unidad: 'cm', min: 50, max: 1000, paso: 10 },
+        bateriaMin:           { grupo: 'Control real (etapa S3)', etiqueta: 'Batería mínima', unidad: '%', min: 10, max: 90, paso: 5 },
+        confirmacionUmbral:   { grupo: 'Mis objetos (etapa S4)', etiqueta: 'Similitud mínima por detección', unidad: '%', escala: 100, min: 0.5, max: 0.99, paso: 0.01 },
+        confirmacionVentana:  { grupo: 'Mis objetos (etapa S4)', etiqueta: 'Detecciones seguidas para confirmar', unidad: '', min: 2, max: 20, paso: 1 },
+        perdidaVentana:       { grupo: 'Mis objetos (etapa S4)', etiqueta: 'Ventana para darlo por perdido', unidad: 'detecciones', min: 2, max: 15, paso: 1 },
+        perdidaMinimo:        { grupo: 'Mis objetos (etapa S4)', etiqueta: 'Fallas dentro de la ventana para perderlo', unidad: '', min: 1, max: 15, paso: 1 },
+    });
+
+    /**
+     * Valida ajustes en unidades internas.
+     * @returns {{ok:boolean, ajustes:Object, errores:string[]}}
+     */
+    function validarAjustes(valores) {
+        const errores = [];
+        const ajustes = {};
+        for (const [clave, valor] of Object.entries(valores || {})) {
+            const r = RANGOS[clave];
+            if (!r) continue;
+            const n = Number(valor);
+            const mostrar = v => `${Math.round(v * (r.escala || 1) * 100) / 100}${r.unidad ? ' ' + r.unidad : ''}`;
+            if (valor === '' || valor === null || !Number.isFinite(n)) { errores.push(`${r.etiqueta}: no es un número.`); continue; }
+            if (n < r.min - 1e-9 || n > r.max + 1e-9) { errores.push(`${r.etiqueta}: tiene que estar entre ${mostrar(r.min)} y ${mostrar(r.max)}.`); continue; }
+            ajustes[clave] = n;
+        }
+        const final = { ...AJUSTES_POR_DEFECTO, ...ajustes };
+        if (final.alturaMinCm >= final.alturaMaxCm) errores.push('La altura mínima tiene que ser menor que la máxima.');
+        if (final.perdidaMinimo > final.perdidaVentana) errores.push('Las fallas para perderlo no pueden ser más que la ventana.');
+        return { ok: errores.length === 0, ajustes, errores };
+    }
+
+    function guardarAjustes(ajustes) {
+        globalThis.localStorage?.setItem(CLAVE_AJUSTES, JSON.stringify(ajustes));
+    }
+
+    function restaurarAjustes() {
+        globalThis.localStorage?.removeItem(CLAVE_AJUSTES);
+    }
+
     function leerAjustesGuardados() {
         try {
             const datos = JSON.parse(globalThis.localStorage?.getItem(CLAVE_AJUSTES) || 'null');
@@ -417,12 +478,18 @@ const DronSeguimiento = (() => {
          * @param {HTMLCanvasElement|HTMLVideoElement} opciones.videoEl fuente de imagen
          * @param {HTMLCanvasElement} [opciones.canvasDebug] canvas superpuesto para dibujar los recuadros
          * @param {Object} [opciones.ajustes] ajustes que pisan los guardados
+         * @param {Function} [opciones.obtenerContexto] () => {enVuelo, alturaCm, bateria, telemetriaOk} (para el registro y las condiciones)
          */
-        constructor({ videoEl, canvasDebug = null, ajustes = {} }) {
+        constructor({ videoEl, canvasDebug = null, ajustes = {}, obtenerContexto = null }) {
             if (!videoEl) throw new Error('[Seguimiento] Se requiere un elemento <video> o <canvas>.');
             this.fuente = videoEl;
             this.canvasDebug = canvasDebug;
+            this._ajustesExtra = ajustes;
             this.ajustes = ajustesActuales(ajustes);
+            this.obtenerContexto = obtenerContexto;
+            /** Registro por cuadro (detección, comando y telemetría); se reinicia al activar */
+            this.registro = [];
+            this._tActivacion = 0;
             this.vision = new Vision(this.ajustes);
             this.seguidor = null;
             this.activo = false;
@@ -463,7 +530,12 @@ const DronSeguimiento = (() => {
 
         activar() {
             if (!this.modeloCargado || this.activo) return;
+            // Los ajustes se releen al activar: lo que se cambie en Config. del dron vale desde la próxima activación
+            this.ajustes = ajustesActuales(this._ajustesExtra);
+            this.vision.a = this.ajustes;
             this.seguidor = new Seguidor(this.ajustes);
+            this.registro = [];
+            this._tActivacion = performance.now();
             this.activo = true;
             this._estadoAnterior = 'buscando';
             this._fps = 0;
@@ -494,8 +566,54 @@ const DronSeguimiento = (() => {
                 edadMs: this.seguidor?.selector.ultimaVista ? Math.round(ahora - this.seguidor.selector.ultimaVista) : null,
                 comando: this.seguidor ? { ...this.seguidor.comando } : { yaw: 0, ud: 0, fb: 0 },
                 objetivo: this.seguidor?.selector.objetivo ? { ...this.seguidor.selector.objetivo } : null,
-                candidatos: this._ultimosCandidatos.length,
+                candidatos: this._contarValidos(this._ultimosCandidatos),
+                condiciones: this.condiciones(),
             };
+        }
+
+        /** Detecciones de la clase buscada que superan el umbral de confianza. */
+        _contarValidos(candidatos) {
+            return candidatos.filter(c => c.clase === this.ajustes.claseObjetivo && c.score >= this.ajustes.umbralConfianza).length;
+        }
+
+        /** Condiciones del control real con el contexto actual del dron (sin dron: no se cumplen). */
+        condiciones() {
+            const ctx = (typeof this.obtenerContexto === 'function' && this.obtenerContexto()) || {};
+            return condicionesControlReal({ ...ctx, backend: this.vision.backend, fps: this._fps }, this.ajustes);
+        }
+
+        _registrar(t, r) {
+            const ob = this.seguidor.selector.objetivo;
+            const cmd = this.seguidor.comando;
+            const ctx = (typeof this.obtenerContexto === 'function' && this.obtenerContexto()) || {};
+            this.registro.push({
+                t: Math.round(t - this._tActivacion),
+                estado: this.seguidor.estado,
+                candidatos: r ? this._contarValidos(r.candidatos) : 0,
+                inferenciaMs: r ? Math.round(r.ms) : null,
+                fps: Math.round(this._fps * 10) / 10,
+                objetivo: ob ? { cx: ob.cx, cy: ob.cy, h: ob.h, score: ob.score } : null,
+                comando: { ...cmd },
+                enVuelo: ctx.enVuelo ?? null,
+                alturaCm: Number.isFinite(ctx.alturaCm) ? Math.round(ctx.alturaCm) : null,
+                bateria: Number.isFinite(ctx.bateria) ? Math.round(ctx.bateria) : null,
+            });
+            if (this.registro.length > 3000) this.registro.shift(); // ~5 min a 10 FPS
+        }
+
+        /** Registro en CSV (para "Copiar registro"). */
+        registroCSV() {
+            const r3 = v => (v === null || v === undefined ? '' : Math.round(v * 1000) / 1000);
+            const filas = ['t_ms;estado;personas;inferencia_ms;fps;obj_cx;obj_cy;obj_alto;obj_score;cmd_giro;cmd_altura;cmd_avance;en_vuelo;altura_cm;bateria'];
+            for (const e of this.registro) {
+                filas.push([
+                    e.t, e.estado, e.candidatos, e.inferenciaMs ?? '', e.fps,
+                    r3(e.objetivo?.cx), r3(e.objetivo?.cy), r3(e.objetivo?.h), r3(e.objetivo?.score),
+                    r3(e.comando.yaw), r3(e.comando.ud), r3(e.comando.fb),
+                    e.enVuelo === null ? '' : (e.enVuelo ? 1 : 0), e.alturaCm ?? '', e.bateria ?? '',
+                ].join(';'));
+            }
+            return filas.join('\n');
         }
 
         async _cicloInferencia() {
@@ -514,6 +632,7 @@ const DronSeguimiento = (() => {
                     this._ultimosCandidatos = [];
                     this.seguidor.procesarDeteccion([], t);
                 }
+                this._registrar(t, r);
                 if (this._tUltimaInferencia !== null) {
                     const fpsInst = 1000 / Math.max(1, t - this._tUltimaInferencia);
                     this._fps = this._fps ? 0.8 * this._fps + 0.2 * fpsInst : fpsInst;
@@ -577,6 +696,78 @@ const DronSeguimiento = (() => {
         }
     }
 
+    // ================================================================
+    // Texto del ensayo y panel superpuesto (cabina y demo de la cámara)
+    // ================================================================
+    const pct = v => (v >= 0 ? '+' : '') + Math.round(v * 100);
+
+    function textoEnsayo(cmd, info) {
+        const comando = `giro ${pct(cmd.yaw)} · altura ${pct(cmd.ud)} · avance ${pct(cmd.fb)}`;
+        switch (info.estado) {
+            case 'buscando': return 'ENSAYO · buscando una persona...';
+            case 'siguiendo': return `ENSAYO (no se envía) · ${comando}`;
+            case 'perdiendo': return `ENSAYO · perdiéndola: el comando baja a 0 · ${comando}`;
+            case 'perdido': return 'ENSAYO · persona perdida: comando quieto';
+            default: return '';
+        }
+    }
+
+    /** Panel con backend, FPS, demora, estado y condiciones del control real (el comando lo muestra el cartel de abajo). */
+    class Panel {
+        constructor(contenedor) {
+            this.el = document.createElement('div');
+            this.el.className = 'panel-seguimiento';
+            this.el.style.cssText = 'position:absolute; top:0.5rem; left:0.5rem; max-width:calc(100% - 1rem); padding:0.25rem 0.5rem;'
+                + ' border-radius:0.375rem; background:rgba(5,11,22,0.75); color:#e2e8f0; font:600 0.625rem/1.4 system-ui, sans-serif;'
+                + ' pointer-events:none; z-index:2;';
+            contenedor.appendChild(this.el);
+            this._ultimo = 0;
+        }
+
+        actualizar(info, forzar = false) {
+            const ahora = performance.now();
+            if (!forzar && ahora - this._ultimo < 200) return; // 5 veces por segundo alcanza
+            this._ultimo = ahora;
+            const backend = info.backend === 'webgl' ? 'WebGL' : `⚠ ${String(info.backend || '?').toUpperCase()} (lento)`;
+            const nombres = { buscando: 'buscando', siguiendo: 'siguiendo', perdiendo: 'perdiéndola', perdido: 'perdida', apagado: 'apagado' };
+            const cond = info.condiciones;
+            const lineaReal = !cond ? '' : cond.ok ? 'Control real (S3): se cumplen las condiciones'
+                : `Control real (S3): falta → ${cond.motivos[0]}${cond.motivos.length > 1 ? ` (+${cond.motivos.length - 1})` : ''}`;
+            const demora = info.edadMs !== null ? ` · hace ${info.edadMs} ms` : '';
+            const lineas = [
+                `🧠 ${backend} · ${info.fps} FPS · ${info.inferenciaMs ?? '--'} ms${demora}`,
+                `Estado: ${nombres[info.estado] || info.estado} · personas: ${info.candidatos}`,
+                lineaReal,
+            ].filter(Boolean);
+            this.el.textContent = lineas.join('\n');
+            this.el.style.whiteSpace = 'pre-line';
+        }
+
+        destruir() {
+            this.el.remove();
+        }
+    }
+
+    /** Copia texto al portapapeles (con respaldo para WebViews sin API de portapapeles). */
+    async function copiarTexto(texto) {
+        try {
+            if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(texto); return true; }
+        } catch (_) { /* se intenta el respaldo */ }
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = texto;
+            ta.setAttribute('readonly', '');
+            ta.style.cssText = 'position:fixed; left:-9999px; opacity:0;';
+            document.body.appendChild(ta);
+            ta.select();
+            const ok = document.execCommand('copy');
+            ta.remove();
+            return ok;
+        } catch (_) {
+            return false;
+        }
+    }
+
     // Partes puras accesibles para la cabina, la demo y las pruebas
     Seguimiento.AJUSTES_POR_DEFECTO = AJUSTES_POR_DEFECTO;
     Seguimiento.CLAVE_AJUSTES = CLAVE_AJUSTES;
@@ -585,6 +776,13 @@ const DronSeguimiento = (() => {
     Seguimiento.Selector = Selector;
     Seguimiento.Seguidor = Seguidor;
     Seguimiento.condicionesControlReal = condicionesControlReal;
+    Seguimiento.RANGOS = RANGOS;
+    Seguimiento.validarAjustes = validarAjustes;
+    Seguimiento.guardarAjustes = guardarAjustes;
+    Seguimiento.restaurarAjustes = restaurarAjustes;
+    Seguimiento.textoEnsayo = textoEnsayo;
+    Seguimiento.Panel = Panel;
+    Seguimiento.copiarTexto = copiarTexto;
     return Seguimiento;
 })();
 

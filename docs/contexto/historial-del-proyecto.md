@@ -117,6 +117,10 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - con la foto de prueba, el criterio "la más centrada" fijaba a una persona lejana diminuta (3 % del alto), que en control real haría avanzar a fondo; ahora fija la más grande y exige al menos el 12 % del alto.
     - Medido en la PC: la inferencia tarda lo mismo con cualquier ancho (17 a 19 ms con WebGL), y 320 px pierde personas lejanas chicas. Se eligió 480 px por defecto (en el celular hay que medirlo).
     - "Despegar" ahora se muestra deshabilitado ("Esperando telemetría…") hasta el primer paquete, en vez de rechazar el toque.
+19. **Seguimiento S2 (6/11).**
+    - Panel en el video, ajustes editables (24, con validación), "Copiar registro" en CSV y demo con la cámara del celular en Sensores.
+    - Probado con una cámara falsa de Edge que transmite una foto real con personas: detecta con WebGL a ~10 FPS y fija a una persona.
+    - Pendiente de la prueba real: con una persona parada, la altura tiende a bajar hacia su centro (la cintura); ajustar en S3 con el dron.
 
 ## 4. Hardware
 
