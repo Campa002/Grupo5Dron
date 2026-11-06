@@ -11,7 +11,8 @@
  *  - ConfigDron       (config-dron.js)
  *
  * Reglas de seguridad:
- *  - Giroscopio y seguimiento DESACTIVADOS al iniciar; al apagarlos, sus ejes vuelven a cero.
+ *  - Giroscopio y seguimiento DESACTIVADOS al iniciar; al apagar el giroscopio, sus ejes vuelven a cero.
+ *  - El seguimiento funciona por ahora SOLO EN ENSAYO: calcula y muestra los comandos, nunca los envía.
  *  - Botón de EMERGENCIA fijo y siempre visible (vertical y horizontal).
  *  - Confirmación explícita antes de despegar; no se despega si no llega telemetría.
  *  - Failsafe: sin telemetría en vuelo por más del tiempo configurado → freno (rc 0 0 0 0) y aterrizaje.
@@ -658,7 +659,7 @@ const Dron = (() => {
         if (!_modoSeguimiento) return;
         _modoSeguimiento = false;
         _seguimiento?.desactivar();
-        _adaptador?.actualizarEjes({ lr: 0, ud: 0 });
+        _mostrarEnsayo('');
         _actualizarBotonSeguimiento();
     }
 
@@ -676,7 +677,6 @@ const Dron = (() => {
         }
         if (_failsafeBloquea()) return;
         if (_maniobraEnCurso()) { App.mostrarToast('Esperá a que termine la maniobra en curso.', 'advertencia'); return; }
-        _apagarSeguimiento();
         const resultado = await _giroscopio.activar();
         if (resultado.ok) {
             _modoGiro = true;
@@ -710,14 +710,17 @@ const Dron = (() => {
     }
 
     // ----------------------------------------------------------------
-    // Seguimiento (EXPERIMENTAL)
+    // Seguimiento (EXPERIMENTAL) — SOLO ENSAYO
+    // Calcula los comandos que mandaría y los muestra sobre el video, pero NUNCA
+    // escribe los ejes del rc. Por eso se puede usar en tierra y no interfiere con
+    // los joysticks ni con el giroscopio. El control real llega en la etapa S3.
     // ----------------------------------------------------------------
 
     async function _toggleSeguimiento() {
         if (!_seguimiento) { App.mostrarToast('El seguimiento no está disponible.', 'advertencia'); return; }
         if (_modoSeguimiento) {
             _apagarSeguimiento();
-            App.mostrarToast('Seguimiento desactivado.', 'info');
+            App.mostrarToast('Ensayo de seguimiento desactivado.', 'info');
             return;
         }
         if (_failsafeBloquea()) return;
@@ -728,25 +731,35 @@ const Dron = (() => {
             if (!res.ok) { App.mostrarToast('No se pudo cargar el modelo de seguimiento.', 'advertencia'); return; }
             if (res.aviso) App.mostrarToast(res.aviso, 'advertencia', 6000);
         }
-        _apagarGiro();
         _modoSeguimiento = true;
         _seguimiento.onOffset = _onSeguimientoOffset;
-        _seguimiento.onPerdida = () => { if (_modoSeguimiento) _adaptador?.actualizarEjes({ lr: 0, ud: 0 }); };
+        _seguimiento.onPerdida = () => { if (_modoSeguimiento) _mostrarEnsayo('ENSAYO · objetivo perdido · comando: quieto'); };
         _seguimiento.activar('person');
-        App.mostrarToast('⚠ Seguimiento EXPERIMENTAL activado: supervisión humana obligatoria.', 'advertencia');
+        _mostrarEnsayo('ENSAYO · buscando una persona...');
+        App.mostrarToast('Ensayo de seguimiento: calcula y muestra los comandos, NO los envía al dron.', 'info', 6000);
         _actualizarBotonSeguimiento();
     }
 
-    function _onSeguimientoOffset({ dx, dy }) {
-        if (!_modoSeguimiento || !_adaptador || !_adaptador.enVuelo) return;
+    /** Muestra (sin enviar) el comando que calcularía el seguimiento. */
+    function _onSeguimientoOffset({ dx, dy, deteccion }) {
+        if (!_modoSeguimiento) return;
+        if (!deteccion) return; // al perder el objetivo lo informa onPerdida
         const sensibilidad = 0.5;
-        _adaptador.actualizarEjes({ lr: dx * sensibilidad, ud: -dy * sensibilidad });
+        const fmt = v => (v >= 0 ? '+' : '') + Math.round(v * sensibilidad * 100);
+        _mostrarEnsayo(`ENSAYO (no se envía) · lateral ${fmt(dx)} · altura ${fmt(-dy)}`);
+    }
+
+    function _mostrarEnsayo(texto) {
+        const caja = _q('#cab-ensayo');
+        if (!caja) return;
+        caja.textContent = texto;
+        caja.hidden = !texto;
     }
 
     function _actualizarBotonSeguimiento() {
         const btn = _q('#btn-toggle-seguimiento');
         if (!btn) return;
-        btn.textContent = _modoSeguimiento ? '🎯 Seguir: ON' : '🎯 Seguir: OFF';
+        btn.textContent = _modoSeguimiento ? '🎯 Ensayo: ON' : '🎯 Ensayo: OFF';
         btn.classList.toggle('cab-activo', _modoSeguimiento);
     }
 
@@ -778,19 +791,17 @@ const Dron = (() => {
 
         // Cada joystick actualiza SOLO sus dos ejes
         _joystickIzq.onChange = ({ x, y }) => {
-            if (_modoSeguimiento) _adaptador?.actualizarEjes({ yaw: x });   // el seguimiento maneja la altura
-            else _adaptador?.actualizarEjes({ ud: y, yaw: x });
+            _adaptador?.actualizarEjes({ ud: y, yaw: x });
         };
         _joystickIzq.onRelease = () => {
-            if (_modoSeguimiento) _adaptador?.actualizarEjes({ yaw: 0 });
-            else _adaptador?.actualizarEjes({ ud: 0, yaw: 0 });
+            _adaptador?.actualizarEjes({ ud: 0, yaw: 0 });
         };
         _joystickDer.onChange = ({ x, y }) => {
-            if (_modoGiro || _modoSeguimiento) return; // en esos modos lo maneja el sensor
+            if (_modoGiro) return; // en ese modo lo maneja el giroscopio
             _adaptador?.actualizarEjes({ lr: x, fb: y });
         };
         _joystickDer.onRelease = () => {
-            if (_modoGiro || _modoSeguimiento) return;
+            if (_modoGiro) return;
             _adaptador?.actualizarEjes({ lr: 0, fb: 0 });
         };
     }
@@ -948,12 +959,14 @@ const Dron = (() => {
                     <canvas id="canvas-video" width="960" height="720"></canvas>
                     <canvas id="canvas-seguimiento"></canvas>
                     <div id="overlay-video-off" class="cab-video__aviso">📷 Sin señal de video</div>
+                    <div id="cab-ensayo" hidden
+                        style="position:absolute; left:0.5rem; right:0.5rem; bottom:0.5rem; padding:0.25rem 0.5rem; border-radius:0.375rem; background:rgba(5,11,22,0.8); color:#fbbf24; font-size:0.75rem; font-weight:600; text-align:center; pointer-events:none;"></div>
                 </div>
 
                 <div class="cab-lado cab-lado--der">
                     <div class="cab-botones">
                         <button id="btn-toggle-giro" class="btn btn--secundario">🧭 Giro: OFF</button>
-                        <button id="btn-toggle-seguimiento" class="btn btn--secundario">🎯 Seguir: OFF</button>
+                        <button id="btn-toggle-seguimiento" class="btn btn--secundario">🎯 Ensayo: OFF</button>
                     </div>
                     <div class="cab-joystick">
                         <span class="cab-joy-etq">↕ Avanzar · ↔ Lateral</span>
@@ -1024,7 +1037,7 @@ const Dron = (() => {
 
             <p class="cab-nota">
                 🛡️ Vuelo supervisado obligatorio, con al menos 3×3 m libres de personas. Giroscopio y seguimiento arrancan apagados.
-                El seguimiento visual es EXPERIMENTAL y requiere validación con el dron real.
+                El seguimiento visual es EXPERIMENTAL: por ahora funciona solo en ensayo (muestra los comandos, no los envía).
             </p>
         </div>`;
     }

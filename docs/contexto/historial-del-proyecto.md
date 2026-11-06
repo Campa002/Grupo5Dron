@@ -99,6 +99,19 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - avisos (toasts) con texto plano;
     - borrado el CSS y el JS sin uso de la cabina vieja y de los módulos del dron;
     - sin logs de depuración.
+17. **Auditoría del seguimiento (6/11).**
+    - Medido: COCO-SSD empaquetado = SSDLite MobileNetV2 (4,5 M parámetros, 18 MB float32), TensorFlow.js 4.17.0, coco-ssd 2.2.3.
+    - En la PC con WebGL: ~20 ms por inferencia; con CPU: ~1,5 s (inutilizable). En el celular hay que medirlo.
+    - Problemas encontrados:
+      - saltaba entre personas (tomaba la primera de cada cuadro);
+      - centraba con roll en vez de yaw;
+      - no tenía control de distancia, zona muerta, aceleración gradual ni vencimiento de comandos;
+      - se podía activar en tierra;
+      - si no cargaba el modelo, el modo "color" mandaba comandos;
+      - sin aviso de WebGL o CPU.
+    - Plan aprobado: S0 a S2 antes de la primera prueba con el Tello; S3 (control real) y S4 ("Mis objetos") después.
+    - Criterio de "Mis objetos" tomado de RAC: confirmar con umbral del 75 % y 8 detecciones consecutivas; dar por perdido con una ventana más corta (3 de 5). Los dos valores, editables.
+    - S0 aplicado: el seguimiento queda solo en ensayo.
 
 ## 4. Hardware
 

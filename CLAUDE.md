@@ -124,6 +124,7 @@ docs/contexto/    informe, historial, reportes
   - la confirmación antes de despegar y el bloqueo del despegue sin telemetría;
   - el failsafe por pérdida de telemetría: freno + `land`, un reintento y aviso fijo. Desde que se dispara, NO sale ningún comando automático (ni `rc` ni keep-alive) para que el Tello pueda aterrizar solo a los ~15 s. Si vuelve la telemetría, reintenta `land`. Decisión de Luciano: NO cortar motores automáticamente;
   - que giroscopio, seguimiento y misiones arranquen desactivados y que al apagarlos sus ejes vuelvan a cero;
+  - el seguimiento está SOLO EN ENSAYO (calcula y muestra, no envía) hasta la etapa S3, después de la primera prueba con el Tello;
   - el aterrizaje al salir de la cabina en vuelo.
 - Interfaz en español, tema oscuro con azul institucional, sin violetas.
 - Git: Luciano hace commit y push salvo que te pida lo contrario. Nunca uses `git push --force` ni `git reset --hard`.
@@ -179,6 +180,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
   - sin `'use strict'` dentro de clases, sin métodos ni opciones sin uso (giroscopio, joystick, sensores, seguimiento) y sin `console.log`/`console.info` de depuración.
 - Cuando cambie la lista de archivos de `sw.js` (`RECURSOS_ESTATICOS`), subí `CACHE_NAME`. Para cambios de contenido no hace falta: el service worker pide primero a la red.
 - `mostrarModalUsuario` (app.js) escapa el nombre, el email y el rol con `escaparHtml` antes de armar el modal.
+- Seguimiento, etapa S0 (6/11): en la cabina "🎯 Ensayo" calcula el comando y lo muestra sobre el video, pero nunca escribe los ejes del rc. Se puede usar en tierra y no interfiere con los joysticks ni con el giroscopio. Auditoría y plan completos del seguimiento: historial, §3, punto 17.
 - Observación para el compañero del aula (no se tocó): en `app.css`, `.dispositivo__botones` tiene padding con `max-height: 0`, así que las tarjetas de dispositivos cerradas muestran una franja de los botones.
 
 ## Próximos pasos (lista única)
@@ -188,5 +190,11 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 3. ~~Fase 2, funciones~~: hecha (ver "Estado").
 4. ~~Fase 3, interfaz~~: hecha (ver "Estado").
 5. ~~Fase 4, limpieza~~: hecha (ver "Estado").
-6. **Hosting:** subir el backend, importar `schema.sql` y crear `config.php` (con `https://localhost` en CORS). Cada cuenta del seed pide cambiar `password` en su primer login.
-7. **Al final:** documentación (README, manual de usuario, manual del programador, API, plan de pruebas, limitaciones) y corrección del informe (por ejemplo, el LED IR figura en GPIO35, que es solo de entrada).
+6. **Seguimiento v2** (una sola tubería: candidatos → selector de objetivo → suavizado → controlador; ensayo y control real comparten todo):
+   - S1: tubería; selector por clase con objetivo fijo; controlador puro (yaw centra, throttle altura, pitch distancia por la altura del recuadro, sin roll), con zona muerta, límite, aceleración gradual y vencimiento; tolerar pérdidas cortas y avisar; cancelar con cualquier toque de joystick o paso; condiciones de activación (en vuelo, altura y batería en rango, telemetría, WebGL, FPS mínimo); aviso si TensorFlow cae a CPU; imagen reducida; FPS adaptativo; el modo color no manda comandos; pruebas en Node (`node --test`) en el job "verificar".
+   - S2: modo ensayo con panel (FPS, demora, backend, estado, comando); ajustes editables guardados en el teléfono (ganancias, zona muerta, velocidad máxima, distancia objetivo, umbral; confirmación tipo RAC: 75 % y 8 detecciones; pérdida: 3 de 5); "Copiar registro" por cuadro (sin método nativo nuevo); demo con la cámara del celular en Sensores (app.js, aprobado).
+   - Firma fija del APK debug (etapa aparte, al final de S2): keystore como secreto de GitHub en base64, nunca en el repo, con la clave por defecto si falta el secreto.
+   - S3 (después de la primera prueba con el Tello): habilitar el control real y ajustar ganancias con el dron.
+   - S4 (después de la primera prueba): "Mis objetos" (MobileNet local para embeddings, IndexedDB, selector por objeto guardado y por toque con rastreador).
+7. **Hosting:** subir el backend, importar `schema.sql` y crear `config.php` (con `https://localhost` en CORS). Cada cuenta del seed pide cambiar `password` en su primer login.
+8. **Al final:** documentación (README, manual de usuario, manual del programador, API, plan de pruebas, limitaciones) y corrección del informe (por ejemplo, el LED IR figura en GPIO35, que es solo de entrada).
