@@ -74,7 +74,6 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
                 <li><a href="#/admin" class="menu-lateral__enlace menu-lateral__enlace--admin" data-pagina="admin"><span class="ico ico--engranaje" aria-hidden="true"></span> Administración</a></li>
                 <li><a href="#/config-dron" class="menu-lateral__enlace" data-pagina="config-dron"><span class="ico ico--llave-ajuste" aria-hidden="true"></span> Config. Dron</a></li>
                 <li class="menu-lateral__separador"></li>
-                <li><a href="#/acerca" class="menu-lateral__enlace" data-pagina="acerca"><span class="ico ico--info" aria-hidden="true"></span> Acerca de</a></li>
                 <li><a href="#" class="menu-lateral__enlace" id="btn-cerrar-sesion"><span class="ico ico--salir" aria-hidden="true"></span> Cerrar sesión</a></li>
             </ul>
         </div>

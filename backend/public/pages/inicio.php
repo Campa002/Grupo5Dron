@@ -2,7 +2,7 @@
     <header class="encabezado">
         <p class="etiqueta etiqueta--linea">Grupo 5 · EEST N° 1 Vicente López</p>
         <h2 class="titulo-grande">Control de sistemas y dron</h2>
-        <p class="bajada">
+        <p class="bajada" id="inicio-saludo">
             Hola, <span id="inicio-nombre-usuario">Usuario</span> <span id="inicio-rol-usuario" class="badge badge--info">Rol</span>
         </p>
     </header>
@@ -48,11 +48,6 @@
                 <span class="acceso__icono" style="font-size: 2.2rem;"><span class="ico ico--engranaje" aria-hidden="true"></span></span>
                 <span class="acceso__titulo">Administración</span>
                 <span class="acceso__desc">Dispositivos, usuarios, códigos IR</span>
-            </a>
-            <a href="#/acerca" class="acceso">
-                <span class="acceso__icono" style="font-size: 2.2rem;"><span class="ico ico--info" aria-hidden="true"></span></span>
-                <span class="acceso__titulo">Acerca de</span>
-                <span class="acceso__desc">Integrantes Grupo 5 y docentes</span>
             </a>
         </div>
 

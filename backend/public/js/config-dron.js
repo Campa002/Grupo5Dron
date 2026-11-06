@@ -76,7 +76,7 @@ const ConfigDron = (() => {
 
     /** Solo se consulta la API con sesión iniciada y conexión (no en modo sin cuenta ni sin conexión). */
     function puedeUsarApi() {
-        return API.estaAutenticado() && !Auth.esModoInvitado() && !Auth.esModoSinConexion();
+        return API.estaAutenticado() && !Auth.esModoSinConexion();
     }
 
     function _conLocales(servidor) {
@@ -137,7 +137,7 @@ const ConfigDron = (() => {
 
     function _permisos() {
         const rol = Auth.obtenerUsuario()?.rol;
-        const conSesion = API.estaAutenticado() && !Auth.esModoInvitado();
+        const conSesion = API.estaAutenticado();
         return {
             editar: conSesion && (rol === 'admin' || rol === 'docente'),
             eliminar: conSesion && rol === 'admin',
@@ -170,7 +170,7 @@ const ConfigDron = (() => {
     }
 
     function _textoSinServidor() {
-        if (Auth.esModoInvitado()) return 'Modo sin cuenta: se muestran los perfiles locales y los guardados en el teléfono.';
+        if (Auth.sinCuenta()) return 'Sin cuenta: se muestran los perfiles locales y los guardados en el teléfono.';
         if (Auth.esModoSinConexion()) return 'Sin conexión con el servidor: se muestran los perfiles guardados en el teléfono.';
         return '';
     }

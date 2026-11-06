@@ -74,11 +74,17 @@ app_path = os.path.join(BASE_PUB, 'js', 'app.js')
 with open(app_path, 'r', encoding='utf-8') as f:
     app_content = f.read()
 
-m_rutas = re.search(r'const\s+rutasValidas\s*=\s*\[(.*?)\];', app_content)
-if m_rutas:
-    paginas = re.findall(r'["\']([^"\']+)["\']', m_rutas.group(1))
-    for p in paginas:
-        verificar_archivo(f"/pages/{p}.php", 'app.js rutasValidas')
+# Las rutas están en RUTAS_DRON, RUTAS_SIN_CUENTA y RUTAS_VALIDAS (las dos últimas suman las anteriores con "...")
+paginas = set()
+for nombre in ('RUTAS_DRON', 'RUTAS_SIN_CUENTA', 'RUTAS_VALIDAS'):
+    m_rutas = re.search(r'const\s+' + nombre + r'\s*=\s*\[(.*?)\];', app_content, re.S)
+    if m_rutas:
+        paginas.update(re.findall(r'["\']([^"\']+)["\']', m_rutas.group(1)))
+if not paginas:
+    # Sin esto, un cambio de nombre en app.js haría que no se revisen las páginas sin avisar
+    faltantes.append("app.js: no se encontraron las rutas (RUTAS_DRON / RUTAS_SIN_CUENTA / RUTAS_VALIDAS)")
+for p in sorted(paginas):
+    verificar_archivo(f"/pages/{p}.php", 'app.js rutas')
 
 # 4. Las páginas son .php pero no pueden depender de PHP (en el APK no hay PHP).
 #    No tiene que quedar ningún .html en pages/, y si una página trae bloques PHP se avisa:

@@ -39,13 +39,16 @@ Celular (APK Capacitor 5, frontend local en https://localhost)
  └─ WiFi del Tello (sin internet) ──UDP──> DJI Ryze Tello 192.168.10.1
 ```
 
-- Frontend: PWA en HTML/CSS/JS vanilla, en `backend/public/`, router por hash (`#/inicio`, `#/dron`, `#/prueba-tello`, `#/sensores`, `#/config-dron`, `#/aula`, `#/admin`, `#/acerca`, `#/login`).
+- Frontend: PWA en HTML/CSS/JS vanilla, en `backend/public/`, router por hash (`#/inicio`, `#/dron`, `#/prueba-tello`, `#/sensores`, `#/config-dron`, `#/aula`, `#/admin`, `#/login`, `#/cambiar-password`). Una ruta que no existe (por ejemplo la vieja `#/acerca`) va al inicio.
 - El APK empaqueta ese frontend: `scripts/build-apk.js` genera `capacitor/www/` (generado, ignorado por git) con un `index.html` estático a partir de `index.php` y copia las páginas (`pages/*.php`) con el mismo nombre, quitándoles cualquier bloque `<?php ... ?>`.
 - Plugin nativo propio `DronNative` en Java (`capacitor/android_plugin/DronNativePlugin.java`) para UDP y para forzar el uso del WiFi del Tello aunque no tenga internet. El navegador solo no puede mandar UDP: por eso existe el APK.
 - NO hay ESP32 en el dron. El celular habla directo con el Tello.
-- El módulo del dron funciona SIN internet y SIN cuenta:
-  - En el login, el botón "Usar el dron sin cuenta" activa el flag `grupo5dron_modo_invitado` en localStorage.
-  - Con ese flag se puede entrar al inicio (con las dos opciones: Dron entra directo, Aula lleva al login), dron, prueba Tello, sensores, config. del dron y acerca. Aula y admin mandan al login.
+- El módulo del dron funciona SIN internet y SIN cuenta (decisión de Luciano del 6/11: el login de entrada sobra para el dron):
+  - La app abre directo en el inicio, con las dos opciones. Inicio, dron, Prueba Tello, Sensores y Config. Dron se usan sin sesión (`RUTAS_SIN_CUENTA` en app.js; `Auth.sinCuenta()` = no hay token ni usuario guardado).
+  - Aula, administración y cambio de contraseña piden iniciar sesión recién al entrar; después del login (y del cambio de contraseña obligatorio, si corresponde) se vuelve a la pantalla pedida (`Auth.recordarDestino` / `Auth.tomarDestino`, en sessionStorage). Si en vez de loguearse se va al inicio o al dron, el destino se olvida.
+  - Menú: "Iniciar sesión" solo sin sesión; con sesión, "Cerrar sesión" (y el menú de usuario con "Cambiar contraseña"). Cerrar sesión vuelve al inicio.
+  - Login: solo email, contraseña e "Ingresar" (más la URL del servidor en el APK si falta). Desde el login se vuelve con el menú.
+  - Ya no existe el flag `grupo5dron_modo_invitado` (auth.js lo borra si quedó de una versión anterior).
   - Una sesión cacheada vencida (sin conexión) también permite entrar al dron. Aula y admin siempre exigen sesión válida.
   - Iniciar o cerrar sesión borra el flag.
 - El APK no puede loguearse contra un servidor HTTP local: `network_security_config.xml` solo permite HTTP hacia 192.168.10.1 y la página es `https://localhost`. Para loguearse desde el APK hace falta un servidor HTTPS.
@@ -89,7 +92,7 @@ backend/
     js/dron-joystick.js, dron-giroscopio.js, dron-seguimiento.js, dron-video.js
     js/config-dron.js       perfiles (cache offline), timeout del failsafe
     js/sensores.js          diagnóstico de sensores del celular
-    js/app.js, api.js, auth.js   compartidos (router, modo sin cuenta, Prueba Tello, sesión offline)
+    js/app.js, api.js, auth.js   compartidos (router, uso sin cuenta, Prueba Tello, sesión offline)
     pages/*.php             vistas parciales (fragmentos HTML; no dependen de PHP)
     libs/tfjs, libs/coco-ssd  modelo de visión LOCAL (pesos en float16, ~10 MB, sí va al repo)
 capacitor/        capacitor.config.json, package.json, network_security_config.xml, android_plugin/
@@ -160,6 +163,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
   - Inclinación respecto de la PANTALLA (vertical y las dos horizontales, `inclinacionEnPantalla`); en vertical natural, los mismos valores de siempre. Si la pantalla gira con la inclinación activada, se apaga con los ejes en cero y pide volver a activarla (recalibra). Decisión de Luciano del 6/11.
   - Sentido del avance (decisión de Luciano del 6/11): inclinar hacia adelante (el borde de arriba de la pantalla hacia abajo, alejándose) avanza, como empujar un joystick. "Invertir avance" (modo técnico, Config. Dron, clave `grupo5dron_invertir_avance`) vuelve al sentido anterior; se lee al activar la inclinación.
   - Modelo en float16 (`scripts/modelo_float16.py`): 9.017.328 bytes en 3 shards, mismas detecciones y FPS que float32 en la PC; `sw.js` v9.
+- Sin login de entrada y sin "Acerca de" (6/11): ver "Arquitectura". `pages/acerca.php` borrada; `sw.js` v10; `check_refs.py` lee las rutas de `RUTAS_DRON`, `RUTAS_SIN_CUENTA` y `RUTAS_VALIDAS` y falla si no las encuentra.
 - Sin probar en el celular: si la detección mejora en el A06 y qué muestra la miniatura; el respaldo por acelerómetro con el sensor real (signos de adelante/atrás y costados).
 
 ## Estado al 5/11/2026
@@ -221,7 +225,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 
 ## Próximos pasos (lista única)
 
-1. **Primera prueba real con el Tello.** Commit, APK de CI e instalación. Con el secreto de firma cargado, los APK nuevos se instalan encima. La primera vez con la clave fija hay que desinstalar la versión anterior. Después: "Usar el dron sin cuenta", `#/prueba-tello` (command, battery?, streamon), "Copiar informe" y pegarlo. Luego la cabina: despegar, aterrizar, paso, freno, giroscopio, failsafe, emergencia.
+1. **Primera prueba real con el Tello.** Commit, APK de CI e instalación. Con el secreto de firma cargado, los APK nuevos se instalan encima. La primera vez con la clave fija hay que desinstalar la versión anterior. Después: abrir la app (entra directo al inicio), `#/prueba-tello` ("Probar conexión"), "Copiar informe" y pegarlo. Luego la cabina: despegar, aterrizar, paso, freno, giroscopio, failsafe, emergencia.
 2. **Corregir lo que salga de esa prueba.** Lo más probable: red sin internet (`vincularRedWifi`), video en el WebView, si el `rc` interfiere con los pasos y la unidad de `vgx`/`vgy`.
    - Detección en el A06: con el modo técnico, mirar la miniatura "lo que ve el modelo" y el brillo. Si la imagen llega rotada o negra, corregir la captura del cuadro.
    - Verificar en el celular el sentido de la inclinación en las dos horizontales (en la PC se simuló con la convención de Android: 90° = girado en sentido antihorario).

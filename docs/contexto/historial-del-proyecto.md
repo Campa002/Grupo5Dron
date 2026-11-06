@@ -147,6 +147,10 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - El acelerómetro usa ahora la inversa exacta de la convención de deviceorientation, así coincide con el giroscopio también en inclinaciones grandes.
     - Modelo en float16 con `scripts/modelo_float16.py`: 18 → 9 MB, 3 shards `.bin`. En la PC, mismas detecciones y puntajes que float32 salvo diferencias de milésimas (dos personas en el límite de 0,50 en una foto).
 26. **Sentido del avance por inclinación invertido (6/11).** Decisión de Luciano: inclinar el celular hacia adelante (el borde de arriba de la pantalla hacia abajo) avanza, como empujar un joystick. Antes avanzaba al levantar el borde de arriba hacia uno. "Invertir avance" en el modo técnico vuelve al sentido anterior. Probado con el simulador y el plugin falso en 0°, 90° y 270°, con giroscopio y acelerómetro, en los dos sentidos.
+27. **Sin login de entrada y sin "Acerca de" (6/11).** Decisión de Luciano: el login sobraba para el dron.
+    - La app abre en el inicio; el dron se usa sin cuenta sin tocar ningún botón (se sacó "Usar el dron sin cuenta" y su flag). Aula y administración piden iniciar sesión al entrar y después vuelven a la pantalla pedida, también pasando por el cambio de contraseña obligatorio. El backend no cambió: aula y admin siguen exigiendo sesión válida.
+    - Sesión vencida: en el inicio y en el dron se sigue sin cuenta; en el aula y la administración pide login y vuelve.
+    - Se borró la página Acerca (y su ícono y estilos). `#/acerca` va al inicio.
 
 ## 4. Hardware
 

@@ -20,11 +20,14 @@ const App = (() => {
     // Número de navegación: si llega otra mientras esta espera, esta se abandona
     let navegacionActual = 0;
 
-    // Pantallas del módulo del dron (si la sesión vence en una de estas, se sigue en modo sin cuenta)
-    const RUTAS_DRON = ['dron', 'prueba-tello', 'sensores', 'config-dron', 'acerca'];
+    // Pantallas del módulo del dron: se usan sin cuenta (la app abre en el inicio, sin pasar por el login)
+    const RUTAS_DRON = ['dron', 'prueba-tello', 'sensores', 'config-dron'];
 
-    // Rutas permitidas en el modo "dron sin cuenta": el inicio (con las dos opciones) y las del dron
-    const RUTAS_SIN_CUENTA = ['inicio', ...RUTAS_DRON];
+    // Rutas que no piden sesión: el inicio (con las dos opciones), las del dron y el login
+    const RUTAS_SIN_CUENTA = ['inicio', 'login', ...RUTAS_DRON];
+
+    // Rutas que existen (cualquier otra, por ejemplo la vieja #/acerca, va al inicio)
+    const RUTAS_VALIDAS = [...RUTAS_SIN_CUENTA, 'aula', 'admin', 'cambiar-password'];
 
     // Modo técnico: muestra lo que sirve para diagnosticar (elementos .solo-tecnico). Arranca apagado.
     const CLAVE_MODO_TECNICO = 'grupo5dron_modo_tecnico';
@@ -172,25 +175,23 @@ const App = (() => {
         const hash = window.location.hash || '#/inicio';
         const ruta = hash.replace(/^#\/?/, '').split('?')[0].trim() || 'inicio';
 
-        const rutasValidas = ['login', 'inicio', 'aula', 'dron', 'sensores', 'config-dron', 'admin', 'acerca', 'prueba-tello', 'cambiar-password'];
-        const destino = rutasValidas.includes(ruta) ? ruta : 'inicio';
+        // Una ruta que no existe (por ejemplo, la vieja #/acerca) va al inicio sin error
+        if (!RUTAS_VALIDAS.includes(ruta)) history.replaceState(null, '', '#/inicio');
+        const destino = RUTAS_VALIDAS.includes(ruta) ? ruta : 'inicio';
 
         // 1. Control de autenticación (permite usuario cacheado sin conexión)
         const estaAutenticado = API.estaAutenticado() || !!Auth.obtenerUsuario();
-        const invitado = !estaAutenticado && Auth.esModoInvitado();
         const esOffline = Auth.esModoSinConexion();
 
-        if (!estaAutenticado && !invitado && destino !== 'login') {
+        // Sin sesión: el dron se usa igual; el aula y la administración piden iniciar sesión y después vuelven ahí
+        if (!estaAutenticado && !RUTAS_SIN_CUENTA.includes(destino)) {
+            Auth.recordarDestino(destino);
+            if (destino !== 'cambiar-password') mostrarToast('Para entrar al aula o a la administración, iniciá sesión.', 'info');
             window.location.hash = '#/login';
             return;
         }
-
-        // Modo dron sin cuenta: inicio y pantallas del dron; el aula y la administración van al login
-        if (invitado && destino !== 'login' && !RUTAS_SIN_CUENTA.includes(destino)) {
-            mostrarToast('El aula y la administración requieren iniciar sesión.', 'advertencia');
-            window.location.hash = '#/login';
-            return;
-        }
+        // Si se fue al inicio o al dron en vez de iniciar sesión, se olvida a dónde había que volver
+        if (destino !== 'login' && RUTAS_SIN_CUENTA.includes(destino)) Auth.tomarDestino();
 
         if (estaAutenticado && destino === 'login') {
             window.location.hash = '#/inicio';
@@ -266,11 +267,11 @@ const App = (() => {
 
     /**
      * Ajusta el header y el menú según la pantalla y el tipo de sesión
-     * (login, sesión normal, sin conexión o dron sin cuenta).
+     * (login, sesión normal, sin conexión o sin cuenta).
      * @param {string} destino ruta actual
      */
     function actualizarEncabezado(destino) {
-        const invitado = !API.estaAutenticado() && !Auth.obtenerUsuario() && Auth.esModoInvitado();
+        const sinCuenta = Auth.sinCuenta();
         const esOffline = Auth.esModoSinConexion();
         const btnMenu = document.getElementById('btn-menu');
         const btnUsuario = document.getElementById('btn-usuario');
@@ -279,44 +280,44 @@ const App = (() => {
         const iconoOffline = document.getElementById('indicador-offline-icono');
         const textoOffline = document.getElementById('indicador-offline-texto');
 
+        // El menú queda visible también en el login: desde ahí se puede volver al dron sin iniciar sesión
+        if (btnMenu) btnMenu.style.visibility = 'visible';
         if (destino === 'login') {
-            document.body.classList.add('pantalla-login');
-            if (btnMenu) btnMenu.style.visibility = 'hidden';
             if (btnUsuario) btnUsuario.style.visibility = 'hidden';
             if (indicadorEsp) indicadorEsp.style.display = 'none';
             if (indicadorOffline) indicadorOffline.style.display = 'none';
         } else {
-            document.body.classList.remove('pantalla-login');
-            if (btnMenu) btnMenu.style.visibility = 'visible';
             if (btnUsuario) btnUsuario.style.visibility = 'visible';
-            if (indicadorEsp) indicadorEsp.style.display = invitado ? 'none' : 'flex';
+            // Sin cuenta es el uso normal del dron: no se muestra el ESP32 del aula ni ningún aviso
+            if (indicadorEsp) indicadorEsp.style.display = sinCuenta ? 'none' : 'flex';
             if (indicadorOffline) {
-                const texto = invitado ? 'Sin cuenta' : 'Modo sin conexión';
-                if (iconoOffline) iconoOffline.className = `ico ico--${invitado ? 'dron' : 'senal'}`;
+                const texto = 'Modo sin conexión';
+                if (iconoOffline) iconoOffline.className = 'ico ico--senal';
                 if (textoOffline) textoOffline.textContent = texto;
                 indicadorOffline.title = texto;
                 indicadorOffline.setAttribute('aria-label', texto);
-                indicadorOffline.style.display = (invitado || esOffline) ? 'inline-flex' : 'none';
+                indicadorOffline.style.display = (!sinCuenta && esOffline) ? 'inline-flex' : 'none';
             }
         }
+        // Menú: "Iniciar sesión" solo sin sesión; con sesión, "Cerrar sesión"
         const enlaceSesion = document.getElementById('btn-cerrar-sesion');
-        textoConIcono(enlaceSesion, invitado ? 'llave' : 'salir', invitado ? 'Iniciar sesión' : 'Cerrar sesión');
+        textoConIcono(enlaceSesion, sinCuenta ? 'llave' : 'salir', sinCuenta ? 'Iniciar sesión' : 'Cerrar sesión');
     }
 
     /**
      * El servidor rechazó el token (401): la sesión venció.
-     * En las pantallas del dron se sigue en modo sin cuenta (no se interrumpe un vuelo);
-     * en el resto se vuelve al login.
+     * En el inicio y en las pantallas del dron se sigue sin cuenta (no se interrumpe un vuelo);
+     * en el aula y la administración se pide iniciar sesión y después se vuelve ahí.
      */
     function manejarSesionVencida() {
         if (!API.estaAutenticado()) return;
         Auth.cerrarSesionLocal();
         const ruta = window.location.hash.replace(/^#\/?/, '').split('?')[0].trim() || 'inicio';
-        if (RUTAS_DRON.includes(ruta)) {
-            Auth.activarModoInvitado();
+        if (RUTAS_SIN_CUENTA.includes(ruta)) {
             actualizarEncabezado(ruta);
-            mostrarToast('Tu sesión venció. Seguís usando el dron en modo sin cuenta; para el aula, iniciá sesión de nuevo.', 'advertencia', 7000);
+            mostrarToast('Tu sesión venció. Seguís usando el dron sin cuenta; para el aula, iniciá sesión de nuevo.', 'advertencia', 7000);
         } else {
+            Auth.recordarDestino(ruta);
             mostrarToast('Tu sesión venció. Iniciá sesión de nuevo.', 'advertencia', 6000);
             window.location.hash = '#/login';
         }
@@ -388,10 +389,6 @@ const App = (() => {
                 break;
             }
 
-            case 'acerca':
-                // Vista estática informativa
-                break;
-
             case 'cambiar-password':
                 Auth.inicializarPaginaCambiarPassword();
                 break;
@@ -413,19 +410,12 @@ const App = (() => {
         const elemNombre = document.getElementById('inicio-nombre-usuario');
         const elemRol = document.getElementById('inicio-rol-usuario');
 
-        // Modo sin cuenta: las dos opciones del informe; el aula lleva al login
-        if (!usuario && Auth.esModoInvitado()) {
-            if (elemNombre) elemNombre.textContent = 'invitado/a';
-            if (elemRol) {
-                elemRol.textContent = 'Sin cuenta';
-                elemRol.className = 'badge badge--info';
-            }
-            const accesoAula = document.getElementById('inicio-acceso-aula');
-            if (accesoAula) {
-                accesoAula.href = '#/login';
-                const desc = accesoAula.querySelector('.acceso__desc');
-                if (desc) desc.textContent = 'Requiere iniciar sesión: te lleva al login.';
-            }
+        // Sin cuenta: las dos opciones del informe; el dron entra directo y el aula pide iniciar sesión al entrar
+        if (!usuario) {
+            const saludo = document.getElementById('inicio-saludo');
+            if (saludo) saludo.textContent = 'Elegí qué querés controlar. El dron se usa sin cuenta.';
+            const desc = document.querySelector('#inicio-acceso-aula .acceso__desc');
+            if (desc) desc.textContent = 'Pide iniciar sesión al entrar.';
             const tarjetaEsp = document.getElementById('inicio-tarjeta-esp32');
             if (tarjetaEsp) tarjetaEsp.hidden = true;
             return;
@@ -586,10 +576,16 @@ const App = (() => {
 
         document.getElementById('btn-modal-logout').onclick = async () => {
             cerrar();
-            await Auth.logout();
-            mostrarToast('Sesión finalizada.', 'info');
-            window.location.hash = '#/login';
+            await cerrarSesionEIrAlInicio();
         };
+    }
+
+    /** Cierra la sesión y vuelve al inicio (la app sigue usable sin cuenta). Si ya estaba ahí, lo recarga. */
+    async function cerrarSesionEIrAlInicio() {
+        await Auth.logout();
+        mostrarToast('Sesión finalizada. Podés seguir usando el dron sin cuenta.', 'info');
+        if (window.location.hash === '#/inicio') cargarRutaActual();
+        else window.location.hash = '#/inicio';
     }
 
     /**
@@ -841,7 +837,7 @@ const App = (() => {
         let paginaCerrada = false;
 
         function textoModoSesion() {
-            if (Auth.esModoInvitado()) return 'Dron sin cuenta';
+            if (Auth.sinCuenta()) return 'Dron sin cuenta';
             return Auth.esModoSinConexion() ? 'Sin conexión con el servidor (sesión cacheada)' : 'Conectado al servidor';
         }
 
@@ -1262,10 +1258,9 @@ const App = (() => {
             btnCerrarSesion.addEventListener('click', async (e) => {
                 e.preventDefault();
                 cerrarMenu();
-                const eraInvitado = Auth.esModoInvitado() && !API.estaAutenticado();
-                await Auth.logout();
-                mostrarToast(eraInvitado ? 'Saliste del modo sin cuenta.' : 'Sesión finalizada.', 'info');
-                window.location.hash = '#/login';
+                // Sin sesión el enlace dice "Iniciar sesión"; con sesión, "Cerrar sesión"
+                if (Auth.sinCuenta()) window.location.hash = '#/login';
+                else await cerrarSesionEIrAlInicio();
             });
         }
 

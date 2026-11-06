@@ -9,7 +9,7 @@
  */
 
 // Subir este número cuando cambie la lista de recursos precacheados
-const CACHE_NAME = 'grupo5dron-v9';
+const CACHE_NAME = 'grupo5dron-v10';
 
 // Si la red tarda más que esto y hay copia en caché, se usa la copia (la red sigue actualizando en segundo plano)
 const ESPERA_RED_MS = 3000;
@@ -46,7 +46,6 @@ const RECURSOS_ESTATICOS = [
     '/pages/inicio.php',
     '/pages/aula.php',
     '/pages/admin.php',
-    '/pages/acerca.php',
     '/pages/dron.php',
     '/pages/sensores.php',
     '/pages/prueba-tello.php',

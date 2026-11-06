@@ -20,23 +20,39 @@ const Auth = (() => {
     }
 
     // ------------------------------------------------------------
-    // Modo "dron sin cuenta": permite usar SOLO el módulo del dron
-    // (cabina, prueba Tello, sensores, config. del dron y acerca)
-    // sin iniciar sesión. El aula y la administración siguen
-    // exigiendo una sesión válida.
+    // Sin cuenta: la app abre en el inicio y el módulo del dron (cabina,
+    // Prueba Tello, Sensores y Config. Dron) se usa sin iniciar sesión.
+    // El aula y la administración piden iniciar sesión recién al entrar,
+    // y después del login se vuelve a la pantalla pedida.
     // ------------------------------------------------------------
-    const CLAVE_MODO_INVITADO = 'grupo5dron_modo_invitado';
 
-    function esModoInvitado() {
-        return localStorage.getItem(CLAVE_MODO_INVITADO) === '1';
+    // Bandera del modo sin cuenta de versiones anteriores: ya no se usa
+    try { localStorage.removeItem('grupo5dron_modo_invitado'); } catch (_) { /* nada */ }
+
+    /** true si no hay ninguna sesión (ni token ni usuario guardado): se usa el dron sin cuenta. */
+    function sinCuenta() {
+        return !API.estaAutenticado() && !obtenerUsuario();
     }
 
-    function activarModoInvitado() {
-        localStorage.setItem(CLAVE_MODO_INVITADO, '1');
+    // Pantalla que se pidió antes del login (solo las que exigen sesión)
+    const CLAVE_DESTINO = 'grupo5dron_destino_login';
+    const DESTINOS_CON_SESION = ['aula', 'admin'];
+
+    /** Recuerda a dónde volver después de iniciar sesión. */
+    function recordarDestino(ruta) {
+        try {
+            if (DESTINOS_CON_SESION.includes(ruta)) sessionStorage.setItem(CLAVE_DESTINO, ruta);
+        } catch (_) { /* sin almacenamiento: vuelve al inicio */ }
     }
 
-    function desactivarModoInvitado() {
-        localStorage.removeItem(CLAVE_MODO_INVITADO);
+    /** Devuelve (y olvida) la pantalla a la que hay que volver; si no hay, el inicio. */
+    function tomarDestino() {
+        let ruta = null;
+        try {
+            ruta = sessionStorage.getItem(CLAVE_DESTINO);
+            sessionStorage.removeItem(CLAVE_DESTINO);
+        } catch (_) { /* nada */ }
+        return DESTINOS_CON_SESION.includes(ruta) ? ruta : 'inicio';
     }
 
     /**
@@ -82,7 +98,6 @@ const Auth = (() => {
 
         API.guardarToken(respuesta.token);
         guardarUsuario(respuesta.usuario);
-        desactivarModoInvitado();
 
         return respuesta.usuario;
     }
@@ -109,7 +124,6 @@ const Auth = (() => {
             // Ignorar errores al cerrar sesión
         }
         cerrarSesionLocal();
-        desactivarModoInvitado();
     }
 
     /** true si el usuario tiene que cambiar la contraseña (cuentas del seed o reseteadas). */
@@ -210,13 +224,6 @@ const Auth = (() => {
             }
         }
 
-        // Usar el dron sin cuenta (por ejemplo, conectado al WiFi del Tello, sin internet)
-        document.getElementById('btn-modo-invitado')?.addEventListener('click', () => {
-            activarModoInvitado();
-            App.mostrarToast('Modo sin cuenta: podés usar el dron; el aula y la administración requieren iniciar sesión.', 'info', 5000);
-            window.location.hash = '#/inicio';
-        });
-
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -246,11 +253,12 @@ const Auth = (() => {
                 await login(email, password);
                 modoSinConexion = false;
                 if (debeCambiarPassword()) {
+                    // El destino pedido queda guardado: se va ahí después de cambiar la contraseña
                     App.mostrarToast('Antes de seguir, cambiá la contraseña temporal.', 'advertencia', 6000);
                     window.location.hash = '#/cambiar-password';
                 } else {
                     App.mostrarToast('¡Bienvenido/a!', 'exito');
-                    window.location.hash = '#/inicio';
+                    window.location.hash = '#/' + tomarDestino();
                 }
             } catch (error) {
                 if (avisoOffline && !obtenerUsuario()) {
@@ -259,7 +267,7 @@ const Auth = (() => {
                 App.mostrarToast(error.message, 'error');
             } finally {
                 btnSubmit.disabled = false;
-                btnSubmit.textContent = 'Iniciar sesión';
+                btnSubmit.textContent = 'Ingresar';
             }
         });
     }
@@ -292,7 +300,7 @@ const Auth = (() => {
                 const usuario = obtenerUsuario();
                 if (usuario) guardarUsuario({ ...usuario, debe_cambiar_password: false });
                 App.mostrarToast('Contraseña actualizada.', 'exito');
-                window.location.hash = '#/inicio';
+                window.location.hash = '#/' + tomarDestino();
             } catch (error) {
                 App.mostrarToast(error.message, 'error', 6000);
             } finally {
@@ -314,9 +322,9 @@ const Auth = (() => {
         inicializarPaginaLogin,
         esModoSinConexion,
         setModoSinConexion,
-        esModoInvitado,
-        activarModoInvitado,
-        desactivarModoInvitado,
+        sinCuenta,
+        recordarDestino,
+        tomarDestino,
         cerrarSesionLocal,
         debeCambiarPassword,
         inicializarPaginaCambiarPassword,

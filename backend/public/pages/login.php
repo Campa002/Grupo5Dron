@@ -27,12 +27,6 @@
             <input class="campo__input" id="login-password" type="password" placeholder="••••••••" required autocomplete="current-password">
         </div>
 
-        <button type="submit" class="btn btn--primario btn--bloque mt-lg">Iniciar sesión</button>
-
-        <button type="button" id="btn-modo-invitado" class="btn btn--secundario btn--bloque mt-md"><span class="ico ico--dron" aria-hidden="true"></span> Usar el dron sin cuenta</button>
-        <p class="texto-xs texto-secundario texto-centro mt-sm">
-            Sin cuenta podés usar la cabina, la prueba del Tello, los sensores y la configuración del dron, aunque no haya internet.
-            El aula y la administración requieren iniciar sesión.
-        </p>
+        <button type="submit" class="btn btn--primario btn--bloque mt-lg">Ingresar</button>
     </form>
 </div>
