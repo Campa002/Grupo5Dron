@@ -18,15 +18,21 @@ const DronAdaptadores = (() => {
     // ============================================================
     // 0. CONTRATO CON EL PLUGIN NATIVO (fuente de verdad: DronNativePlugin.java)
     // ============================================================
-    //  enviarComando({host, puerto, mensaje, timeoutMs}) -> {respuesta, error?}  (nunca rechaza: si no hay respuesta, respuesta = 'timeout')
-    //  enviarSinRespuesta({host, puerto, mensaje})       -> {enviado}            (para rc y emergency)
+    //  Todo lo que va al Tello (comandos, rc y emergency) sale de UN solo socket con el mismo puerto local.
+    //  enviarComando({host, puerto, mensaje, timeoutMs}) -> {respuesta, puertoLocal, desde?, error?}
+    //      (nunca rechaza: si no hay respuesta, respuesta = 'timeout'; si se canceló la espera, 'cancelado')
+    //  enviarSinRespuesta({host, puerto, mensaje})       -> {enviado}     (para rc y emergency)
+    //  cancelarEsperas({comando?})                        -> {canceladas}  (sin comando: todas)
     //  iniciarEscucha({puerto}) / detenerEscucha({puerto})
-    //  vincularRedWifi() -> {vinculada, motivo}
-    //  info() -> {version, sdkAndroid, redVinculada}
-    //  Eventos: 'telemetria' {raw, puerto} y 'videoPaquete' {data (base64), tamano, paquetes}
+    //  vincularRedWifi() -> {vinculada, motivo, red}      red: 'wifi' | 'datos' | 'ninguna' | 'otra'
+    //  info() -> {version, sdkAndroid, redVinculada, red, puertoLocalComandos}
+    //  Eventos: 'telemetria' {raw, puerto},
+    //           'videoPaquete' {data (base64), tamano, paquetes, perdida, perdidasTotales} y
+    //           'respuestaUdp' {texto, desde, puertoLocal, comando, sinEspera} (cada respuesta que llega del dron)
     const DronNativo = {
         EVENTO_TELEMETRIA: 'telemetria',
         EVENTO_VIDEO: 'videoPaquete',
+        EVENTO_RESPUESTA: 'respuestaUdp',
 
         disponible() {
             return !!(window.Capacitor?.Plugins?.DronNative);
@@ -38,15 +44,20 @@ const DronAdaptadores = (() => {
             return p;
         },
 
-        /** Envía un comando y espera la respuesta. Devuelve {respuesta, error}. Nunca rechaza. */
+        /** Envía un comando y espera la respuesta. Devuelve {respuesta, error, puertoLocal, desde}. Nunca rechaza. */
         async enviarComando(host, puerto, mensaje, timeoutMs = 5000) {
             try {
                 const r = await this._plugin().enviarComando({ host, puerto, mensaje, timeoutMs });
                 const respuesta = String(r?.respuesta ?? '').trim();
-                return { respuesta: respuesta || 'sin respuesta', error: r?.error || null };
+                return { respuesta: respuesta || 'sin respuesta', error: r?.error || null, puertoLocal: r?.puertoLocal ?? null, desde: r?.desde || null };
             } catch (e) {
-                return { respuesta: 'error', error: e?.message || String(e) };
+                return { respuesta: 'error', error: e?.message || String(e), puertoLocal: null, desde: null };
             }
+        },
+
+        /** Los comandos que esperan respuesta (solo los iguales a `comando`, si se indica) terminan ya con "cancelado". */
+        async cancelarEsperas(comando = '') {
+            try { return await this._plugin().cancelarEsperas({ comando }); } catch (_) { return { canceladas: 0 }; }
         },
 
         /** Envía sin esperar respuesta (rc, emergency). No bloquea. */
@@ -145,6 +156,14 @@ const DronAdaptadores = (() => {
             // Ejes RC normalizados a -100..100 (formato del comando "rc a b c d")
             this.valoresRC = { roll: 0, pitch: 0, yaw: 0, throttle: 0 };
             this.frecuenciaRCHz = 15;
+            // La cabina lo define para mostrar avisos que solo interesan en el modo técnico
+            this.onAvisoTecnico = null;
+        }
+
+        _avisoTecnico(texto) {
+            if (typeof this.onAvisoTecnico === 'function') {
+                try { this.onAvisoTecnico(texto); } catch (e) { console.error(e); }
+            }
         }
 
         async conectar() { throw new Error('conectar() no implementado'); }
@@ -408,18 +427,49 @@ const DronAdaptadores = (() => {
             this.comandosEnCurso = 0;
             this.redVinculada = null;
             this.ultimaRespuestaCommand = null;
+            this.red = null;             // 'wifi' | 'datos' | 'ninguna' | 'otra' (según el plugin)
             this._oyentesNativos = [];   // handles con remove()
             this._escuchasAbiertas = new Set();
+            // Motores: el campo "time" de la telemetría avanza solo con los motores encendidos
+            this._tiempoMotor = null;
+            this._motorAvanzoTs = 0;
+            // Registro de comandos y respuestas (modo técnico: "Copiar registro de comandos")
+            this.registro = [];
+            this.videoBytes = 0;
+            this.videoPerdidas = 0;
+        }
+
+        _registrar(texto) {
+            const hora = new Date().toLocaleTimeString();
+            this.registro.push(`[${hora}] ${texto}`);
+            if (this.registro.length > 300) this.registro.shift();
+        }
+
+        registroTexto() {
+            return [
+                `Red: ${this.red || 'sin dato'} · video: ${this.videoBytes.toLocaleString()} bytes, ${this.videoPerdidas} pérdidas de paquetes detectadas`,
+                ...this.registro,
+            ].join('\n');
         }
 
         async enviarComando(cmd, timeoutMs = 8000) {
             this.comandosEnCurso++;
+            this._registrar(`TX "${cmd}"`);
             try {
-                const { respuesta } = await DronNativo.enviarComando(this.ip, this.puertoComando, cmd, timeoutMs);
+                const { respuesta, error, puertoLocal } = await DronNativo.enviarComando(this.ip, this.puertoComando, cmd, timeoutMs);
+                this._registrar(`Resultado de "${cmd}": "${respuesta}"${error ? ` (${error})` : ''}${puertoLocal ? ` · puerto local ${puertoLocal}` : ''}`);
                 return respuesta;
             } finally {
                 this.comandosEnCurso--;
             }
+        }
+
+        /** true si la telemetría dice que está en el aire: altura de 30 cm o más y motores encendidos. */
+        enVueloSegunTelemetria() {
+            const ahora = Date.now();
+            return (this.telemetria.altura || 0) >= 30
+                && ahora - this._motorAvanzoTs < 2500
+                && ahora - this.ultimaTelemetriaTs < 1500;
         }
 
         _enviarRC(rc) {
@@ -450,12 +500,19 @@ const DronAdaptadores = (() => {
             }
             await this._liberarRecursos();
 
-            // 1. Forzar el uso del WiFi del Tello aunque no tenga internet
+            // 1. Forzar el uso del WiFi del Tello aunque no tenga internet (y aunque estén prendidos los datos)
             const red = await DronNativo.vincularRedWifi();
             this.redVinculada = !!red?.vinculada;
+            this.red = red?.red || null;
+            this._registrar(`Red: ${this.red || 'sin dato'} (${red?.vinculada ? 'vinculada' : 'sin vincular'}: ${red?.motivo || 'sin motivo'})`);
 
             // 2. Escuchar telemetría ANTES de "command" para no perder los primeros paquetes
             this._oyentesNativos.push(DronNativo.escuchar(DronNativo.EVENTO_TELEMETRIA, (d) => this.procesarStringEstado(d?.raw)));
+            // Cada respuesta que llega del dron, con su puerto (para el registro del modo técnico)
+            this._oyentesNativos.push(DronNativo.escuchar(DronNativo.EVENTO_RESPUESTA, (d) => {
+                const para = d?.comando ? `para "${d.comando}"` : 'sin comando esperando';
+                this._registrar(`RX "${d?.texto}" de ${d?.desde} → puerto local ${d?.puertoLocal} (${para})`);
+            }));
             await this._abrirEscucha(this.puertoEstado);
 
             // 3. Modo SDK: hasta 2 intentos
@@ -467,7 +524,8 @@ const DronAdaptadores = (() => {
             if (!esOk(resp)) {
                 await this._liberarRecursos();
                 const motivoRed = this.redVinculada ? '' : ` La red WiFi no se pudo vincular (${red?.motivo || 'sin motivo'}).`;
-                throw new Error(`El dron no respondió. ¿Está prendido y el celular conectado a su WiFi TELLO-XXXXXX? (respuesta: "${resp}")${motivoRed}`);
+                const ayudaDatos = this.red === 'wifi' ? '' : ' Apagá los datos móviles y volvé a probar.';
+                throw new Error(`El dron no respondió. ¿Está prendido y el celular conectado a su WiFi TELLO-XXXXXX? (respuesta: "${resp}")${motivoRed}${ayudaDatos}`);
             }
 
             this.conectado = true;
@@ -491,15 +549,29 @@ const DronAdaptadores = (() => {
 
         /**
          * Activa el video: abre la escucha en el puerto de video y manda "streamon".
-         * @param {Function} onPaquete recibe {data, tamano, paquetes}
-         * @returns {Promise<boolean>} true si el Tello respondió "ok" a streamon
+         * @param {Function} onPaquete recibe {data, tamano, paquetes, perdida}
+         * @returns {Promise<boolean>} true si el Tello respondió "ok" a streamon o si ya llegan datos de video
          */
         async iniciarVideo(onPaquete) {
             if (!this.conectado) return false;
-            this._oyentesNativos.push(DronNativo.escuchar(DronNativo.EVENTO_VIDEO, onPaquete));
+            this._oyentesNativos.push(DronNativo.escuchar(DronNativo.EVENTO_VIDEO, (d) => {
+                this.videoBytes += d?.tamano || 0;
+                if (Number.isFinite(d?.perdidasTotales)) this.videoPerdidas = d.perdidasTotales;
+                onPaquete(d);
+            }));
             await this._abrirEscucha(this.puertoVideo);
+            const bytesAntes = this.videoBytes;
             const resp = await this.enviarComando('streamon', 3000);
-            return esOk(resp);
+            if (esOk(resp)) return true;
+            // Respaldo: si la respuesta se perdió pero llegan datos de video, el video está activo
+            const fin = Date.now() + 2000;
+            while (this.videoBytes === bytesAntes && Date.now() < fin && this.conectado) await esperar(100);
+            if (this.videoBytes > bytesAntes) {
+                this._registrar('Video activo por los datos que llegan (sin respuesta a "streamon")');
+                this._avisoTecnico(`El dron no respondió a "streamon" (${resp}), pero llega video: se toma como activo.`);
+                return true;
+            }
+            return false;
         }
 
         procesarStringEstado(str) {
@@ -513,7 +585,11 @@ const DronAdaptadores = (() => {
             }
             if ('bat' in datos) this.telemetria.bateria = datos.bat;
             if ('h' in datos) this.telemetria.altura = datos.h;                 // cm
-            if ('time' in datos) this.telemetria.tiempoVuelo = datos.time;      // s con motores encendidos
+            if ('time' in datos) {
+                this.telemetria.tiempoVuelo = datos.time;                        // s con motores encendidos
+                if (this._tiempoMotor !== null && datos.time > this._tiempoMotor) this._motorAvanzoTs = Date.now();
+                this._tiempoMotor = datos.time;
+            }
             if ('vgx' in datos && 'vgy' in datos) {
                 // El SDK no documenta la unidad de vgx/vgy; se asume dm/s (verificar en la prueba real).
                 this.telemetria.velocidad = Math.round(Math.hypot(datos.vgx, datos.vgy) * 10);
@@ -527,12 +603,54 @@ const DronAdaptadores = (() => {
             await super.desconectar();
         }
 
+        /**
+         * Despega. Antes espera (hasta 4 s) a que termine el comando anterior (por ejemplo "streamon"): las
+         * respuestas del Tello no dicen a qué comando contestan y se reparten en orden.
+         * Mientras espera la respuesta de "takeoff" (el Tello la manda al terminar de subir, a los ~5 s):
+         *  - Respaldo: desde los 6 s, si la telemetría muestra 30 cm o más con los motores encendidos (tres
+         *    lecturas seguidas, ~0,6 s), se considera en vuelo aunque el "ok" no haya llegado.
+         *  - Para que el Tello no aterrice solo (~15 s sin comandos): desde los 8 s, un "rc 0 0 0 0" por segundo,
+         *    solo si sigue llegando telemetría (si se cortó, no se manda nada, igual que en el failsafe).
+         */
         async despegar() {
             if (!this.conectado) throw new Error('El dron no está conectado.');
             this.detenerRC();
             const gen = this.generacionEmergencia;
-            const resp = await this.enviarComando('takeoff', 20000);
+            const finEspera = Date.now() + 4000;
+            while (this.comandosEnCurso > 0 && Date.now() < finEspera && gen === this.generacionEmergencia) await esperar(100);
             if (gen !== this.generacionEmergencia) throw new Error('Despegue cancelado por emergencia.');
+            const inicio = Date.now();
+            let resp = null;
+            let terminado = false;
+            this.enviarComando('takeoff', 20000).then(r => { resp = r; terminado = true; });
+
+            let lecturasEnAire = 0;
+            let ultimoMantener = inicio;
+            let porTelemetria = false;
+            while (!terminado) {
+                await esperar(200);
+                if (terminado || gen !== this.generacionEmergencia) break;
+                const ahora = Date.now();
+                lecturasEnAire = ahora - inicio >= 6000 && this.enVueloSegunTelemetria() ? lecturasEnAire + 1 : 0;
+                if (lecturasEnAire >= 3) { porTelemetria = true; break; }
+                if (ahora - inicio >= 8000 && ahora - ultimoMantener >= 1000 && !this.enviosSuspendidos
+                    && ahora - this.ultimaTelemetriaTs < 2000) {
+                    ultimoMantener = ahora;
+                    this._enviarRC({ roll: 0, pitch: 0, throttle: 0, yaw: 0 });
+                    this._registrar('TX "rc 0 0 0 0" (mantener el enlace durante el despegue)');
+                }
+            }
+            if (gen !== this.generacionEmergencia) throw new Error('Despegue cancelado por emergencia.');
+            if (porTelemetria) {
+                // Su "ok" tardío no debe quedar asignado al comando siguiente
+                DronNativo.cancelarEsperas('takeoff');
+                this.enVuelo = true;
+                this.telemetria.estado = 'en vuelo';
+                this.notificarTelemetria();
+                this._registrar(`En vuelo según la telemetría (altura ${this.telemetria.altura} cm, motores encendidos), sin respuesta a "takeoff"`);
+                this._avisoTecnico(`El dron no respondió a "takeoff", pero los datos dicen que vuela (${this.telemetria.altura} cm, motores encendidos): controles habilitados.`);
+                return true;
+            }
             if (!esOk(resp)) {
                 // Si la respuesta se perdió pero la telemetría dice que está en el aire, tratarlo como en vuelo
                 if ((this.telemetria.altura || 0) >= 30 && Date.now() - this.ultimaTelemetriaTs < 2000) {

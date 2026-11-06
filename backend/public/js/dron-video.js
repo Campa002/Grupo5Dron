@@ -11,6 +11,10 @@
  *     llega un slice con first_mb_in_slice = 0, o un SPS/PPS/AUD.
  *  4. A cada cuadro clave (IDR) se le antepone el último SPS y PPS, como exige WebCodecs en modo Annex B.
  *  5. Si el decodificador falla, se recrea y se espera el próximo cuadro clave.
+ *  6. Si el plugin avisa que se perdió un paquete (perdida = true), se descarta el cuadro incompleto y se
+ *     espera el próximo cuadro clave: sin eso, los cuadros siguientes se ven "rotos" hasta que llega uno.
+ *     Si las pérdidas avisadas son demasiadas (más de 20 en 2 s), se ignoran: preferible ver con fallas
+ *     que quedarse congelado si la regla del plugin no aplica a este video.
  */
 
 // eslint-disable-next-line no-unused-vars
@@ -33,6 +37,9 @@ class DronVideoDecoder {
         this.frameCount = 0;
         this.bytesRecibidos = 0;
         this.errores = 0;
+        this.perdidas = 0;           // paquetes perdidos que avisó el plugin
+        this.cuadrosClave = 0;
+        this._marcasPerdida = [];    // momentos de las últimas pérdidas (para el límite de 20 en 2 s)
         this.soportaWebCodecs = typeof window.VideoDecoder === 'function';
 
         if (!this.soportaWebCodecs) {
@@ -97,9 +104,11 @@ class DronVideoDecoder {
     /**
      * Procesa datos recibidos del plugin.
      * @param {string|Uint8Array|ArrayBuffer} payload Base64 o bytes crudos.
+     * @param {{perdida?: boolean}} [opciones] perdida = antes de estos bytes faltó un paquete.
      */
-    procesarChunk(payload) {
+    procesarChunk(payload, opciones = {}) {
         if (!this.soportaWebCodecs || !payload) return;
+        if (opciones.perdida) this._descartarPorPerdida();
         let bytes;
         if (typeof payload === 'string') {
             const bin = atob(payload);
@@ -120,6 +129,18 @@ class DronVideoDecoder {
         if (this.buffer.length > 4 * 1024 * 1024) this.buffer = new Uint8Array(0);
 
         this._extraerNALs();
+    }
+
+    _descartarPorPerdida() {
+        this.perdidas++;
+        const ahora = performance.now();
+        this._marcasPerdida = this._marcasPerdida.filter(t => ahora - t < 2000);
+        this._marcasPerdida.push(ahora);
+        if (this._marcasPerdida.length > 20) return;
+        // La NAL a medio armar y el cuadro en curso quedaron incompletos
+        this.buffer = new Uint8Array(0);
+        this.nalsCuadro = [];
+        this.esperandoClave = true;
     }
 
     _extraerNALs() {
@@ -172,7 +193,7 @@ class DronVideoDecoder {
         try {
             this.decoder.decode(new EncodedVideoChunk({ type: esClave ? 'key' : 'delta', timestamp: this.timestamp, data: datos }));
             this.timestamp += 33333; // ~30 cuadros por segundo, en microsegundos
-            if (esClave) this.esperandoClave = false;
+            if (esClave) { this.esperandoClave = false; this.cuadrosClave++; }
         } catch (e) {
             this.errores++;
             this.esperandoClave = true;
