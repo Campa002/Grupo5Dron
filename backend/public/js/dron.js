@@ -190,13 +190,13 @@ const Dron = (() => {
         const a = _adaptador;
         if (!a) return;
         _actualizarEstadoUI('conectando');
-        _textoVideo('📷 Conectando...');
+        _textoVideo('Conectando...');
         try {
             await a.conectar();
         } catch (err) {
             if (a !== _adaptador) return;
             _actualizarEstadoUI('desconectado');
-            _textoVideo('🔴 ' + err.message);
+            _textoVideo('Sin conexión: ' + err.message);
             App.mostrarToast(err.message, 'error', 9000);
             return;
         }
@@ -216,21 +216,21 @@ const Dron = (() => {
     async function _iniciarVideo() {
         const a = _adaptador;
         if (!a) return;
-        if (!a.tieneVideo()) { _textoVideo('🎮 Simulador: sin video'); return; }
-        if (typeof DronVideoDecoder === 'undefined') { _textoVideo('⚠ Falta el módulo de video'); return; }
+        if (!a.tieneVideo()) { _textoVideo('Simulador: sin video'); return; }
+        if (typeof DronVideoDecoder === 'undefined') { _textoVideo('Falta el módulo de video'); return; }
 
         _video = new DronVideoDecoder({
             canvasEl: _q('#canvas-video'),
             onFrameRendered: (n) => { if (n === 1) _textoVideo(''); },
         });
-        if (!_video.soportaWebCodecs) { _textoVideo('⚠ Este WebView no soporta WebCodecs: no hay video'); return; }
+        if (!_video.soportaWebCodecs) { _textoVideo('Este WebView no soporta WebCodecs: no hay video'); return; }
 
-        _textoVideo('📷 Esperando video del Tello...');
+        _textoVideo('Esperando video del Tello...');
         try {
             const ok = await a.iniciarVideo(d => _video?.procesarChunk(d?.data));
-            if (a === _adaptador && !ok) _textoVideo('📷 El Tello no confirmó "streamon"');
+            if (a === _adaptador && !ok) _textoVideo('El Tello no confirmó "streamon"');
         } catch (err) {
-            if (a === _adaptador) _textoVideo('📷 No se pudo abrir el video: ' + err.message);
+            if (a === _adaptador) _textoVideo('No se pudo abrir el video: ' + err.message);
         }
     }
 
@@ -304,7 +304,7 @@ const Dron = (() => {
         // 2. Desde acá no sale ningún comando automático (ni rc continuo ni keep-alive).
         //    Si el enlace está caído a medias, así el Tello activa su aterrizaje automático (~15 s sin comandos).
         a.suspenderEnviosAutomaticos();
-        App.mostrarToast(`⚠ FAILSAFE: sin telemetría hace ${(msSinTelemetria / 1000).toFixed(1)} s. Frenando y aterrizando...`, 'error', 8000);
+        App.mostrarToast(`FAILSAFE: sin telemetría hace ${(msSinTelemetria / 1000).toFixed(1)} s. Frenando y aterrizando...`, 'error', 8000);
 
         // 3. Dos intentos de "land"
         _accionVuelo = true;
@@ -326,7 +326,7 @@ const Dron = (() => {
         _esperandoVueltaTelemetria = !_hayTelemetria();
         _actualizarEstadoUI(a.enVuelo ? 'failsafe' : 'conectado');
         if (a.enVuelo) {
-            _mostrarAvisoFijo('⚠ El dron no confirmó el aterrizaje. La app dejó de mandar comandos para que el Tello ' +
+            _mostrarAvisoFijo('El dron no confirmó el aterrizaje. La app dejó de mandar comandos para que el Tello ' +
                 'aterrice solo (lo hace a los ~15 s sin comandos). Si sigue en el aire, usá EMERGENCIA o Aterrizar. ' +
                 'Si vuelve la conexión, se reintenta el aterrizaje automáticamente.');
         }
@@ -472,7 +472,7 @@ const Dron = (() => {
                 _accionVuelo = false;
                 _ocultarAvisoFijo();
                 _actualizarEstadoUI(a.conectado ? 'conectado' : 'desconectado');
-                App.mostrarToast(`⛔ ${motivo}: motores apagados.`, 'error', 6000);
+                App.mostrarToast(`${motivo}: motores apagados.`, 'error', 6000);
             });
     }
 
@@ -486,7 +486,7 @@ const Dron = (() => {
         _joystickDer?.centrar();
         a.frenar();
         const txt = _q('#estado-paso-texto');
-        if (txt) txt.textContent = '⏹ Freno: rc 0 0 0 0 enviado';
+        if (txt) txt.textContent = 'Freno: rc 0 0 0 0 enviado';
     }
 
     // ----------------------------------------------------------------
@@ -528,14 +528,14 @@ const Dron = (() => {
         _pasoEnEjecucion = true;
         const txt = _q('#estado-paso-texto');
         const nombre = accion === 'girar' ? `girar ${valor > 0 ? 'derecha' : 'izquierda'} ${Math.abs(valor)}°` : `${accion} ${valor} cm`;
-        if (txt) txt.textContent = `⏳ Ejecutando: ${nombre}...`;
+        if (txt) txt.textContent = `Ejecutando: ${nombre}...`;
 
         a.pausarRC();
         try {
             await _ejecutarAccion(a, accion, valor);
-            if (txt) txt.textContent = `✅ Listo: ${nombre}`;
+            App.textoConIcono(txt, 'check', `Listo: ${nombre}`);
         } catch (err) {
-            if (txt) txt.textContent = `❌ ${err.message}`;
+            App.textoConIcono(txt, 'cruz', err.message);
             App.mostrarToast(`El paso "${nombre}" falló: ${err.message}`, 'error', 7000);
         } finally {
             a.reanudarRC();
@@ -589,7 +589,7 @@ const Dron = (() => {
             for (let i = 0; i < mision.pasos.length; i++) {
                 if (_cancelarMisionFlag || a !== _adaptador) { resultado = 'cancelada'; break; }
                 const p = mision.pasos[i];
-                if (info) info.innerHTML = `⏳ <strong>Paso ${i + 1}/${mision.pasos.length}:</strong> ${_esc(p.accion)} ${_esc(String(p.valor))} (esperando "ok" del dron)...`;
+                if (info) info.innerHTML = `<strong>Paso ${i + 1}/${mision.pasos.length}:</strong> ${_esc(p.accion)} ${_esc(String(p.valor))} (esperando "ok" del dron)...`;
                 try {
                     await _ejecutarAccion(a, p.accion, p.valor);
                 } catch (err) {
@@ -620,7 +620,7 @@ const Dron = (() => {
         if (!_misionEnEjecucion) return;
         _cancelarMisionFlag = true;
         if (frenar) _adaptador?.frenar();
-        App.mostrarToast('🛑 Cancelando la misión: termina el paso en curso y se detiene.', 'advertencia');
+        App.mostrarToast('Cancelando la misión: termina el paso en curso y se detiene.', 'advertencia');
     }
 
     function _crearMision() {
@@ -771,7 +771,7 @@ const Dron = (() => {
         const filas = _seguimiento?.registro.length || 0;
         if (!filas) { App.mostrarToast('Todavía no hay registro: activá el ensayo un rato.', 'info'); return; }
         const ok = await DronSeguimiento.copiarTexto(_seguimiento.registroCSV());
-        App.mostrarToast(ok ? `📋 Registro copiado (${filas} cuadros).` : 'No se pudo copiar el registro.', ok ? 'exito' : 'advertencia');
+        App.mostrarToast(ok ? `Registro copiado (${filas} cuadros).` : 'No se pudo copiar el registro.', ok ? 'exito' : 'advertencia');
     }
 
     function _mostrarEnsayo(texto) {
@@ -784,7 +784,7 @@ const Dron = (() => {
     function _actualizarBotonSeguimiento() {
         const btn = _q('#btn-toggle-seguimiento');
         if (!btn) return;
-        btn.textContent = _modoSeguimiento ? '🎯 Ensayo: ON' : '🎯 Ensayo: OFF';
+        App.textoConIcono(btn, 'objetivo', _modoSeguimiento ? 'Ensayo: ON' : 'Ensayo: OFF');
         btn.classList.toggle('cab-activo', _modoSeguimiento);
     }
 
@@ -846,16 +846,16 @@ const Dron = (() => {
 
         const icono = _q('#tel-bateria-icono');
         if (tel.bateria === null || tel.bateria === undefined) {
-            if (icono) icono.textContent = '⚪';
+            if (icono) icono.className = 'punto';
             return;
         }
         const bat = Number(tel.bateria);
-        if (icono) icono.textContent = bat <= 10 ? '🔴' : bat <= 25 ? '🟡' : '🟢';
+        if (icono) icono.className = `punto punto--${bat <= 10 ? 'error' : bat <= 25 ? 'advertencia' : 'exito'}`;
 
         // Avisos de batería: una sola vez por nivel
         const nivel = bat <= 10 ? 2 : bat <= 25 ? 1 : 0;
         if (nivel > _nivelAvisoBateria && _adaptador?.enVuelo) {
-            App.mostrarToast(nivel === 2 ? `🔴 Batería crítica: ${Math.round(bat)}%. Aterrizá ya.` : `🟡 Batería baja: ${Math.round(bat)}%. Pensá en aterrizar.`,
+            App.mostrarToast(nivel === 2 ? `Batería crítica: ${Math.round(bat)}%. Aterrizá ya.` : `Batería baja: ${Math.round(bat)}%. Pensá en aterrizar.`,
                 nivel === 2 ? 'error' : 'advertencia', 8000);
         }
         if (nivel > _nivelAvisoBateria || nivel === 0) _nivelAvisoBateria = nivel;
@@ -866,18 +866,19 @@ const Dron = (() => {
     // ----------------------------------------------------------------
 
     function _actualizarEstadoUI(estado) {
+        // [color del punto, texto]
         const textos = {
-            conectando: '🟡 Conectando...',
-            conectado: '🟢 Conectado (en tierra)',
-            despegando: '🔵 Despegando...',
-            en_vuelo: '🔵 En vuelo',
-            aterrizando: '🔵 Aterrizando...',
-            failsafe: '🟠 Failsafe: sin enviar comandos',
-            desconectado: '🔴 Desconectado',
+            conectando: ['advertencia', 'Conectando...'],
+            conectado: ['exito', 'Conectado (en tierra)'],
+            despegando: ['acento', 'Despegando...'],
+            en_vuelo: ['acento', 'En vuelo'],
+            aterrizando: ['acento', 'Aterrizando...'],
+            failsafe: ['alerta', 'Failsafe: sin enviar comandos'],
+            desconectado: ['error', 'Desconectado'],
         };
         _estadoUI = estado;
-        const span = _q('#estado-conexion');
-        if (span) span.textContent = textos[estado] || estado;
+        const [color, texto] = textos[estado] || ['', estado];
+        App.textoConPunto(_q('#estado-conexion'), color, texto);
 
         const btnAterrizar = _q('#btn-aterrizar');
         const btnEmergencia = _q('#btn-emergencia');
@@ -900,8 +901,11 @@ const Dron = (() => {
         if (!btn) return;
         const esperando = _estadoUI === 'conectado' && !_hayTelemetria();
         btn.disabled = _estadoUI !== 'conectado' || esperando;
-        const texto = esperando ? '⏳ Esperando telemetría…' : '🛫 Despegar';
-        if (btn.textContent !== texto) btn.textContent = texto;
+        const texto = esperando ? 'Esperando telemetría…' : 'Despegar';
+        if (btn.dataset.texto !== texto) {
+            App.textoConIcono(btn, esperando ? '' : 'despegar', texto);
+            btn.dataset.texto = texto;
+        }
     }
 
     function _mostrarAvisoFijo(texto) {
@@ -923,12 +927,12 @@ const Dron = (() => {
     function _mostrarSinPerfil(contenedor) {
         contenedor.innerHTML = `
         <div class="dron-pagina">
-            <h2 class="seccion-titulo mb-md">🚁 Control del Dron</h2>
+            <h2 class="seccion-titulo mb-md">Control del Dron</h2>
             <div class="tarjeta tarjeta--acento texto-centro">
-                <div style="font-size:3rem; margin-bottom: var(--espacio-md);">⚙️</div>
+                <div style="margin-bottom: var(--espacio-md);">${App.icono('engranaje', 'ico--grande')}</div>
                 <h3 class="tarjeta__titulo">No hay perfil de dron seleccionado</h3>
                 <p class="texto-sm texto-secundario mb-lg">Antes de volar, elegí un perfil en Configuración del dron.</p>
-                <a href="#/config-dron" class="btn btn--primario">🔧 Ir a Configuración del dron</a>
+                <a href="#/config-dron" class="btn btn--primario">${App.icono('llave-ajuste')} Ir a Configuración del dron</a>
             </div>
         </div>`;
     }
@@ -936,12 +940,12 @@ const Dron = (() => {
     function _mostrarError(contenedor, mensaje) {
         contenedor.innerHTML = `
         <div class="dron-pagina">
-            <h2 class="seccion-titulo mb-md">🚁 Control del Dron</h2>
+            <h2 class="seccion-titulo mb-md">Control del Dron</h2>
             <div class="tarjeta tarjeta--acento texto-centro">
-                <div style="font-size:3rem; margin-bottom: var(--espacio-md);">⚠️</div>
+                <div style="margin-bottom: var(--espacio-md);">${App.icono('alerta', 'ico--grande')}</div>
                 <h3 class="tarjeta__titulo">Error</h3>
                 <p class="texto-sm texto-secundario mb-lg">${_esc(mensaje)}</p>
-                <a href="#/config-dron" class="btn btn--primario">🔧 Ir a Configuración del dron</a>
+                <a href="#/config-dron" class="btn btn--primario">${App.icono('llave-ajuste')} Ir a Configuración del dron</a>
             </div>
         </div>`;
     }
@@ -959,14 +963,14 @@ const Dron = (() => {
         <div class="dron-pagina cabina">
             <!-- Barra superior: estado y telemetría -->
             <div class="cab-barra">
-                <button id="btn-cab-menu" class="cab-btn-menu" aria-label="Abrir menú">☰</button>
+                <button id="btn-cab-menu" class="cab-btn-menu" aria-label="Abrir menú">${App.icono('menu')}</button>
                 <div class="cab-estado">
-                    <span id="estado-conexion">🟡 Conectando...</span>
-                    <span id="estado-telemetria" class="cab-sin-tel" hidden>🟠 Sin telemetría</span>
+                    <span id="estado-conexion"><span class="punto punto--advertencia" aria-hidden="true"></span>Conectando...</span>
+                    <span id="estado-telemetria" class="cab-sin-tel" hidden><span class="punto punto--alerta" aria-hidden="true"></span>Sin telemetría</span>
                     <span class="cab-perfil">Perfil: <strong id="nombre-perfil-activo">—</strong></span>
                 </div>
                 <div class="cab-telemetria" id="panel-telemetria">
-                    <div class="cab-dato"><b><span id="tel-bateria-icono">⚪</span> <span id="tel-bateria-valor">--%</span></b><small>Batería</small></div>
+                    <div class="cab-dato"><b><span id="tel-bateria-icono" class="punto" aria-hidden="true"></span><span id="tel-bateria-valor">--%</span></b><small>Batería</small></div>
                     <div class="cab-dato"><b id="tel-altura-valor">-- cm</b><small>Altura</small></div>
                     <div class="cab-dato"><b id="tel-velocidad-valor">-- cm/s</b><small>Velocidad</small></div>
                     <div class="cab-dato"><b id="tel-tiempo-valor">-- s</b><small>Motores</small></div>
@@ -974,10 +978,11 @@ const Dron = (() => {
             </div>
 
             <!-- EMERGENCIA: fija y siempre visible -->
-            <button id="btn-emergencia" class="cab-emergencia" disabled>⛔ EMERGENCIA</button>
+            <button id="btn-emergencia" class="cab-emergencia" disabled>${App.icono('alto')} EMERGENCIA</button>
 
             <!-- Aviso fijo (por ejemplo, failsafe sin aterrizaje confirmado) -->
             <div id="cab-aviso-fijo" class="cab-aviso-fijo" role="alert" hidden>
+                ${App.icono('alerta')}
                 <span id="cab-aviso-fijo-texto"></span>
                 <button id="btn-cerrar-aviso-fijo" class="btn btn--secundario">Entendido</button>
             </div>
@@ -986,11 +991,11 @@ const Dron = (() => {
             <div class="cab-principal">
                 <div class="cab-lado cab-lado--izq">
                     <div class="cab-botones">
-                        <button id="btn-despegar" class="btn btn--primario" disabled>🛫 Despegar</button>
-                        <button id="btn-aterrizar" class="btn btn--secundario" disabled>🛬 Aterrizar</button>
+                        <button id="btn-despegar" class="btn btn--primario" disabled>${App.icono('despegar')} Despegar</button>
+                        <button id="btn-aterrizar" class="btn btn--secundario" disabled>${App.icono('aterrizar')} Aterrizar</button>
                     </div>
                     <div class="cab-joystick">
-                        <span class="cab-joy-etq">↕ Subir/bajar · ↔ Girar</span>
+                        <span class="cab-joy-etq">${App.icono('flechas-v')} Subir/bajar · ${App.icono('flechas-h')} Girar</span>
                         <div id="joystick-izquierdo"></div>
                     </div>
                 </div>
@@ -998,7 +1003,7 @@ const Dron = (() => {
                 <div class="cab-video">
                     <canvas id="canvas-video" width="960" height="720"></canvas>
                     <canvas id="canvas-seguimiento"></canvas>
-                    <div id="overlay-video-off" class="cab-video__aviso">📷 Sin señal de video</div>
+                    <div id="overlay-video-off" class="cab-video__aviso">Sin señal de video</div>
                     <div id="cab-ensayo" hidden
                         style="position:absolute; left:0.5rem; right:0.5rem; bottom:0.5rem; padding:0.25rem 0.5rem; border-radius:0.375rem; background:rgba(5,11,22,0.8); color:#fbbf24; font-size:0.75rem; font-weight:600; text-align:center; pointer-events:none;"></div>
                 </div>
@@ -1006,25 +1011,25 @@ const Dron = (() => {
                 <div class="cab-lado cab-lado--der">
                     <div class="cab-botones">
                         <button id="btn-toggle-giro" class="btn btn--secundario">🧭 Giro: OFF</button>
-                        <button id="btn-toggle-seguimiento" class="btn btn--secundario">🎯 Ensayo: OFF</button>
+                        <button id="btn-toggle-seguimiento" class="btn btn--secundario">${App.icono('objetivo')} Ensayo: OFF</button>
                     </div>
                     <div class="cab-joystick">
-                        <span class="cab-joy-etq">↕ Avanzar · ↔ Lateral</span>
+                        <span class="cab-joy-etq">${App.icono('flechas-v')} Avanzar · ${App.icono('flechas-h')} Lateral</span>
                         <div id="joystick-derecho"></div>
                     </div>
                 </div>
             </div>
 
             <div class="cab-acciones">
-                <button id="btn-reconectar" class="btn btn--primario" hidden>🔄 Reconectar</button>
-                <button id="btn-calibrar-giro" class="btn btn--secundario">🎯 Calibrar giro</button>
-                <button id="btn-copiar-registro-seg" class="btn btn--secundario" hidden>📋 Copiar registro</button>
-                <button id="btn-ir-config-dron" class="btn btn--secundario">🔧 Config. dron</button>
+                <button id="btn-reconectar" class="btn btn--primario" hidden>${App.icono('recargar')} Reconectar</button>
+                <button id="btn-calibrar-giro" class="btn btn--secundario">${App.icono('objetivo')} Calibrar giro</button>
+                <button id="btn-copiar-registro-seg" class="btn btn--secundario" hidden>${App.icono('copiar')} Copiar registro</button>
+                <button id="btn-ir-config-dron" class="btn btn--secundario">${App.icono('llave-ajuste')} Config. dron</button>
             </div>
 
             <!-- Movimientos por paso -->
             <section class="cab-panel">
-                <h3 class="cab-panel__titulo">🎯 Movimientos por paso</h3>
+                <h3 class="cab-panel__titulo">Movimientos por paso</h3>
                 <div class="cab-opciones">
                     <label>Distancia
                         <select id="sel-paso-distancia" class="cab-select">
@@ -1045,39 +1050,39 @@ const Dron = (() => {
                 <div class="cab-pasos">
                     <div class="cab-cruz">
                         <span></span>
-                        <button id="btn-paso-adelante" class="btn btn--secundario" aria-label="Adelante">▲</button>
+                        <button id="btn-paso-adelante" class="btn btn--secundario" aria-label="Adelante">${App.icono('tri-arriba')}</button>
                         <span></span>
-                        <button id="btn-paso-izquierda" class="btn btn--secundario" aria-label="Izquierda">◄</button>
-                        <button id="btn-paso-frenar" class="btn btn--peligro" aria-label="Frenar">⏹</button>
-                        <button id="btn-paso-derecha" class="btn btn--secundario" aria-label="Derecha">►</button>
+                        <button id="btn-paso-izquierda" class="btn btn--secundario" aria-label="Izquierda">${App.icono('tri-izq')}</button>
+                        <button id="btn-paso-frenar" class="btn btn--peligro" aria-label="Frenar">${App.icono('detener')}</button>
+                        <button id="btn-paso-derecha" class="btn btn--secundario" aria-label="Derecha">${App.icono('tri-der')}</button>
                         <span></span>
-                        <button id="btn-paso-atras" class="btn btn--secundario" aria-label="Atrás">▼</button>
+                        <button id="btn-paso-atras" class="btn btn--secundario" aria-label="Atrás">${App.icono('tri-abajo')}</button>
                         <span></span>
                     </div>
                     <div class="cab-pasos__extra">
-                        <button id="btn-paso-subir" class="btn btn--secundario">🔼 Subir</button>
-                        <button id="btn-paso-bajar" class="btn btn--secundario">🔽 Bajar</button>
-                        <button id="btn-paso-girar-izq" class="btn btn--secundario">↺ Girar izq.</button>
-                        <button id="btn-paso-girar-der" class="btn btn--secundario">↻ Girar der.</button>
+                        <button id="btn-paso-subir" class="btn btn--secundario">${App.icono('chevron-arriba')} Subir</button>
+                        <button id="btn-paso-bajar" class="btn btn--secundario">${App.icono('chevron-abajo')} Bajar</button>
+                        <button id="btn-paso-girar-izq" class="btn btn--secundario">${App.icono('girar-izq')} Girar izq.</button>
+                        <button id="btn-paso-girar-der" class="btn btn--secundario">${App.icono('girar-der')} Girar der.</button>
                     </div>
                 </div>
-                <p id="estado-paso-texto" class="cab-panel__estado">Listo para comandos. ⏹ = freno (rc 0 0 0 0).</p>
+                <p id="estado-paso-texto" class="cab-panel__estado">Listo para comandos. El botón rojo del centro frena (rc 0 0 0 0).</p>
             </section>
 
             <!-- Misiones -->
             <section class="cab-panel">
-                <h3 class="cab-panel__titulo">📜 Misiones</h3>
+                <h3 class="cab-panel__titulo">Misiones</h3>
                 <div class="cab-mision">
                     <select id="sel-mision-activa" class="cab-select" aria-label="Misión"></select>
-                    <button id="btn-ejecutar-mision" class="btn btn--primario">▶ Iniciar</button>
-                    <button id="btn-cancelar-mision" class="btn btn--peligro" hidden>⛔ Cancelar misión</button>
-                    <button id="btn-nueva-mision" class="btn btn--secundario">+ Nueva</button>
+                    <button id="btn-ejecutar-mision" class="btn btn--primario">${App.icono('play')} Iniciar</button>
+                    <button id="btn-cancelar-mision" class="btn btn--peligro" hidden>${App.icono('alto')} Cancelar misión</button>
+                    <button id="btn-nueva-mision" class="btn btn--secundario">${App.icono('mas')} Nueva</button>
                 </div>
                 <div id="info-mision-pasos" class="cab-panel__estado"></div>
             </section>
 
             <p class="cab-nota">
-                🛡️ Vuelo supervisado obligatorio, con al menos 3×3 m libres de personas. Giroscopio y seguimiento arrancan apagados.
+                ${App.icono('escudo')} Vuelo supervisado obligatorio, con al menos 3×3 m libres de personas. Giroscopio y seguimiento arrancan apagados.
                 El seguimiento visual es EXPERIMENTAL: por ahora funciona solo en ensayo (muestra los comandos, no los envía).
             </p>
         </div>`;

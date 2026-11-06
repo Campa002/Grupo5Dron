@@ -187,12 +187,12 @@ const ConfigDron = (() => {
         <div class="config-dron-pagina">
             <div class="flex justify-between items-center mb-md flex-wrap gap-sm">
                 <div>
-                    <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">🔧 Configuración del dron</h2>
+                    <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">Configuración del dron</h2>
                     <p class="texto-sm texto-secundario">
                         Elegí el perfil que usa la cabina. Los perfiles se guardan en el teléfono para funcionar sin internet.
                     </p>
                 </div>
-                ${permisos.editar ? `<button id="btn-nuevo-perfil" class="btn btn--primario">➕ Nuevo perfil</button>` : ''}
+                ${permisos.editar ? `<button id="btn-nuevo-perfil" class="btn btn--primario">${App.icono('mas')} Nuevo perfil</button>` : ''}
             </div>
 
             <p id="config-dron-origen" class="texto-xs texto-secundario mb-md" hidden></p>
@@ -200,7 +200,7 @@ const ConfigDron = (() => {
 
             <!-- Failsafe configurable -->
             <div class="tarjeta mt-lg">
-                <h3 class="texto-sm texto-secundario" style="font-weight:600; margin-bottom: var(--espacio-xs);">⏱️ Failsafe de seguridad (telemetría UDP 8890)</h3>
+                <h3 class="texto-sm texto-secundario" style="font-weight:600; margin-bottom: var(--espacio-xs);">Failsafe de seguridad (telemetría UDP 8890)</h3>
                 <p class="texto-xs texto-secundario" style="margin-bottom: var(--espacio-sm);">
                     Tiempo máximo sin recibir telemetría antes de frenar y aterrizar automáticamente.
                 </p>
@@ -254,13 +254,13 @@ const ConfigDron = (() => {
         <div class="tarjeta tarjeta-perfil ${esActivo ? 'tarjeta--acento' : ''}" data-id="${_esc(id)}">
             <div class="flex justify-between items-center mb-md">
                 <div class="flex items-center gap-sm">
-                    <span style="font-size:1.75rem;">${esTello ? '🛸' : '🎮'}</span>
+                    <span style="font-size:1.5rem; line-height:1; color: var(--color-celeste);">${App.icono(esTello ? 'dron' : 'simulador')}</span>
                     <h3 class="tarjeta__titulo" style="margin:0;">${_esc(perfil.nombre)}</h3>
                 </div>
                 ${editable && (permisos.editar || permisos.eliminar) ? `
                 <div class="flex gap-sm">
-                    ${permisos.editar ? `<button class="btn btn--secundario btn--icono btn-editar-perfil" data-id="${_esc(id)}" aria-label="Editar perfil">✏️</button>` : ''}
-                    ${permisos.eliminar ? `<button class="btn btn--secundario btn--icono btn-eliminar-perfil" data-id="${_esc(id)}" data-nombre="${_esc(perfil.nombre)}" aria-label="Eliminar perfil">🗑️</button>` : ''}
+                    ${permisos.editar ? `<button class="btn btn--secundario btn--icono btn-editar-perfil" data-id="${_esc(id)}" aria-label="Editar perfil">${App.icono('editar')}</button>` : ''}
+                    ${permisos.eliminar ? `<button class="btn btn--secundario btn--icono btn-eliminar-perfil" data-id="${_esc(id)}" data-nombre="${_esc(perfil.nombre)}" aria-label="Eliminar perfil">${App.icono('borrar')}</button>` : ''}
                 </div>` : ''}
             </div>
             <div class="flex gap-sm flex-wrap mb-md">
@@ -270,7 +270,7 @@ const ConfigDron = (() => {
             ${perfil.descripcion ? `<p class="texto-sm texto-secundario mb-md">${_esc(perfil.descripcion)}</p>` : ''}
             ${esTello ? `<p class="texto-xs texto-secundario mb-md">IP: <code>${_esc(p.ip)}</code> · Puerto de comandos: <code>${_esc(String(p.puerto_comando))}</code></p>` : ''}
             <button class="btn ${esActivo ? 'btn--secundario' : 'btn--primario'} btn--bloque btn-seleccionar-perfil" data-id="${_esc(id)}" ${esActivo ? 'disabled' : ''}>
-                ${esActivo ? '✓ Seleccionado' : 'Seleccionar'}
+                ${esActivo ? App.icono('check') + ' Seleccionado' : 'Seleccionar'}
             </button>
         </div>`;
     }
@@ -349,7 +349,7 @@ const ConfigDron = (() => {
             <div id="error-form-perfil" class="advertencia-seguridad" style="display:none;"></div>
             <div class="flex gap-sm mt-md" style="justify-content:flex-end;">
                 <button type="button" id="btn-cancelar-perfil" class="btn btn--secundario">Cancelar</button>
-                <button type="submit" class="btn btn--primario" id="btn-guardar-perfil">${perfil ? '💾 Guardar cambios' : '➕ Crear perfil'}</button>
+                <button type="submit" class="btn btn--primario" id="btn-guardar-perfil">${perfil ? App.icono('guardar') + ' Guardar cambios' : App.icono('mas') + ' Crear perfil'}</button>
             </div>
         </form>`;
     }
@@ -398,7 +398,7 @@ const ConfigDron = (() => {
         } catch (err) {
             mostrarError('No se pudo guardar: ' + (err.message || 'error desconocido'));
             btnGuardar.disabled = false;
-            btnGuardar.textContent = idExistente ? '💾 Guardar cambios' : '➕ Crear perfil';
+            App.textoConIcono(btnGuardar, idExistente ? 'guardar' : 'mas', idExistente ? 'Guardar cambios' : 'Crear perfil');
         }
     }
 
@@ -432,7 +432,7 @@ const ConfigDron = (() => {
         for (const [clave, r] of Object.entries(R)) (grupos[r.grupo] = grupos[r.grupo] || []).push([clave, r]);
 
         caja.innerHTML = `
-            <h3 class="texto-sm texto-secundario" style="font-weight:600; margin-bottom: var(--espacio-xs);">🎯 Ajustes del seguimiento</h3>
+            <h3 class="texto-sm texto-secundario" style="font-weight:600; margin-bottom: var(--espacio-xs);">Ajustes del seguimiento</h3>
             <p class="texto-xs texto-secundario mb-md">
                 Se guardan en este teléfono y se aplican la próxima vez que actives el ensayo.
                 Por ahora el seguimiento funciona solo en ensayo (no envía comandos al dron).

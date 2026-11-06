@@ -89,9 +89,9 @@ const Admin = (() => {
                                     <td>${(d.botones || []).length} botones</td>
                                     <td><span class="badge badge--${d.activo ? 'exito' : 'error'}">${d.activo ? 'Activo' : 'Inactivo'}</span></td>
                                     <td>
-                                        <button class="btn btn--secundario btn--icono" onclick="Admin.editarDispositivo(${d.id})" title="Editar">✏️</button>
-                                        <button class="btn btn--secundario btn--icono" onclick="Admin.gestionarBotones(${d.id})" title="Botones">🎛️</button>
-                                        <button class="btn btn--peligro btn--icono" onclick="Admin.eliminarDispositivo(${d.id})" title="Eliminar">🗑️</button>
+                                        <button class="btn btn--secundario btn--icono" onclick="Admin.editarDispositivo(${d.id})" title="Editar" aria-label="Editar"><span class="ico ico--editar" aria-hidden="true"></span></button>
+                                        <button class="btn btn--secundario btn--icono" onclick="Admin.gestionarBotones(${d.id})" title="Botones" aria-label="Botones"><span class="ico ico--aula" aria-hidden="true"></span></button>
+                                        <button class="btn btn--peligro btn--icono" onclick="Admin.eliminarDispositivo(${d.id})" title="Eliminar" aria-label="Eliminar"><span class="ico ico--borrar" aria-hidden="true"></span></button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -124,11 +124,11 @@ const Admin = (() => {
                         <div class="campo">
                             <label class="campo__label" for="disp-tipo">Tipo</label>
                             <select class="campo__input" id="disp-tipo">
-                                <option value="luz" ${datosExistentes?.tipo === 'luz' ? 'selected' : ''}>💡 Luz</option>
-                                <option value="ventilador" ${datosExistentes?.tipo === 'ventilador' ? 'selected' : ''}>🌀 Ventilador</option>
-                                <option value="aire" ${datosExistentes?.tipo === 'aire' ? 'selected' : ''}>❄️ Aire acondicionado</option>
-                                <option value="proyector" ${datosExistentes?.tipo === 'proyector' ? 'selected' : ''}>📽️ Proyector</option>
-                                <option value="otro" ${datosExistentes?.tipo === 'otro' ? 'selected' : ''}>🔌 Otro</option>
+                                <option value="luz" ${datosExistentes?.tipo === 'luz' ? 'selected' : ''}>Luz</option>
+                                <option value="ventilador" ${datosExistentes?.tipo === 'ventilador' ? 'selected' : ''}>Ventilador</option>
+                                <option value="aire" ${datosExistentes?.tipo === 'aire' ? 'selected' : ''}>Aire acondicionado</option>
+                                <option value="proyector" ${datosExistentes?.tipo === 'proyector' ? 'selected' : ''}>Proyector</option>
+                                <option value="otro" ${datosExistentes?.tipo === 'otro' ? 'selected' : ''}>Otro</option>
                             </select>
                         </div>
                         <div class="campo">
@@ -237,8 +237,8 @@ const Admin = (() => {
                                             }
                                         </div>
                                         <div class="flex gap-sm">
-                                            <button class="btn btn--secundario btn--icono" onclick="Aula.activarAprendizaje(${b.id})" title="Aprender IR">📡</button>
-                                            <button class="btn btn--peligro btn--icono" onclick="Admin.eliminarBoton(${b.id}, ${dispositivoId})" title="Eliminar">🗑️</button>
+                                            <button class="btn btn--secundario btn--icono" onclick="Aula.activarAprendizaje(${b.id})" title="Aprender IR" aria-label="Aprender IR"><span class="ico ico--senal" aria-hidden="true"></span></button>
+                                            <button class="btn btn--peligro btn--icono" onclick="Admin.eliminarBoton(${b.id}, ${dispositivoId})" title="Eliminar" aria-label="Eliminar"><span class="ico ico--borrar" aria-hidden="true"></span></button>
                                         </div>
                                     </div>
                                 </div>
@@ -345,7 +345,7 @@ const Admin = (() => {
                                     <td><span class="badge badge--info">${u.rol}</span></td>
                                     <td><span class="badge badge--${u.activo ? 'exito' : 'error'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
                                     <td>
-                                        <button class="btn btn--secundario btn--icono" onclick="Admin.eliminarUsuario(${u.id})" title="Desactivar">🚫</button>
+                                        <button class="btn btn--secundario btn--icono" onclick="Admin.eliminarUsuario(${u.id})" title="Desactivar" aria-label="Desactivar"><span class="ico ico--prohibido" aria-hidden="true"></span></button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -439,9 +439,9 @@ const Admin = (() => {
                 <h3 class="mb-md">Configuración del sistema</h3>
 
                 <div class="tarjeta mb-md">
-                    <div class="tarjeta__titulo">⚡ Control de relé 220V</div>
+                    <div class="tarjeta__titulo">Control de relé 220V</div>
                     <div class="advertencia-seguridad">
-                        <span class="advertencia-seguridad__icono">⚠️</span>
+                        <span class="advertencia-seguridad__icono"><span class="ico ico--alerta" aria-hidden="true"></span></span>
                         <div>
                             <strong>Requiere supervisión docente y medidas de seguridad eléctrica.</strong>
                             <p class="texto-xs mt-sm">El control de un circuito de 220V mediante relé involucra riesgo eléctrico. Solo activar bajo supervisión de un docente calificado.</p>
@@ -455,7 +455,7 @@ const Admin = (() => {
                 </div>
 
                 <div class="tarjeta mb-md">
-                    <div class="tarjeta__titulo">🔧 Parámetros del ESP32</div>
+                    <div class="tarjeta__titulo">Parámetros del ESP32</div>
                     <div class="campo">
                         <label class="campo__label">Intervalo de polling (ms)</label>
                         <input class="campo__input" id="cfg-polling" type="number" value="${valores.polling_intervalo_ms || 1000}" min="500" max="10000">
@@ -467,7 +467,7 @@ const Admin = (() => {
                 </div>
 
                 <div class="tarjeta mb-md">
-                    <div class="tarjeta__titulo">🎮 Giroscopio</div>
+                    <div class="tarjeta__titulo">Giroscopio</div>
                     <div class="campo">
                         <label class="campo__label">Zona muerta (grados)</label>
                         <input class="campo__input" id="cfg-zona-muerta" type="number" value="${valores.giroscopio_zona_muerta || 5}" min="1" max="30">
@@ -489,7 +489,7 @@ const Admin = (() => {
         try {
             if (habilitado) {
                 const confirmado = confirm(
-                    '⚠️ ADVERTENCIA DE SEGURIDAD ⚠️\n\n' +
+                    'ADVERTENCIA DE SEGURIDAD\n\n' +
                     'Estás por habilitar el control de un circuito de 220V.\n' +
                     'Esto SOLO debe hacerse bajo supervisión docente y con las medidas de seguridad eléctrica adecuadas.\n\n' +
                     '¿Confirmar activación?'

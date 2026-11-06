@@ -14,15 +14,15 @@ const Aula = (() => {
 
     // Mapa de iconos para tipos de dispositivo
     const ICONOS_TIPO = {
-        luz: '💡', ventilador: '🌀', aire: '❄️',
-        proyector: '📽️', otro: '🔌', dispositivo: '🎛️',
+        luz: '<span class="ico ico--luz" aria-hidden="true"></span>', ventilador: '<span class="ico ico--ventilador" aria-hidden="true"></span>', aire: '<span class="ico ico--copo" aria-hidden="true"></span>',
+        proyector: '<span class="ico ico--proyector" aria-hidden="true"></span>', otro: '<span class="ico ico--enchufe" aria-hidden="true"></span>', dispositivo: '<span class="ico ico--aula" aria-hidden="true"></span>',
     };
     const ICONOS_BOTON = {
-        'power-on': '🟢', 'power-off': '🔴', 'temp-up': '🔼',
-        'temp-down': '🔽', 'speed-up': '⏫', 'speed-down': '⏬',
-        'volume-up': '🔊', 'volume-down': '🔉', 'mute': '🔇',
-        'cold': '❄️', 'hot': '🔥', 'fan': '🌀',
-        'hdmi': '📺', 'vga': '🖥️', 'boton': '⚡',
+        'power-on': '<span class="ico ico--encender texto-exito" aria-hidden="true"></span>', 'power-off': '<span class="ico ico--encender texto-error" aria-hidden="true"></span>', 'temp-up': '<span class="ico ico--chevron-arriba" aria-hidden="true"></span>',
+        'temp-down': '<span class="ico ico--chevron-abajo" aria-hidden="true"></span>', 'speed-up': '<span class="ico ico--doble-arriba" aria-hidden="true"></span>', 'speed-down': '<span class="ico ico--doble-abajo" aria-hidden="true"></span>',
+        'volume-up': '<span class="ico ico--volumen-mas" aria-hidden="true"></span>', 'volume-down': '<span class="ico ico--volumen-menos" aria-hidden="true"></span>', 'mute': '<span class="ico ico--silencio" aria-hidden="true"></span>',
+        'cold': '<span class="ico ico--copo" aria-hidden="true"></span>', 'hot': '<span class="ico ico--fuego" aria-hidden="true"></span>', 'fan': '<span class="ico ico--ventilador" aria-hidden="true"></span>',
+        'hdmi': '<span class="ico ico--tele" aria-hidden="true"></span>', 'vga': '<span class="ico ico--pantalla" aria-hidden="true"></span>', 'boton': '<span class="ico ico--rayo" aria-hidden="true"></span>',
     };
 
     /**
@@ -68,14 +68,14 @@ const Aula = (() => {
                         <div class="dispositivo__nombre">${disp.nombre}</div>
                         <div class="dispositivo__tipo">${disp.tipo}</div>
                     </div>
-                    <span class="dispositivo__flecha">▼</span>
+                    <span class="dispositivo__flecha"><span class="ico ico--chevron-abajo" aria-hidden="true"></span></span>
                 </div>
                 <div class="dispositivo__botones">
                     ${(disp.botones || []).map((btn) => `
                         <button class="dispositivo__btn ${!btn.tiene_codigo_ir ? 'dispositivo__btn--sin-codigo' : ''}"
                                 onclick="Aula.enviarComando(${btn.id}, ${disp.id})"
                                 title="${btn.tiene_codigo_ir ? 'Enviar comando' : 'Sin código IR asignado'}">
-                            <span class="dispositivo__btn-icono">${ICONOS_BOTON[btn.icono] || '⚡'}</span>
+                            <span class="dispositivo__btn-icono">${ICONOS_BOTON[btn.icono] || '<span class="ico ico--rayo" aria-hidden="true"></span>'}</span>
                             <span class="dispositivo__btn-nombre">${btn.nombre}</span>
                         </button>
                     `).join('')}
@@ -104,7 +104,7 @@ const Aula = (() => {
                 boton_id: botonId,
             });
 
-            App.mostrarToast('Comando enviado ✓', 'exito');
+            App.mostrarToast('Comando enviado', 'exito');
 
             // Seguir el estado del comando
             seguirEstadoComando(respuesta.comando_id);
@@ -181,10 +181,10 @@ const Aula = (() => {
 
                 if (estado === 'ejecutado') {
                     clearInterval(intervalo);
-                    App.mostrarToast('✓ Comando ejecutado correctamente', 'exito');
+                    App.mostrarToast('Comando ejecutado correctamente', 'exito');
                 } else if (estado === 'error') {
                     clearInterval(intervalo);
-                    App.mostrarToast(`✗ Error: ${resp.comando.resultado || 'Error desconocido'}`, 'error');
+                    App.mostrarToast(`Error: ${resp.comando.resultado || 'Error desconocido'}`, 'error');
                 }
             } catch (e) {
                 // Ignorar errores de seguimiento
@@ -231,7 +231,7 @@ const Aula = (() => {
             if (infoEsp && estado) {
                 infoEsp.innerHTML = `
                     <span class="badge badge--${estado.en_linea ? 'exito' : 'error'}">
-                        ${estado.en_linea ? '🟢 En línea' : '🔴 Desconectado'}
+                        ${estado.en_linea ? '<span class="punto punto--exito" aria-hidden="true"></span>En línea' : '<span class="punto punto--error" aria-hidden="true"></span>Desconectado'}
                     </span>
                     ${estado.ip_local ? `<span class="texto-xs texto-secundario">IP: ${estado.ip_local}</span>` : ''}
                     ${estado.modo_aprendizaje ? '<span class="badge badge--advertencia">Modo aprendizaje</span>' : ''}

@@ -3,21 +3,21 @@
     <div class="flex justify-between items-center mb-md flex-wrap gap-sm">
         <div>
             <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">
-                📡 Diagnóstico de Sensores
+                Diagnóstico de Sensores
             </h2>
             <p class="texto-sm texto-secundario">
                 Verificación de los sensores del dispositivo necesarios para operar el dron.
             </p>
         </div>
         <button id="btn-diagnosticar-sensores" class="btn btn--primario">
-            🔍 Ejecutar diagnóstico
+            <span class="ico ico--buscar" aria-hidden="true"></span> Ejecutar diagnóstico
         </button>
     </div>
 
     <!-- Aviso de privacidad -->
     <div class="tarjeta tarjeta--acento mb-md" style="padding: var(--espacio-sm) var(--espacio-md);">
         <p class="texto-xs texto-secundario">
-            ℹ️ El diagnóstico verifica la disponibilidad de los sensores sin transmitir datos personales.
+            <span class="ico ico--info" aria-hidden="true"></span> El diagnóstico verifica la disponibilidad de los sensores sin transmitir datos personales.
             La solicitud de permisos (GPS, cámara) se realiza sólo si ya fueron otorgados previamente;
             en caso contrario, sólo se reporta el estado como "pendiente".
         </p>
@@ -41,12 +41,12 @@
             </div>
         </div>
         <p id="giro-estado" class="texto-xs texto-secundario mb-sm">Preparando el sensor...</p>
-        <button id="btn-giro-vivo" class="btn btn--secundario" hidden>▶ Ver lectura en vivo</button>
+        <button id="btn-giro-vivo" class="btn btn--secundario" hidden><span class="ico ico--play" aria-hidden="true"></span> Ver lectura en vivo</button>
     </div>
 
     <!-- Demo del seguimiento con la cámara del celular (misma lógica que la cabina, en ensayo) -->
     <div class="sensor-panel" id="panel-demo-seguimiento">
-        <div class="sensor-panel__titulo">🎯 Demo de seguimiento con la cámara</div>
+        <div class="sensor-panel__titulo">Demo de seguimiento con la cámara</div>
         <p class="texto-xs texto-secundario mb-sm">
             Usa la cámara del celular con la misma lógica que la cabina, en modo ensayo: detecta a la persona,
             calcula el giro, la altura y el avance que mandaría al dron, y los muestra. No necesita el dron.
@@ -61,8 +61,8 @@
                 style="position:absolute; left:0.5rem; right:0.5rem; bottom:0.5rem; padding:0.25rem 0.5rem; border-radius:0.375rem; background:rgba(5,11,22,0.8); color:#fbbf24; font-size:0.75rem; font-weight:600; text-align:center; pointer-events:none;"></div>
         </div>
         <div class="flex gap-sm flex-wrap">
-            <button id="btn-demo-seg" class="btn btn--primario">▶ Probar con la cámara</button>
-            <button id="btn-demo-seg-copiar" class="btn btn--secundario" hidden>📋 Copiar registro</button>
+            <button id="btn-demo-seg" class="btn btn--primario"><span class="ico ico--play" aria-hidden="true"></span> Probar con la cámara</button>
+            <button id="btn-demo-seg-copiar" class="btn btn--secundario" hidden><span class="ico ico--copiar" aria-hidden="true"></span> Copiar registro</button>
         </div>
         <p id="demo-seg-estado" class="texto-xs texto-secundario mt-sm"></p>
     </div>

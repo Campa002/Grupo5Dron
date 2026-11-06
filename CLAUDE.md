@@ -134,6 +134,7 @@ docs/contexto/    informe, historial, reportes
   - el seguimiento está SOLO EN ENSAYO (calcula y muestra, no envía) hasta la etapa S3, después de la primera prueba con el Tello;
   - el aterrizaje al salir de la cabina en vuelo.
 - Interfaz en español, tema oscuro con azul institucional, sin violetas.
+- Sin emojis en la interfaz (el único que queda es 🧭 del giroscopio). Íconos: SVG propios en `app.css` (bloque "ÍCONOS PROPIOS", clases `.ico .ico--nombre`, color `currentColor`), desde JS con `App.icono(nombre)`, `App.textoConIcono(el, nombre, texto)` y `App.textoConPunto(el, color, texto)` para estados. Íconos decorativos con `aria-hidden` y siempre con texto visible o `aria-label`.
 - Git: Luciano hace commit y push salvo que te pida lo contrario. Nunca uses `git push --force` ni `git reset --hard`.
 - No escribas documentación final salvo que te lo pida (se hace al final del proyecto).
 - Al terminar una tarea, separá siempre: qué verificaste de verdad, qué solo está escrito y qué necesita el dron o un Android real.

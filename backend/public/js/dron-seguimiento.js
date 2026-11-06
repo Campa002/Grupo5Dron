@@ -16,7 +16,7 @@
  * Coordenadas: todo normalizado a [0, 1] respecto de la imagen (x, y = esquina superior izquierda).
  * Comandos: yaw, ud (throttle) y fb (pitch) en [-1, 1] (×100 = valor del comando "rc" del Tello).
  *
- * ⚠ Por ahora la cabina lo usa SOLO EN ENSAYO (calcula y muestra, no envía). El control real es la etapa S3.
+ * IMPORTANTE: por ahora la cabina lo usa SOLO EN ENSAYO (calcula y muestra, no envía). El control real es la etapa S3.
  */
 
 // eslint-disable-next-line no-unused-vars
@@ -221,7 +221,7 @@ const DronSeguimiento = (() => {
 
     // ================================================================
     // Selector de objetivo (puro): por clase, con objetivo fijo
-    // Estados: 'buscando' → 'siguiendo' ⇄ 'perdiendo' → 'perdido'
+    // Estados: 'buscando' → 'siguiendo' <-> 'perdiendo' → 'perdido'
     // ================================================================
     class Selector {
         constructor(ajustes) {
@@ -728,14 +728,14 @@ const DronSeguimiento = (() => {
             const ahora = performance.now();
             if (!forzar && ahora - this._ultimo < 200) return; // 5 veces por segundo alcanza
             this._ultimo = ahora;
-            const backend = info.backend === 'webgl' ? 'WebGL' : `⚠ ${String(info.backend || '?').toUpperCase()} (lento)`;
+            const backend = info.backend === 'webgl' ? 'WebGL' : `${String(info.backend || '?').toUpperCase()} (lento)`;
             const nombres = { buscando: 'buscando', siguiendo: 'siguiendo', perdiendo: 'perdiéndola', perdido: 'perdida', apagado: 'apagado' };
             const cond = info.condiciones;
             const lineaReal = !cond ? '' : cond.ok ? 'Control real (S3): se cumplen las condiciones'
-                : `Control real (S3): falta → ${cond.motivos[0]}${cond.motivos.length > 1 ? ` (+${cond.motivos.length - 1})` : ''}`;
+                : `Control real (S3): falta ${cond.motivos[0]}${cond.motivos.length > 1 ? ` (+${cond.motivos.length - 1})` : ''}`;
             const demora = info.edadMs !== null ? ` · hace ${info.edadMs} ms` : '';
             const lineas = [
-                `🧠 ${backend} · ${info.fps} FPS · ${info.inferenciaMs ?? '--'} ms${demora}`,
+                `Visión: ${backend} · ${info.fps} FPS · ${info.inferenciaMs ?? '--'} ms${demora}`,
                 `Estado: ${nombres[info.estado] || info.estado} · personas: ${info.candidatos}`,
                 lineaReal,
             ].filter(Boolean);

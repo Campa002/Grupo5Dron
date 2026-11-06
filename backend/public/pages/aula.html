@@ -2,7 +2,7 @@
     <div class="flex justify-between items-center mb-md flex-wrap gap-sm">
         <div>
             <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">
-                🎛️ Control del Aula
+                Control del Aula
             </h2>
             <p class="texto-sm texto-secundario">
                 Comandos IR y relé para equipamiento del salón
@@ -10,7 +10,7 @@
         </div>
         <div class="flex items-center gap-sm">
             <button class="btn btn--secundario" onclick="Aula.cargarDispositivos()" title="Recargar dispositivos">
-                🔄 Actualizar
+                <span class="ico ico--recargar" aria-hidden="true"></span> Actualizar
             </button>
         </div>
     </div>
@@ -21,7 +21,7 @@
             <div class="flex items-center gap-sm">
                 <span class="texto-sm" style="font-weight: 600;">ESP32 Aula:</span>
                 <div id="info-esp32" class="flex items-center gap-sm">
-                    <span class="badge badge--error">🔴 Verificando...</span>
+                    <span class="badge badge--error"><span class="punto punto--error" aria-hidden="true"></span>Verificando...</span>
                 </div>
             </div>
             <div class="texto-xs texto-secundario">
@@ -33,7 +33,7 @@
     <!-- Control directo de Relé (Canal 1 - GPIO26 / Canal 2 - GPIO27) -->
     <div class="tarjeta mb-md">
         <div class="flex justify-between items-center mb-sm">
-            <div class="tarjeta__titulo" style="margin-bottom: 0;">⚡ Relé de Potencia 220V</div>
+            <div class="tarjeta__titulo" style="margin-bottom: 0;">Relé de Potencia 220V</div>
             <span class="badge badge--advertencia">Requiere Supervisión Docente</span>
         </div>
         <p class="texto-xs texto-secundario mb-md">
@@ -41,16 +41,16 @@
         </p>
         <div class="flex flex-wrap gap-sm">
             <button class="btn btn--exito" onclick="Aula.enviarComandoRele('encender', 1)">
-                🟢 Encender Canal 1
+                <span class="ico ico--encender" aria-hidden="true"></span> Encender Canal 1
             </button>
             <button class="btn btn--peligro" onclick="Aula.enviarComandoRele('apagar', 1)">
-                🔴 Apagar Canal 1
+                <span class="ico ico--encender" aria-hidden="true"></span> Apagar Canal 1
             </button>
             <button class="btn btn--secundario solo-docente" onclick="Aula.enviarComandoRele('encender', 2)">
-                🟢 Encender Canal 2
+                <span class="ico ico--encender" aria-hidden="true"></span> Encender Canal 2
             </button>
             <button class="btn btn--secundario solo-docente" onclick="Aula.enviarComandoRele('apagar', 2)">
-                🔴 Apagar Canal 2
+                <span class="ico ico--encender" aria-hidden="true"></span> Apagar Canal 2
             </button>
         </div>
     </div>

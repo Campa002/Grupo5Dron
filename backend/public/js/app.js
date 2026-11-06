@@ -38,18 +38,18 @@ const App = (() => {
         if (!contenedor) return;
 
         const iconos = {
-            exito: '✓',
-            error: '✗',
-            advertencia: '⚠️',
-            info: 'ℹ️',
+            exito: 'check',
+            error: 'cruz',
+            advertencia: 'alerta',
+            info: 'info',
         };
 
         // Texto plano (textContent): un mensaje que venga del servidor no puede inyectar HTML
         const toast = document.createElement('div');
         toast.className = `toast toast--${tipo}`;
         const icono = document.createElement('span');
-        icono.className = 'toast__icono';
-        icono.textContent = iconos[tipo] || '⚡';
+        icono.className = `toast__icono ico ico--${iconos[tipo] || 'info'}`;
+        icono.setAttribute('aria-hidden', 'true');
         const texto = document.createElement('span');
         texto.className = 'toast__texto';
         texto.textContent = mensaje;
@@ -131,7 +131,7 @@ const App = (() => {
         } catch (error) {
             return `
                 <div class="tarjeta texto-centro" style="padding: var(--espacio-2xl) var(--espacio-md);">
-                    <div style="font-size: 3rem; margin-bottom: var(--espacio-sm);">⚠️</div>
+                    <div style="margin-bottom: var(--espacio-sm);">${icono('alerta', 'ico--grande')}</div>
                     <h3 class="mb-sm">Error cargando la página</h3>
                     <p class="texto-sm texto-secundario mb-lg">${error.message}</p>
                     <button class="btn btn--primario" onclick="App.cargarRutaActual()">Reintentar</button>
@@ -267,7 +267,7 @@ const App = (() => {
             if (indicadorEsp) indicadorEsp.style.display = invitado ? 'none' : 'flex';
             if (indicadorOffline) {
                 const texto = invitado ? 'Sin cuenta' : 'Modo sin conexión';
-                if (iconoOffline) iconoOffline.textContent = invitado ? '🚁' : '📡';
+                if (iconoOffline) iconoOffline.className = `ico ico--${invitado ? 'dron' : 'senal'}`;
                 if (textoOffline) textoOffline.textContent = texto;
                 indicadorOffline.title = texto;
                 indicadorOffline.setAttribute('aria-label', texto);
@@ -275,7 +275,7 @@ const App = (() => {
             }
         }
         const enlaceSesion = document.getElementById('btn-cerrar-sesion');
-        if (enlaceSesion) enlaceSesion.textContent = invitado ? '🔑 Iniciar sesión' : '🚪 Cerrar sesión';
+        textoConIcono(enlaceSesion, invitado ? 'llave' : 'salir', invitado ? 'Iniciar sesión' : 'Cerrar sesión');
     }
 
     /**
@@ -392,7 +392,7 @@ const App = (() => {
         if (!usuario && Auth.esModoInvitado()) {
             if (elemNombre) elemNombre.textContent = 'invitado/a';
             if (elemRol) {
-                elemRol.textContent = '🚁 Sin cuenta';
+                elemRol.textContent = 'Sin cuenta';
                 elemRol.className = 'badge badge--info';
             }
             const accesoAula = document.getElementById('inicio-acceso-aula');
@@ -412,9 +412,9 @@ const App = (() => {
 
         if (elemRol && usuario) {
             const etiquetasRol = {
-                admin: '👑 Administrador',
-                docente: '👨‍🏫 Docente',
-                usuario: '🎒 Estudiante',
+                admin: 'Administrador',
+                docente: 'Docente',
+                usuario: 'Estudiante',
             };
             elemRol.textContent = etiquetasRol[usuario.rol] || usuario.rol;
             elemRol.className = `badge badge--${usuario.rol === 'admin' ? 'advertencia' : (usuario.rol === 'docente' ? 'info' : 'exito')}`;
@@ -433,7 +433,7 @@ const App = (() => {
                 if (estado && estado.en_linea) {
                     elemEsp32.innerHTML = `
                         <div class="flex items-center gap-sm mt-xs">
-                            <span class="badge badge--exito">🟢 En línea</span>
+                            <span class="badge badge--exito"><span class="punto punto--exito" aria-hidden="true"></span>En línea</span>
                             <span>IP: <code>${estado.ip_local || 'N/A'}</code></span>
                             <span>Señal: <strong>${estado.rssi || 'N/A'} dBm</strong></span>
                             <span>FW: v${estado.version_fw || '1.0'}</span>
@@ -442,7 +442,7 @@ const App = (() => {
                 } else {
                     elemEsp32.innerHTML = `
                         <div class="flex items-center gap-sm mt-xs">
-                            <span class="badge badge--error">🔴 Desconectado</span>
+                            <span class="badge badge--error"><span class="punto punto--error" aria-hidden="true"></span>Desconectado</span>
                             <span>Último latido registrado: ${estado && estado.ultimo_heartbeat ? estado.ultimo_heartbeat : 'Sin registros'}</span>
                         </div>
                     `;
@@ -468,6 +468,41 @@ const App = (() => {
     }
 
     /**
+     * HTML de un ícono propio (SVG definido en app.css). Es decorativo: siempre va junto a un
+     * texto visible o dentro de un botón con aria-label.
+     * @param {string} nombre Por ejemplo 'dron', 'check', 'alerta'
+     * @param {string} [clases] Clases extra (por ejemplo 'ico--grande')
+     */
+    function icono(nombre, clases = '') {
+        return `<span class="ico ico--${nombre}${clases ? ' ' + clases : ''}" aria-hidden="true"></span>`;
+    }
+
+    /** Pone en `el` un ícono (opcional) y un texto plano (textContent: no interpreta HTML). */
+    function textoConIcono(el, nombre, texto) {
+        if (!el) return;
+        el.replaceChildren();
+        if (nombre) {
+            const ico = document.createElement('span');
+            ico.className = `ico ico--${nombre}`;
+            ico.setAttribute('aria-hidden', 'true');
+            el.append(ico, ' ');
+        }
+        el.append(texto);
+    }
+
+    /**
+     * Pone en `el` un punto de color de estado y un texto plano.
+     * @param {string} color 'exito' | 'error' | 'advertencia' | 'acento' | 'alerta' | '' (gris)
+     */
+    function textoConPunto(el, color, texto) {
+        if (!el) return;
+        const punto = document.createElement('span');
+        punto.className = `punto${color ? ' punto--' + color : ''}`;
+        punto.setAttribute('aria-hidden', 'true');
+        el.replaceChildren(punto, texto);
+    }
+
+    /**
      * Muestra un diálogo flotante o modal con los datos de sesión del usuario.
      */
     function mostrarModalUsuario() {
@@ -487,13 +522,13 @@ const App = (() => {
         modalOverlay.innerHTML = `
             <div class="modal">
                 <div class="modal__header">
-                    <h3 class="modal__titulo">👤 Perfil de Usuario</h3>
+                    <h3 class="modal__titulo">Perfil de usuario</h3>
                     <button class="modal__cerrar" id="btn-cerrar-modal-user">&times;</button>
                 </div>
                 <div class="modal__body">
                     <div class="tarjeta mb-md" style="background: var(--color-fondo-claro);">
                         <div class="flex items-center gap-md">
-                            <div style="font-size: 2.5rem;">🎓</div>
+                            <div>${icono('usuario', 'ico--grande')}</div>
                             <div>
                                 <h4 style="font-weight: 700;">${escaparHtml(usuario.nombre)}</h4>
                                 <p class="texto-sm texto-secundario">${escaparHtml(usuario.email)}</p>
@@ -501,14 +536,14 @@ const App = (() => {
                             </div>
                         </div>
                     </div>
-                    <button class="btn btn--secundario btn--bloque mb-md" id="btn-modal-cambiar-pass">🔑 Cambiar contraseña</button>
+                    <button class="btn btn--secundario btn--bloque mb-md" id="btn-modal-cambiar-pass">${icono('llave')} Cambiar contraseña</button>
                     <p class="texto-xs texto-secundario">
                         Conectado al servidor de Grupo 5 — EEST N° 1 "Eduardo Ader".
                     </p>
                 </div>
                 <div class="modal__footer">
                     <button class="btn btn--secundario" id="btn-modal-cancelar">Cerrar</button>
-                    <button class="btn btn--peligro" id="btn-modal-logout">🚪 Cerrar sesión</button>
+                    <button class="btn btn--peligro" id="btn-modal-logout">${icono('salir')} Cerrar sesión</button>
                 </div>
             </div>
         `;
@@ -558,11 +593,11 @@ const App = (() => {
             const resumen = Sensores.obtenerResumen();
             panelResultados.innerHTML = resumen.map(s => `
                 <div class="tarjeta flex items-start gap-md mb-sm">
-                    <span style="font-size:1.75rem; flex-shrink:0;">${s.icono}</span>
+                    <span style="font-size:1.5rem; flex-shrink:0; line-height:1; color: var(--color-celeste);">${s.icono}</span>
                     <div style="flex:1; min-width:0;">
                         <div class="flex justify-between items-center gap-sm flex-wrap">
                             <strong class="texto-sm">${s.nombre}</strong>
-                            <span class="badge ${s.ok ? 'badge--exito' : 'badge--error'}">${s.ok ? '✓ ' + s.estado : '✗ ' + s.estado}</span>
+                            <span class="badge ${s.ok ? 'badge--exito' : 'badge--error'}">${icono(s.ok ? 'check' : 'cruz')}${s.estado}</span>
                         </div>
                         <p class="texto-xs texto-secundario mt-xs">${s.detalle}</p>
                     </div>
@@ -570,7 +605,7 @@ const App = (() => {
             `).join('');
 
             btnDiagnosticar.disabled = false;
-            btnDiagnosticar.textContent = '🔄 Repetir diagnóstico';
+            textoConIcono(btnDiagnosticar, 'recargar', 'Repetir diagnóstico');
         }
 
         // ---- Giroscopio en vivo ----
@@ -581,20 +616,20 @@ const App = (() => {
             q('#giro-beta').textContent = fmt(ev.beta);
             q('#giro-gamma').textContent = fmt(ev.gamma);
             q('#giro-alpha').textContent = fmt(ev.alpha);
-            if (lecturas === 1 && estadoVivo) estadoVivo.textContent = '✓ Recibiendo datos reales del sensor. Inclinate para ver cómo cambian.';
+            if (lecturas === 1) textoConIcono(estadoVivo, 'check', 'Recibiendo datos reales del sensor. Inclinate para ver cómo cambian.');
         }
 
         async function iniciarLecturaVivo() {
             if (escuchando || !estadoVivo) return;
             if (typeof DeviceOrientationEvent === 'undefined') {
-                estadoVivo.textContent = '✗ Este navegador no da acceso al giroscopio.';
+                textoConIcono(estadoVivo, 'cruz', 'Este navegador no da acceso al giroscopio.');
                 return;
             }
             // iOS 13+ pide permiso con un toque del usuario
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 try {
                     if (await DeviceOrientationEvent.requestPermission() !== 'granted') {
-                        estadoVivo.textContent = '✗ Permiso del giroscopio denegado.';
+                        textoConIcono(estadoVivo, 'cruz', 'Permiso del giroscopio denegado.');
                         return;
                     }
                 } catch (_) {
@@ -608,7 +643,7 @@ const App = (() => {
             if (btnVivo) btnVivo.hidden = true;
             estadoVivo.textContent = 'Esperando datos del sensor...';
             timerSinDatos = setTimeout(() => {
-                if (!lecturas) estadoVivo.textContent = '✗ No llegan datos: este dispositivo no tiene giroscopio o el navegador no lo expone (en una PC es normal).';
+                if (!lecturas) textoConIcono(estadoVivo, 'cruz', 'No llegan datos: este dispositivo no tiene giroscopio o el navegador no lo expone (en una PC es normal).');
             }, 2500);
         }
 
@@ -631,13 +666,13 @@ const App = (() => {
             camara = null;
             if (videoDemo) videoDemo.srcObject = null;
             if (cajaDemo) cajaDemo.hidden = true;
-            if (btnDemo) { btnDemo.textContent = '▶ Probar con la cámara'; btnDemo.disabled = false; }
+            if (btnDemo) { textoConIcono(btnDemo, 'play', 'Probar con la cámara'); btnDemo.disabled = false; }
         }
 
         async function iniciarDemo() {
             if (typeof DronSeguimiento === 'undefined' || !videoDemo) return;
             if (!navigator.mediaDevices?.getUserMedia) {
-                estadoDemo.textContent = '✗ Este navegador no permite usar la cámara.';
+                textoConIcono(estadoDemo, 'cruz', 'Este navegador no permite usar la cámara.');
                 return;
             }
             btnDemo.disabled = true;
@@ -648,9 +683,9 @@ const App = (() => {
                     audio: false,
                 });
             } catch (e) {
-                estadoDemo.textContent = e?.name === 'NotAllowedError'
-                    ? '✗ Permiso de cámara denegado. Habilitalo en los ajustes del teléfono.'
-                    : `✗ No se pudo abrir la cámara: ${e?.message || e}`;
+                textoConIcono(estadoDemo, 'cruz', e?.name === 'NotAllowedError'
+                    ? 'Permiso de cámara denegado. Habilitalo en los ajustes del teléfono.'
+                    : `No se pudo abrir la cámara: ${e?.message || e}`);
                 btnDemo.disabled = false;
                 return;
             }
@@ -664,7 +699,7 @@ const App = (() => {
                 estadoDemo.textContent = 'Cargando el modelo de detección...';
                 const res = await demo.inicializar();
                 if (paginaCerrada) { detenerDemo(); return; }
-                if (!res.ok) { estadoDemo.textContent = `✗ No se pudo cargar el modelo: ${res.error}`; detenerDemo(); return; }
+                if (!res.ok) { textoConIcono(estadoDemo, 'cruz', `No se pudo cargar el modelo: ${res.error}`); detenerDemo(); return; }
                 estadoDemo.textContent = res.aviso || '';
             }
             panelDemo = new DronSeguimiento.Panel(cajaDemo);
@@ -673,7 +708,7 @@ const App = (() => {
                 panelDemo?.actualizar(info);
             };
             demo.activar();
-            btnDemo.textContent = '⏹ Detener';
+            textoConIcono(btnDemo, 'detener', 'Detener');
             btnDemo.disabled = false;
             btnCopiarDemo.hidden = false;
         }
@@ -683,7 +718,7 @@ const App = (() => {
             const filas = demo?.registro.length || 0;
             if (!filas) { mostrarToast('Todavía no hay registro.', 'info'); return; }
             const ok = await DronSeguimiento.copiarTexto(demo.registroCSV());
-            mostrarToast(ok ? `📋 Registro copiado (${filas} cuadros).` : 'No se pudo copiar el registro.', ok ? 'exito' : 'advertencia');
+            mostrarToast(ok ? `Registro copiado (${filas} cuadros).` : 'No se pudo copiar el registro.', ok ? 'exito' : 'advertencia');
         });
 
         btnDiagnosticar?.addEventListener('click', ejecutarDiagnostico);
@@ -770,7 +805,7 @@ const App = (() => {
         function agregarLog(tipo, msg) {
             if (!logBox) return;
             const hora = new Date().toLocaleTimeString();
-            const prefijo = tipo === 'tx' ? '📤 [TX]' : tipo === 'rx' ? '📥 [RX]' : 'ℹ️ [INFO]';
+            const prefijo = tipo === 'tx' ? '[TX]' : tipo === 'rx' ? '[RX]' : '[INFO]';
             logBox.textContent += `\n[${hora}] ${prefijo} ${msg}`;
             logBox.scrollTop = logBox.scrollHeight;
         }
@@ -796,7 +831,7 @@ const App = (() => {
         }, 1000);
 
         if (badge) {
-            badge.textContent = tieneNativo ? '🟢 Plugin nativo activo' : '🟡 Navegador: sin plugin nativo (respuestas simuladas)';
+            textoConPunto(badge, tieneNativo ? 'exito' : 'advertencia', tieneNativo ? 'Plugin nativo activo' : 'Navegador: sin plugin nativo (respuestas simuladas)');
             badge.style.color = tieneNativo ? 'var(--color-exito)' : 'var(--color-advertencia)';
         }
 
@@ -896,11 +931,11 @@ const App = (() => {
                     lineas.push(`${ruta}: ${r.bytes.toLocaleString()} bytes · ${r.tipo}${nota}`);
                 }
                 estadoDiag.modelo = (!problemas.length && recibido === esperado)
-                    ? `✓ ${rutas.length} archivos de pesos, ${recibido.toLocaleString()} bytes (coincide con model.json)`
-                    : `✗ recibidos ${recibido.toLocaleString()} de ${esperado.toLocaleString()} bytes${problemas.length ? ` · con problemas: ${problemas.join(', ')}` : ''}`;
+                    ? `OK: ${rutas.length} archivos de pesos, ${recibido.toLocaleString()} bytes (coincide con model.json)`
+                    : `FALLA: recibidos ${recibido.toLocaleString()} de ${esperado.toLocaleString()} bytes${problemas.length ? ` · con problemas: ${problemas.join(', ')}` : ''}`;
                 if (problemas.length || recibido !== esperado) registrarError(`Modelo: ${estadoDiag.modelo}`);
             } catch (e) {
-                estadoDiag.modelo = `✗ ${e.message}`;
+                estadoDiag.modelo = `FALLA: ${e.message}`;
                 registrarError(`Modelo: ${e.message}`);
             }
             estadoDiag.modeloDetalle = lineas;
@@ -921,7 +956,7 @@ const App = (() => {
                     registrarError(e);
                 }
                 const resW = await DN.vincularRedWifi();
-                estadoDiag.wifi = resW.vinculada ? `✓ Vinculada (${resW.motivo || 'OK'})` : `✗ No vinculada (${resW.motivo || 'sin motivo'})`;
+                estadoDiag.wifi = resW.vinculada ? `Vinculada (${resW.motivo || 'OK'})` : `NO vinculada (${resW.motivo || 'sin motivo'})`;
                 if (!resW.vinculada) registrarError(`vincularRedWifi: ${resW.motivo}`);
             } else {
                 estadoDiag.pluginInfo = 'No disponible (navegador)';
@@ -931,12 +966,12 @@ const App = (() => {
             if (typeof VideoDecoder !== 'undefined') {
                 try {
                     const sop = await VideoDecoder.isConfigSupported({ codec: 'avc1.42001f', codedWidth: 960, codedHeight: 720 });
-                    estadoDiag.webCodecs = sop.supported ? '✓ Soportado (H.264 960x720)' : '✗ H.264 no soportado';
+                    estadoDiag.webCodecs = sop.supported ? 'Soportado (H.264 960x720)' : 'H.264 NO soportado';
                 } catch (e) {
                     estadoDiag.webCodecs = `Error al verificar: ${e.message}`;
                 }
             } else {
-                estadoDiag.webCodecs = '✗ WebCodecs no disponible en este WebView';
+                estadoDiag.webCodecs = 'WebCodecs NO disponible en este WebView';
             }
 
             estadoDiag.apiUrl = API.getBaseUrl() || '(no configurada)';
@@ -969,7 +1004,7 @@ const App = (() => {
         q('#btn-copiar-diagnostico')?.addEventListener('click', async () => {
             const informe = [
                 '========================================',
-                '📋 INFORME DE DIAGNÓSTICO — GRUPO 5 DRON',
+                'INFORME DE DIAGNÓSTICO — GRUPO 5 DRON',
                 `Fecha y hora: ${new Date().toLocaleString()}`,
                 '========================================',
                 `• Plugin DronNative:     ${estadoDiag.pluginInfo}`,
@@ -1003,7 +1038,7 @@ const App = (() => {
                     copiado = document.execCommand('copy');
                 } catch (_) { /* sin portapapeles */ }
             }
-            mostrarToast(copiado ? '📋 Informe copiado al portapapeles.' : 'No se pudo copiar automáticamente. Revisá los permisos.', copiado ? 'exito' : 'advertencia');
+            mostrarToast(copiado ? 'Informe copiado al portapapeles.' : 'No se pudo copiar automáticamente. Revisá los permisos.', copiado ? 'exito' : 'advertencia');
         });
 
         estadoDiag.modoSesion = textoModoSesion();
@@ -1095,5 +1130,8 @@ const App = (() => {
         cerrarMenu,
         cargarRutaActual,
         mostrarModalUsuario,
+        icono,
+        textoConIcono,
+        textoConPunto,
     };
 })();

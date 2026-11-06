@@ -40,17 +40,17 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
                 <span class="header__menu-icono"></span>
             </button>
             <h1 class="header__titulo">
-                <span class="header__titulo-icono">⚡</span>
+                <span class="header__titulo-icono"><span class="ico ico--rayo" aria-hidden="true"></span></span>
                 <span class="header__titulo-texto">Control de Sistemas y Dron</span>
             </h1>
             <div class="header__acciones">
-                <span id="indicador-offline" class="badge badge--advertencia header__badge" style="display:none;" title="Modo sin conexión"><span id="indicador-offline-icono" aria-hidden="true">📡</span><span id="indicador-offline-texto" class="header__badge-texto">Modo sin conexión</span></span>
+                <span id="indicador-offline" class="badge badge--advertencia header__badge" style="display:none;" title="Modo sin conexión"><span id="indicador-offline-icono" class="ico ico--senal" aria-hidden="true"></span><span id="indicador-offline-texto" class="header__badge-texto">Modo sin conexión</span></span>
                 <span id="indicador-esp32" class="indicador indicador--offline" title="ESP32 desconectado">
                     <span class="indicador__punto"></span>
                     <span class="indicador__texto">ESP32</span>
                 </span>
                 <button id="btn-usuario" class="header__btn-usuario" aria-label="Usuario">
-                    <span class="header__usuario-icono">👤</span>
+                    <span class="header__usuario-icono"><span class="ico ico--usuario" aria-hidden="true"></span></span>
                 </button>
             </div>
         </div>
@@ -61,21 +61,21 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
         <div class="menu-lateral__overlay" id="menu-overlay"></div>
         <div class="menu-lateral__contenido">
             <div class="menu-lateral__header">
-                <span class="menu-lateral__logo">⚡</span>
+                <span class="menu-lateral__logo"><span class="ico ico--rayo" aria-hidden="true"></span></span>
                 <span class="menu-lateral__nombre">Grupo 5</span>
             </div>
             <ul class="menu-lateral__lista">
-                <li><a href="#/inicio" class="menu-lateral__enlace" data-pagina="inicio">🏠 Inicio</a></li>
-                <li><a href="#/aula" class="menu-lateral__enlace" data-pagina="aula">🎛️ Control del Aula</a></li>
-                <li><a href="#/dron" class="menu-lateral__enlace" data-pagina="dron">🚁 Control del Dron</a></li>
-                <li><a href="#/sensores" class="menu-lateral__enlace" data-pagina="sensores">📡 Diagnóstico Sensores</a></li>
-                <li><a href="#/prueba-tello" class="menu-lateral__enlace" data-pagina="prueba-tello">📡 Prueba Tello</a></li>
+                <li><a href="#/inicio" class="menu-lateral__enlace" data-pagina="inicio"><span class="ico ico--inicio" aria-hidden="true"></span> Inicio</a></li>
+                <li><a href="#/aula" class="menu-lateral__enlace" data-pagina="aula"><span class="ico ico--aula" aria-hidden="true"></span> Control del Aula</a></li>
+                <li><a href="#/dron" class="menu-lateral__enlace" data-pagina="dron"><span class="ico ico--dron" aria-hidden="true"></span> Control del Dron</a></li>
+                <li><a href="#/sensores" class="menu-lateral__enlace" data-pagina="sensores"><span class="ico ico--sensores" aria-hidden="true"></span> Diagnóstico Sensores</a></li>
+                <li><a href="#/prueba-tello" class="menu-lateral__enlace" data-pagina="prueba-tello"><span class="ico ico--senal" aria-hidden="true"></span> Prueba Tello</a></li>
                 <li class="menu-lateral__separador"></li>
-                <li><a href="#/admin" class="menu-lateral__enlace menu-lateral__enlace--admin" data-pagina="admin">⚙️ Administración</a></li>
-                <li><a href="#/config-dron" class="menu-lateral__enlace" data-pagina="config-dron">🔧 Config. Dron</a></li>
+                <li><a href="#/admin" class="menu-lateral__enlace menu-lateral__enlace--admin" data-pagina="admin"><span class="ico ico--engranaje" aria-hidden="true"></span> Administración</a></li>
+                <li><a href="#/config-dron" class="menu-lateral__enlace" data-pagina="config-dron"><span class="ico ico--llave-ajuste" aria-hidden="true"></span> Config. Dron</a></li>
                 <li class="menu-lateral__separador"></li>
-                <li><a href="#/acerca" class="menu-lateral__enlace" data-pagina="acerca">ℹ️ Acerca de</a></li>
-                <li><a href="#" class="menu-lateral__enlace" id="btn-cerrar-sesion">🚪 Cerrar sesión</a></li>
+                <li><a href="#/acerca" class="menu-lateral__enlace" data-pagina="acerca"><span class="ico ico--info" aria-hidden="true"></span> Acerca de</a></li>
+                <li><a href="#" class="menu-lateral__enlace" id="btn-cerrar-sesion"><span class="ico ico--salir" aria-hidden="true"></span> Cerrar sesión</a></li>
             </ul>
         </div>
     </nav>

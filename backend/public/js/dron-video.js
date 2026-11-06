@@ -2,7 +2,7 @@
  * Decodificador de Video H.264 del DJI Tello vía WebCodecs
  * Grupo 5: Control de Sistemas y Dron — EEST N° 1 de Vicente López "Eduardo Ader"
  *
- * ⚠ REQUIERE VALIDACIÓN CON EL DRON REAL.
+ * IMPORTANTE: REQUIERE VALIDACIÓN CON EL DRON REAL.
  *
  * Flujo:
  *  1. El plugin nativo agrupa los datagramas UDP del puerto 11111 (~30 ms) y los manda en Base64.
@@ -36,7 +36,7 @@ class DronVideoDecoder {
         this.soportaWebCodecs = typeof window.VideoDecoder === 'function';
 
         if (!this.soportaWebCodecs) {
-            this._dibujarMensaje('⚠ Este WebView no soporta WebCodecs: no se puede mostrar el video.');
+            this._dibujarMensaje('Este WebView no soporta WebCodecs: no se puede mostrar el video.');
         }
     }
 

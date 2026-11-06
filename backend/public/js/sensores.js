@@ -189,6 +189,7 @@ const Sensores = (() => {
 
     /**
      * Devuelve un resumen legible para mostrar en la UI.
+     * El ícono es HTML (ícono propio de app.css); el giroscopio conserva su emoji de brújula.
      * @returns {Array<{ nombre: string, icono: string, estado: string, detalle: string, ok: boolean }>}
      */
     function obtenerResumen() {
@@ -204,7 +205,7 @@ const Sensores = (() => {
             },
             {
                 nombre:  'GPS',
-                icono:   '📍',
+                icono:   '<span class="ico ico--ubicacion" aria-hidden="true"></span>',
                 ok:      estado.gps.disponible === true,
                 estado:  _textoDisponibilidad(estado.gps.disponible),
                 detalle: estado.gps.disponible
@@ -214,7 +215,7 @@ const Sensores = (() => {
             },
             {
                 nombre:  'Cámara',
-                icono:   '📷',
+                icono:   '<span class="ico ico--camara" aria-hidden="true"></span>',
                 ok:      estado.camara.disponible === true,
                 estado:  _textoDisponibilidad(estado.camara.disponible),
                 detalle: estado.camara.disponible
@@ -223,24 +224,24 @@ const Sensores = (() => {
             },
             {
                 nombre:  'Vibración',
-                icono:   '📳',
+                icono:   '<span class="ico ico--vibracion" aria-hidden="true"></span>',
                 ok:      estado.vibracion.disponible === true,
                 estado:  _textoDisponibilidad(estado.vibracion.disponible),
                 detalle: estado.vibracion.disponible ? 'Vibration API disponible' : 'No soportada',
             },
             {
                 nombre:  'Conexión de Red',
-                icono:   '📶',
+                icono:   '<span class="ico ico--red" aria-hidden="true"></span>',
                 ok:      estado.red.disponible !== false,
                 estado:  estado.red.disponible ? 'Disponible' : 'Desconocida',
                 detalle: estado.red.tipo
                     ? `Tipo: ${estado.red.tipo}` +
-                      (estado.red.velocidadBajaEstimada ? ' ⚠ Velocidad baja' : '')
+                      (estado.red.velocidadBajaEstimada ? ' (velocidad baja)' : '')
                     : 'Network Information API no disponible',
             },
             {
                 nombre:  'Pantalla',
-                icono:   '🖥️',
+                icono:   '<span class="ico ico--pantalla" aria-hidden="true"></span>',
                 ok:      true,
                 estado:  'Detectada',
                 detalle: `${estado.pantalla.resolucion || '?'}, DPR: ${estado.pantalla.dpr || '?'}`,
