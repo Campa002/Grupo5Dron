@@ -641,8 +641,10 @@ const App = (() => {
         function iniciarLecturaVivo() {
             if (lector || !estadoVivo) return;
             lector = new DronGiroscopio.LectorInclinacion({
-                onLectura: ({ beta, gamma, alpha }) => {
+                onLectura: ({ beta: betaTel, gamma: gammaTel, alpha }) => {
                     lecturas++;
+                    // Respecto de la pantalla, como en la cabina (vertical y las dos horizontales)
+                    const { beta, gamma } = DronGiroscopio.inclinacionEnPantalla(betaTel, gammaTel, DronGiroscopio.anguloPantalla());
                     q('#giro-beta').textContent = fmt(beta);
                     q('#giro-gamma').textContent = fmt(gamma);
                     q('#giro-alpha').textContent = alpha === null ? 'No disp.' : fmt(alpha);
@@ -1093,7 +1095,8 @@ const App = (() => {
                 const rutas = [];
                 for (const g of modelo.weightsManifest) {
                     rutas.push(...g.paths);
-                    for (const w of g.weights) esperado += (w.shape || []).reduce((a, b) => a * b, 1) * (bytesPorTipo[w.dtype] || 4);
+                    // Un peso cuantizado (el modelo está en float16) ocupa lo que su tipo cuantizado, no su dtype
+                    for (const w of g.weights) esperado += (w.shape || []).reduce((a, b) => a * b, 1) * (bytesPorTipo[w.quantization?.dtype || w.dtype] || 4);
                 }
                 let recibido = 0;
                 const problemas = [];
@@ -1152,7 +1155,7 @@ const App = (() => {
             estadoDiag.modoSesion = textoModoSesion();
             estadoDiag.userAgent = navigator.userAgent;
             // En el APK los archivos son locales (rápido): se verifica el modelo siempre.
-            // En el navegador serían 18 MB por la red: solo con el botón "Verificar modelo".
+            // En el navegador serían 9 MB por la red: solo con el botón "Verificar modelo".
             if (tieneNativo) await verificarModelo();
             actualizarUIResumen();
             agregarLog('info', 'Diagnóstico general completado.');

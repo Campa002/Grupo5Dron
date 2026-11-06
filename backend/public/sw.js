@@ -9,7 +9,7 @@
  */
 
 // Subir este número cuando cambie la lista de recursos precacheados
-const CACHE_NAME = 'grupo5dron-v8';
+const CACHE_NAME = 'grupo5dron-v9';
 
 // Si la red tarda más que esto y hay copia en caché, se usa la copia (la red sigue actualizando en segundo plano)
 const ESPERA_RED_MS = 3000;
@@ -32,11 +32,9 @@ const RECURSOS_ESTATICOS = [
     '/libs/tfjs/tf.min.js',
     '/libs/coco-ssd/coco-ssd.min.js',
     '/libs/coco-ssd/model.json',
-    '/libs/coco-ssd/group1-shard1of5.bin',
-    '/libs/coco-ssd/group1-shard2of5.bin',
-    '/libs/coco-ssd/group1-shard3of5.bin',
-    '/libs/coco-ssd/group1-shard4of5.bin',
-    '/libs/coco-ssd/group1-shard5of5.bin',
+    '/libs/coco-ssd/group1-shard1of3.bin',
+    '/libs/coco-ssd/group1-shard2of3.bin',
+    '/libs/coco-ssd/group1-shard3of3.bin',
     '/js/dron-seguimiento.js',
     '/js/dron-video.js',
     '/js/config-dron.js',

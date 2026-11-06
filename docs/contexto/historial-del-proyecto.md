@@ -142,6 +142,10 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - Detección: casi nunca veía personas (~5 FPS, ~190 ms). COCO-SSD reduce todo a 300×300 sin respetar la proporción: la cámara vertical (9:16) le llegaba aplastada. Ahora se completa a un cuadrado con bordes (de 1:1 a 4:3 se usa tal cual: el Tello no cambia). En la PC sube la confianza (81 → 95 %) pero también detectaba estirada, y con texturas de 16 bits forzadas también detecta: la causa en el A06 hay que confirmarla con la miniatura "lo que ve el modelo" (modo técnico) y el brillo del cuadro. El ancho de análisis (300/320/480) y el modelo en float16 no cambian los FPS en la PC; float16 da las mismas detecciones con la mitad de tamaño (18 → 9 MB), pero no se aplicó porque no mejora los FPS.
     - Interfaz minimalista con el estilo de racvision.org (proyecto RAC del grupo) y nuestros colores. Lo de diagnóstico pasó a un "Modo técnico" (Config. Dron, arranca apagado). "Mis objetos" se oculta hasta S4. Sensores ya no muestra GPS, vibración, red ni pantalla.
     - El A06 no tiene giroscopio ni magnetómetro: deviceorientation llega vacío. La inclinación ahora sale del acelerómetro (accelerationIncludingGravity, filtrada) si en 0,7 s no hay orientación; sin giro vertical. Con giroscopio todo sigue igual.
+25. **Inclinación según la pantalla y modelo en float16 (6/11).** Decisiones de Luciano.
+    - Antes, en horizontal la inclinación quedaba rotada 90° (usaba los ejes del teléfono). Ahora es respecto de la pantalla en vertical y en las dos horizontales; en vertical natural no cambia nada. Si la pantalla gira con la inclinación activada, se apaga con los ejes en cero y hay que volver a activarla (recalibra).
+    - El acelerómetro usa ahora la inversa exacta de la convención de deviceorientation, así coincide con el giroscopio también en inclinaciones grandes.
+    - Modelo en float16 con `scripts/modelo_float16.py`: 18 → 9 MB, 3 shards `.bin`. En la PC, mismas detecciones y puntajes que float32 salvo diferencias de milésimas (dos personas en el límite de 0,50 en una foto).
 
 ## 4. Hardware
 

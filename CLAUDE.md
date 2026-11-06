@@ -91,7 +91,7 @@ backend/
     js/sensores.js          diagnóstico de sensores del celular
     js/app.js, api.js, auth.js   compartidos (router, modo sin cuenta, Prueba Tello, sesión offline)
     pages/*.php             vistas parciales (fragmentos HTML; no dependen de PHP)
-    libs/tfjs, libs/coco-ssd  modelo de visión LOCAL (~19 MB, sí va al repo)
+    libs/tfjs, libs/coco-ssd  modelo de visión LOCAL (pesos en float16, ~10 MB, sí va al repo)
 capacitor/        capacitor.config.json, package.json, network_security_config.xml, android_plugin/
 scripts/          build-apk.js, check_js.py, check_refs.py, generar_hash.php
 posibles-implementaciones/  firmware del aula, adaptadores genéricos (HTTP, UDP/TCP), herramientas viejas
@@ -123,7 +123,7 @@ docs/contexto/    informe, historial, reportes
 - Cambios puntuales. Respetá los nombres existentes de funciones, IDs, endpoints y tablas.
 - Archivos con finales de línea CRLF: si una edición falla, revisá eso.
 - Nada de recursos externos (CDN, Google Fonts): el APK tiene que andar sin internet.
-- Todo archivo que use la app tiene que tener extensión. En el APK, Capacitor responde index.html a cualquier ruta sin "." (html5mode). Por eso los shards del modelo son `group1-shardNofM.bin`. Si se cambia el modelo, renombrar los shards y sus `paths` en `model.json`.
+- Todo archivo que use la app tiene que tener extensión. En el APK, Capacitor responde index.html a cualquier ruta sin "." (html5mode). Por eso los shards del modelo son `group1-shardNofM.bin`. Si se cambia el modelo, renombrar los shards y sus `paths` en `model.json`, pasarlo a float16 con `python scripts/modelo_float16.py` y actualizar la lista de `sw.js` (y subir `CACHE_NAME`).
 - Las páginas son .php pero no pueden depender de PHP para funcionar en el APK. No hay archivos `.html` en el proyecto (`check_refs.py` falla si aparece uno en `pages/` y avisa si una página trae código PHP). `build-apk.js` quita todo bloque `<?php ... ?>` / `<?= ... ?>` al generar `www/` y falla si queda alguno. Capacitor sirve `/pages/x.php` como archivo porque tiene extensión; `cargarPlantilla` (app.js) no depende del content-type y avisa si en lugar de la vista llega una página completa.
 - `.gitattributes` marca como binarios `backend/public/libs/**`, imágenes, `.bin` y keystores (la PC tiene `core.autocrlf=true`).
 - Sin credenciales reales en el repo. `config.php` y `config.h` están en `.gitignore`.
@@ -157,6 +157,8 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
   - Detección: la imagen que va al modelo respeta la proporción (vertical → cuadrado con bordes; 4:3 del Tello sin cambios). `Seguimiento.marcoAnalisis`. Miniatura "lo que ve el modelo", brillo del cuadro y datos de WebGL en el modo técnico; el CSV trae una primera línea con cámara, imagen analizada y backend. La caja de la demo toma la proporción de la cámara.
   - Interfaz minimalista con modo técnico. Inicio: solo Aula y Dron. Cabina: estados, batería y altura sobre el video. Sensores: inclinación y detección. Prueba Tello: cinco pasos y "Listo para volar" o qué falta. "Mis objetos" oculto hasta S4.
   - Inclinación: `LectorInclinacion` (dron-giroscopio.js) usa deviceorientation y, si no llega con datos, el acelerómetro; sin giro vertical y con aviso. El diagnóstico de Sensores escucha los eventos de verdad.
+  - Inclinación respecto de la PANTALLA (vertical y las dos horizontales, `inclinacionEnPantalla`); en vertical natural, los mismos valores de siempre. Si la pantalla gira con la inclinación activada, se apaga con los ejes en cero y pide volver a activarla (recalibra). Decisión de Luciano del 6/11.
+  - Modelo en float16 (`scripts/modelo_float16.py`): 9.017.328 bytes en 3 shards, mismas detecciones y FPS que float32 en la PC; `sw.js` v9.
 - Sin probar en el celular: si la detección mejora en el A06 y qué muestra la miniatura; el respaldo por acelerómetro con el sensor real (signos de adelante/atrás y costados).
 
 ## Estado al 5/11/2026
@@ -221,8 +223,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 1. **Primera prueba real con el Tello.** Commit, APK de CI e instalación. Con el secreto de firma cargado, los APK nuevos se instalan encima. La primera vez con la clave fija hay que desinstalar la versión anterior. Después: "Usar el dron sin cuenta", `#/prueba-tello` (command, battery?, streamon), "Copiar informe" y pegarlo. Luego la cabina: despegar, aterrizar, paso, freno, giroscopio, failsafe, emergencia.
 2. **Corregir lo que salga de esa prueba.** Lo más probable: red sin internet (`vincularRedWifi`), video en el WebView, si el `rc` interfiere con los pasos y la unidad de `vgx`/`vgy`.
    - Detección en el A06: con el modo técnico, mirar la miniatura "lo que ve el modelo" y el brillo. Si la imagen llega rotada o negra, corregir la captura del cuadro.
-   - Para decidir con Luciano (cambia el vuelo): en horizontal, la inclinación usa beta → avance y gamma → lateral en coordenadas del teléfono, que acostado quedan rotadas 90°. No se tocó.
-   - Opcional: modelo en float16 (9 MB en vez de 18, mismas detecciones, mismos FPS en la PC).
+   - Verificar en el celular el sentido de la inclinación en las dos horizontales (en la PC se simuló con la convención de Android: 90° = girado en sentido antihorario).
 3. ~~Fase 2, funciones~~: hecha (ver "Estado").
 4. ~~Fase 3, interfaz~~: hecha (ver "Estado").
 5. ~~Fase 4, limpieza~~: hecha (ver "Estado").

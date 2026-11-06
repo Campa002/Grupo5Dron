@@ -159,6 +159,7 @@ const Dron = (() => {
 
         _giroscopio = new DronGiroscopio({ onChange: _onGiroscopioCambio });
         _giroscopio.onFuente = _onFuenteInclinacion;
+        _giroscopio.onCambioOrientacion = _onCambioOrientacionInclinacion;
 
         if (typeof DronSeguimiento !== 'undefined') {
             _seguimiento = new DronSeguimiento({
@@ -707,6 +708,17 @@ const Dron = (() => {
             App.mostrarToast(msg, 'advertencia');
         }
         _actualizarBotonGiro();
+    }
+
+    /**
+     * La pantalla giró con la inclinación activada: DronGiroscopio ya se desactivó (ejes en 0).
+     * Se apaga el modo (ejes y joystick al centro) y se pide volver a activarla para recalibrar.
+     */
+    function _onCambioOrientacionInclinacion() {
+        if (!_modoGiro) return;
+        _apagarGiro();
+        App.mostrarToast('Cambió la orientación de la pantalla: se apagó el control por inclinación. ' +
+            'Sostené el celular como vas a volar y volvé a activarlo para recalibrar.', 'advertencia', 8000);
     }
 
     /** El lector decidió de qué sensor sale la inclinación. Con giroscopio no se avisa nada (es lo de siempre). */

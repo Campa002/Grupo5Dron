@@ -10,19 +10,27 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const DronGiroscopio = require('../backend/public/js/dron-giroscopio.js');
 
-const { inclinacionDesdeGravedad, LectorInclinacion } = DronGiroscopio;
+const { inclinacionDesdeGravedad, inclinacionEnPantalla, arribaDesdeInclinacion, LectorInclinacion } = DronGiroscopio;
 const G = 9.81;
-const rad = g => g * Math.PI / 180;
 const cerca = (a, b, tol = 0.5) => Math.abs(a - b) <= tol;
 const esperar = ms => new Promise(r => setTimeout(r, ms));
 
-/** Gravedad que mide el acelerómetro con el teléfono inclinado beta (adelante/atrás) y gamma (costados). */
+/** Gravedad que mide el acelerómetro con el teléfono en beta y gamma (convención de deviceorientation). */
 function gravedad(beta, gamma) {
-    return {
-        x: -G * Math.sin(rad(gamma)),
-        y: G * Math.cos(rad(gamma)) * Math.sin(rad(beta)),
-        z: G * Math.cos(rad(gamma)) * Math.cos(rad(beta)),
-    };
+    const v = arribaDesdeInclinacion(beta, gamma);
+    return { x: G * v.x, y: G * v.y, z: G * v.z };
+}
+
+/**
+ * beta y gamma del TELÉFONO cuando, respecto de la pantalla girada `angulo`, está en (betaP, gammaP).
+ * Es lo que mandaría el sensor si sostenés el celular así (la inversa de inclinacionEnPantalla).
+ */
+function telefonoDesdePantalla(betaP, gammaP, angulo) {
+    const s = arribaDesdeInclinacion(betaP, gammaP);
+    const t = angulo * Math.PI / 180;
+    const c = Math.round(Math.cos(t));
+    const n = Math.round(Math.sin(t));
+    return inclinacionDesdeGravedad(s.x * c + s.y * n, -s.x * n + s.y * c, s.z);
 }
 
 function evento(tipo, datos) {
@@ -126,4 +134,77 @@ test('DronGiroscopio: con giroscopio, misma calibración, zona muerta y escala q
     // Más allá del límite → 1
     giro._procesarLectura(80, -40);
     assert.deepEqual(cambios.at(-1), { pitch: 1, roll: -1 });
+});
+
+// ---------------------------------------------------------------
+// Inclinación respecto de la pantalla (vertical y las dos horizontales)
+// ---------------------------------------------------------------
+
+test('acelerómetro: inversa exacta de deviceorientation también con beta y gamma combinados grandes', () => {
+    for (const [b, c] of [[60, 40], [-120, 30], [150, -70], [100, 10]]) {
+        const v = arribaDesdeInclinacion(b, c);
+        const r = inclinacionDesdeGravedad(v.x, v.y, v.z);
+        assert.ok(cerca(r.beta, b, 0.01) && cerca(r.gamma, c, 0.01), `${b},${c} → ${JSON.stringify(r)}`);
+    }
+});
+
+test('pantalla vertical (ángulo 0): devuelve exactamente lo mismo de siempre', () => {
+    for (const [b, c] of [[45, 0], [12.345, -7.5], [89, 60]]) {
+        assert.deepEqual(inclinacionEnPantalla(b, c, 0), { beta: b, gamma: c });
+    }
+});
+
+test('horizontal: celular acostado y parado frente a vos → 90° adelante/atrás respecto de la pantalla', () => {
+    // Girado antihorario (90): el borde derecho del teléfono queda arriba → gamma del teléfono -90
+    const r90 = inclinacionEnPantalla(0, -90, 90);
+    assert.ok(cerca(r90.beta, 90) && cerca(r90.gamma, 0), JSON.stringify(r90));
+    // Girado horario (270): el borde izquierdo queda arriba → gamma del teléfono +90
+    const r270 = inclinacionEnPantalla(0, 90, 270);
+    assert.ok(cerca(r270.beta, 90) && cerca(r270.gamma, 0), JSON.stringify(r270));
+});
+
+test('horizontal y vertical invertida: la inclinación vuelve a quedar en los ejes de la pantalla', () => {
+    for (const angulo of [90, 180, 270]) {
+        for (const [b, c] of [[45, 0], [60, 0], [45, 15], [30, -20]]) {
+            const tel = telefonoDesdePantalla(b, c, angulo);
+            const r = inclinacionEnPantalla(tel.beta, tel.gamma, angulo);
+            assert.ok(cerca(r.beta, b, 0.01) && cerca(r.gamma, c, 0.01), `${angulo}°: ${b},${c} → ${JSON.stringify(r)}`);
+        }
+    }
+});
+
+for (const angulo of [0, 90, 270]) {
+    test(`DronGiroscopio a ${angulo}°: inclinar hacia el borde de arriba de la pantalla es avanzar, y al costado es lateral`, () => {
+        const cambios = [];
+        const giro = new DronGiroscopio({ onChange: c => cambios.push(c), suavizado: 0, obtenerAngulo: () => angulo });
+        giro.activo = true;
+        giro.angulo = angulo;
+        const leer = (b, c) => { const t = telefonoDesdePantalla(b, c, angulo); giro._procesarLectura(t.beta, t.gamma); };
+        leer(45, 0);                 // calibra: celular a 45° respecto de la pantalla
+        leer(60, 0);                 // 15° más → pitch 0,5 y nada de lateral
+        assert.deepEqual(cambios.at(-1), { pitch: 0.5, roll: 0 });
+        leer(45, 15);                // 15° al costado derecho → roll 0,5 y nada de avance
+        assert.deepEqual(cambios.at(-1), { pitch: 0, roll: 0.5 });
+    });
+}
+
+test('DronGiroscopio: si la pantalla gira con la inclinación activada, se apaga con ejes en 0 y avisa', () => {
+    let angulo = 90;
+    const cambios = [];
+    const avisos = [];
+    const giro = new DronGiroscopio({ onChange: c => cambios.push(c), suavizado: 0, obtenerAngulo: () => angulo });
+    giro.onCambioOrientacion = a => avisos.push(a);
+    giro.activo = true;
+    giro.angulo = 90;
+    let t = telefonoDesdePantalla(45, 0, 90);
+    giro._procesarLectura(t.beta, t.gamma);
+    t = telefonoDesdePantalla(60, 0, 90);
+    giro._procesarLectura(t.beta, t.gamma);
+    assert.deepEqual(cambios.at(-1), { pitch: 0.5, roll: 0 });
+    angulo = 270;                    // el celular dio vuelta
+    t = telefonoDesdePantalla(60, 0, 270);
+    giro._procesarLectura(t.beta, t.gamma);
+    assert.equal(giro.activo, false);
+    assert.deepEqual(cambios.at(-1), { pitch: 0, roll: 0 });
+    assert.deepEqual(avisos, [270]);
 });

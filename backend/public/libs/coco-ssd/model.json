@@ -19477,7 +19477,10 @@
         {
           "shape": [],
           "dtype": "float32",
-          "name": "ConstantFolding/Postprocessor/Decode/div_recip"
+          "name": "ConstantFolding/Postprocessor/Decode/div_recip",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19486,12 +19489,18 @@
             4
           ],
           "dtype": "float32",
-          "name": "Postprocessor/ExpandDims"
+          "name": "Postprocessor/ExpandDims",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [],
           "dtype": "float32",
-          "name": "ConstantFolding/Postprocessor/Decode/div_4_recip"
+          "name": "ConstantFolding/Postprocessor/Decode/div_4_recip",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19503,7 +19512,10 @@
         {
           "shape": [],
           "dtype": "float32",
-          "name": "ConstantFolding/Postprocessor/Decode/div_2_recip"
+          "name": "ConstantFolding/Postprocessor/Decode/div_2_recip",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19513,35 +19525,50 @@
             1
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/BoxEncodingPredictor_depthwise/depthwise_weights"
+          "name": "BoxPredictor_0/BoxEncodingPredictor_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/BoxEncodingPredictor_depthwise/BatchNorm/gamma"
+          "name": "BoxPredictor_0/BoxEncodingPredictor_depthwise/BatchNorm/gamma",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/BoxEncodingPredictor_depthwise/BatchNorm/beta"
+          "name": "BoxPredictor_0/BoxEncodingPredictor_depthwise/BatchNorm/beta",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/BoxEncodingPredictor_depthwise/BatchNorm/moving_mean"
+          "name": "BoxPredictor_0/BoxEncodingPredictor_depthwise/BatchNorm/moving_mean",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/BoxEncodingPredictor_depthwise/BatchNorm/moving_variance"
+          "name": "BoxPredictor_0/BoxEncodingPredictor_depthwise/BatchNorm/moving_variance",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19551,14 +19578,20 @@
             12
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/BoxEncodingPredictor/weights"
+          "name": "BoxPredictor_0/BoxEncodingPredictor/weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             12
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/BoxEncodingPredictor/biases"
+          "name": "BoxPredictor_0/BoxEncodingPredictor/biases",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19568,35 +19601,50 @@
             1
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/BoxEncodingPredictor_depthwise/depthwise_weights"
+          "name": "BoxPredictor_1/BoxEncodingPredictor_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             1280
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/BoxEncodingPredictor_depthwise/BatchNorm/gamma"
+          "name": "BoxPredictor_1/BoxEncodingPredictor_depthwise/BatchNorm/gamma",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             1280
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/BoxEncodingPredictor_depthwise/BatchNorm/beta"
+          "name": "BoxPredictor_1/BoxEncodingPredictor_depthwise/BatchNorm/beta",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             1280
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/BoxEncodingPredictor_depthwise/BatchNorm/moving_mean"
+          "name": "BoxPredictor_1/BoxEncodingPredictor_depthwise/BatchNorm/moving_mean",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             1280
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/BoxEncodingPredictor_depthwise/BatchNorm/moving_variance"
+          "name": "BoxPredictor_1/BoxEncodingPredictor_depthwise/BatchNorm/moving_variance",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19606,14 +19654,20 @@
             24
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/BoxEncodingPredictor/weights"
+          "name": "BoxPredictor_1/BoxEncodingPredictor/weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             24
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/BoxEncodingPredictor/biases"
+          "name": "BoxPredictor_1/BoxEncodingPredictor/biases",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19623,35 +19677,50 @@
             1
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/BoxEncodingPredictor_depthwise/depthwise_weights"
+          "name": "BoxPredictor_2/BoxEncodingPredictor_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             512
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/BoxEncodingPredictor_depthwise/BatchNorm/gamma"
+          "name": "BoxPredictor_2/BoxEncodingPredictor_depthwise/BatchNorm/gamma",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             512
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/BoxEncodingPredictor_depthwise/BatchNorm/beta"
+          "name": "BoxPredictor_2/BoxEncodingPredictor_depthwise/BatchNorm/beta",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             512
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/BoxEncodingPredictor_depthwise/BatchNorm/moving_mean"
+          "name": "BoxPredictor_2/BoxEncodingPredictor_depthwise/BatchNorm/moving_mean",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             512
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/BoxEncodingPredictor_depthwise/BatchNorm/moving_variance"
+          "name": "BoxPredictor_2/BoxEncodingPredictor_depthwise/BatchNorm/moving_variance",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19661,14 +19730,20 @@
             24
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/BoxEncodingPredictor/weights"
+          "name": "BoxPredictor_2/BoxEncodingPredictor/weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             24
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/BoxEncodingPredictor/biases"
+          "name": "BoxPredictor_2/BoxEncodingPredictor/biases",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19678,35 +19753,50 @@
             1
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/BoxEncodingPredictor_depthwise/depthwise_weights"
+          "name": "BoxPredictor_3/BoxEncodingPredictor_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/BoxEncodingPredictor_depthwise/BatchNorm/gamma"
+          "name": "BoxPredictor_3/BoxEncodingPredictor_depthwise/BatchNorm/gamma",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/BoxEncodingPredictor_depthwise/BatchNorm/beta"
+          "name": "BoxPredictor_3/BoxEncodingPredictor_depthwise/BatchNorm/beta",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/BoxEncodingPredictor_depthwise/BatchNorm/moving_mean"
+          "name": "BoxPredictor_3/BoxEncodingPredictor_depthwise/BatchNorm/moving_mean",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/BoxEncodingPredictor_depthwise/BatchNorm/moving_variance"
+          "name": "BoxPredictor_3/BoxEncodingPredictor_depthwise/BatchNorm/moving_variance",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19716,14 +19806,20 @@
             24
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/BoxEncodingPredictor/weights"
+          "name": "BoxPredictor_3/BoxEncodingPredictor/weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             24
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/BoxEncodingPredictor/biases"
+          "name": "BoxPredictor_3/BoxEncodingPredictor/biases",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19733,35 +19829,50 @@
             1
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/BoxEncodingPredictor_depthwise/depthwise_weights"
+          "name": "BoxPredictor_4/BoxEncodingPredictor_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/BoxEncodingPredictor_depthwise/BatchNorm/gamma"
+          "name": "BoxPredictor_4/BoxEncodingPredictor_depthwise/BatchNorm/gamma",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/BoxEncodingPredictor_depthwise/BatchNorm/beta"
+          "name": "BoxPredictor_4/BoxEncodingPredictor_depthwise/BatchNorm/beta",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/BoxEncodingPredictor_depthwise/BatchNorm/moving_mean"
+          "name": "BoxPredictor_4/BoxEncodingPredictor_depthwise/BatchNorm/moving_mean",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/BoxEncodingPredictor_depthwise/BatchNorm/moving_variance"
+          "name": "BoxPredictor_4/BoxEncodingPredictor_depthwise/BatchNorm/moving_variance",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19771,14 +19882,20 @@
             24
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/BoxEncodingPredictor/weights"
+          "name": "BoxPredictor_4/BoxEncodingPredictor/weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             24
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/BoxEncodingPredictor/biases"
+          "name": "BoxPredictor_4/BoxEncodingPredictor/biases",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19788,35 +19905,50 @@
             1
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/BoxEncodingPredictor_depthwise/depthwise_weights"
+          "name": "BoxPredictor_5/BoxEncodingPredictor_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/BoxEncodingPredictor_depthwise/BatchNorm/gamma"
+          "name": "BoxPredictor_5/BoxEncodingPredictor_depthwise/BatchNorm/gamma",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/BoxEncodingPredictor_depthwise/BatchNorm/beta"
+          "name": "BoxPredictor_5/BoxEncodingPredictor_depthwise/BatchNorm/beta",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/BoxEncodingPredictor_depthwise/BatchNorm/moving_mean"
+          "name": "BoxPredictor_5/BoxEncodingPredictor_depthwise/BatchNorm/moving_mean",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/BoxEncodingPredictor_depthwise/BatchNorm/moving_variance"
+          "name": "BoxPredictor_5/BoxEncodingPredictor_depthwise/BatchNorm/moving_variance",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19826,14 +19958,20 @@
             24
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/BoxEncodingPredictor/weights"
+          "name": "BoxPredictor_5/BoxEncodingPredictor/weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             24
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/BoxEncodingPredictor/biases"
+          "name": "BoxPredictor_5/BoxEncodingPredictor/biases",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [],
@@ -19858,35 +19996,50 @@
             1
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/ClassPredictor_depthwise/depthwise_weights"
+          "name": "BoxPredictor_0/ClassPredictor_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/ClassPredictor_depthwise/BatchNorm/gamma"
+          "name": "BoxPredictor_0/ClassPredictor_depthwise/BatchNorm/gamma",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/ClassPredictor_depthwise/BatchNorm/beta"
+          "name": "BoxPredictor_0/ClassPredictor_depthwise/BatchNorm/beta",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/ClassPredictor_depthwise/BatchNorm/moving_mean"
+          "name": "BoxPredictor_0/ClassPredictor_depthwise/BatchNorm/moving_mean",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/ClassPredictor_depthwise/BatchNorm/moving_variance"
+          "name": "BoxPredictor_0/ClassPredictor_depthwise/BatchNorm/moving_variance",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19896,14 +20049,20 @@
             273
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/ClassPredictor/weights"
+          "name": "BoxPredictor_0/ClassPredictor/weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             273
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_0/ClassPredictor/biases"
+          "name": "BoxPredictor_0/ClassPredictor/biases",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [],
@@ -19918,35 +20077,50 @@
             1
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/ClassPredictor_depthwise/depthwise_weights"
+          "name": "BoxPredictor_1/ClassPredictor_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             1280
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/ClassPredictor_depthwise/BatchNorm/gamma"
+          "name": "BoxPredictor_1/ClassPredictor_depthwise/BatchNorm/gamma",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             1280
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/ClassPredictor_depthwise/BatchNorm/beta"
+          "name": "BoxPredictor_1/ClassPredictor_depthwise/BatchNorm/beta",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             1280
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/ClassPredictor_depthwise/BatchNorm/moving_mean"
+          "name": "BoxPredictor_1/ClassPredictor_depthwise/BatchNorm/moving_mean",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             1280
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/ClassPredictor_depthwise/BatchNorm/moving_variance"
+          "name": "BoxPredictor_1/ClassPredictor_depthwise/BatchNorm/moving_variance",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -19956,14 +20130,20 @@
             546
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/ClassPredictor/weights"
+          "name": "BoxPredictor_1/ClassPredictor/weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             546
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_1/ClassPredictor/biases"
+          "name": "BoxPredictor_1/ClassPredictor/biases",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [],
@@ -19978,35 +20158,50 @@
             1
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/ClassPredictor_depthwise/depthwise_weights"
+          "name": "BoxPredictor_2/ClassPredictor_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             512
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/ClassPredictor_depthwise/BatchNorm/gamma"
+          "name": "BoxPredictor_2/ClassPredictor_depthwise/BatchNorm/gamma",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             512
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/ClassPredictor_depthwise/BatchNorm/beta"
+          "name": "BoxPredictor_2/ClassPredictor_depthwise/BatchNorm/beta",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             512
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/ClassPredictor_depthwise/BatchNorm/moving_mean"
+          "name": "BoxPredictor_2/ClassPredictor_depthwise/BatchNorm/moving_mean",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             512
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/ClassPredictor_depthwise/BatchNorm/moving_variance"
+          "name": "BoxPredictor_2/ClassPredictor_depthwise/BatchNorm/moving_variance",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20016,14 +20211,20 @@
             546
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/ClassPredictor/weights"
+          "name": "BoxPredictor_2/ClassPredictor/weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             546
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_2/ClassPredictor/biases"
+          "name": "BoxPredictor_2/ClassPredictor/biases",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [],
@@ -20038,35 +20239,50 @@
             1
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/ClassPredictor_depthwise/depthwise_weights"
+          "name": "BoxPredictor_3/ClassPredictor_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/ClassPredictor_depthwise/BatchNorm/gamma"
+          "name": "BoxPredictor_3/ClassPredictor_depthwise/BatchNorm/gamma",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/ClassPredictor_depthwise/BatchNorm/beta"
+          "name": "BoxPredictor_3/ClassPredictor_depthwise/BatchNorm/beta",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/ClassPredictor_depthwise/BatchNorm/moving_mean"
+          "name": "BoxPredictor_3/ClassPredictor_depthwise/BatchNorm/moving_mean",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/ClassPredictor_depthwise/BatchNorm/moving_variance"
+          "name": "BoxPredictor_3/ClassPredictor_depthwise/BatchNorm/moving_variance",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20076,14 +20292,20 @@
             546
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/ClassPredictor/weights"
+          "name": "BoxPredictor_3/ClassPredictor/weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             546
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_3/ClassPredictor/biases"
+          "name": "BoxPredictor_3/ClassPredictor/biases",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [],
@@ -20098,35 +20320,50 @@
             1
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/ClassPredictor_depthwise/depthwise_weights"
+          "name": "BoxPredictor_4/ClassPredictor_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/ClassPredictor_depthwise/BatchNorm/gamma"
+          "name": "BoxPredictor_4/ClassPredictor_depthwise/BatchNorm/gamma",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/ClassPredictor_depthwise/BatchNorm/beta"
+          "name": "BoxPredictor_4/ClassPredictor_depthwise/BatchNorm/beta",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/ClassPredictor_depthwise/BatchNorm/moving_mean"
+          "name": "BoxPredictor_4/ClassPredictor_depthwise/BatchNorm/moving_mean",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/ClassPredictor_depthwise/BatchNorm/moving_variance"
+          "name": "BoxPredictor_4/ClassPredictor_depthwise/BatchNorm/moving_variance",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20136,14 +20373,20 @@
             546
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/ClassPredictor/weights"
+          "name": "BoxPredictor_4/ClassPredictor/weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             546
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_4/ClassPredictor/biases"
+          "name": "BoxPredictor_4/ClassPredictor/biases",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [],
@@ -20158,35 +20401,50 @@
             1
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/ClassPredictor_depthwise/depthwise_weights"
+          "name": "BoxPredictor_5/ClassPredictor_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/ClassPredictor_depthwise/BatchNorm/gamma"
+          "name": "BoxPredictor_5/ClassPredictor_depthwise/BatchNorm/gamma",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/ClassPredictor_depthwise/BatchNorm/beta"
+          "name": "BoxPredictor_5/ClassPredictor_depthwise/BatchNorm/beta",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/ClassPredictor_depthwise/BatchNorm/moving_mean"
+          "name": "BoxPredictor_5/ClassPredictor_depthwise/BatchNorm/moving_mean",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/ClassPredictor_depthwise/BatchNorm/moving_variance"
+          "name": "BoxPredictor_5/ClassPredictor_depthwise/BatchNorm/moving_variance",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20196,21 +20454,30 @@
             546
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/ClassPredictor/weights"
+          "name": "BoxPredictor_5/ClassPredictor/weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             546
           ],
           "dtype": "float32",
-          "name": "BoxPredictor_5/ClassPredictor/biases"
+          "name": "BoxPredictor_5/ClassPredictor/biases",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             160
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20220,14 +20487,20 @@
             960
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             960
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20237,21 +20510,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             960
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             960
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20261,14 +20543,20 @@
             160
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_15/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             160
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20278,14 +20566,20 @@
             960
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             960
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20295,21 +20589,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             960
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             960
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20319,14 +20622,20 @@
             160
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_14/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             96
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20336,14 +20645,20 @@
             576
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20353,21 +20668,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20377,14 +20701,20 @@
             96
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_12/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             96
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20394,14 +20724,20 @@
             576
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20411,21 +20747,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20435,14 +20780,20 @@
             96
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_11/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             64
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20452,14 +20803,20 @@
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20469,21 +20826,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20493,14 +20859,20 @@
             64
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_9/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             64
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20510,14 +20882,20 @@
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20527,21 +20905,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20551,14 +20938,20 @@
             64
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_8/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             64
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20568,14 +20961,20 @@
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20585,21 +20984,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20609,14 +21017,20 @@
             64
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_7/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             32
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20626,14 +21040,20 @@
             192
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             192
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20643,21 +21063,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             192
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             192
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20667,14 +21096,20 @@
             32
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_5/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             32
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20684,14 +21119,20 @@
             192
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             192
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20701,21 +21142,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             192
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             192
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20725,14 +21175,20 @@
             32
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_4/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             24
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20742,14 +21198,20 @@
             144
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             144
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20759,21 +21221,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             144
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             144
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20783,12 +21254,18 @@
             24
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_2/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [],
           "dtype": "float32",
-          "name": "Preprocessor/mul/x"
+          "name": "Preprocessor/mul/x",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [],
@@ -20798,7 +21275,10 @@
         {
           "shape": [],
           "dtype": "float32",
-          "name": "Preprocessor/sub/y"
+          "name": "Preprocessor/sub/y",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20808,14 +21288,20 @@
             32
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/Conv/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/Conv/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             32
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/Conv/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/Conv/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20825,21 +21311,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             32
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             32
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20849,14 +21344,20 @@
             16
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             16
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20866,14 +21367,20 @@
             96
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             96
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20883,21 +21390,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             96
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             96
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20907,14 +21423,20 @@
             24
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             24
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_1/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20924,14 +21446,20 @@
             144
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             144
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20941,21 +21469,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             144
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             144
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20965,14 +21502,20 @@
             32
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             32
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_3/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20982,14 +21525,20 @@
             192
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             192
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -20999,21 +21548,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             192
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             192
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21023,14 +21581,20 @@
             64
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             64
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_6/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21040,14 +21604,20 @@
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21057,21 +21627,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             384
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21081,14 +21660,20 @@
             96
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             96
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_10/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21098,14 +21683,20 @@
             576
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21115,21 +21706,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             576
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21139,14 +21739,20 @@
             160
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             160
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_13/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21156,14 +21762,20 @@
             960
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/expand/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/expand/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             960
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/expand/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/expand/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21173,21 +21785,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             960
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             960
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21197,14 +21818,20 @@
             320
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/project/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/project/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             320
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/project/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/expanded_conv_16/project/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21214,14 +21841,20 @@
             1280
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/Conv_1/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/Conv_1/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             1280
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/Conv_1/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/Conv_1/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21231,14 +21864,20 @@
             256
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_2_1x1_256/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_2_1x1_256/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_2_1x1_256/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_2_1x1_256/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21248,21 +21887,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_2_3x3_s2_512_depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_2_3x3_s2_512_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_2_3x3_s2_512_depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_2_3x3_s2_512_depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_2_3x3_s2_512_depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_2_3x3_s2_512_depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21272,14 +21920,20 @@
             512
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_2_3x3_s2_512/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_2_3x3_s2_512/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             512
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_2_3x3_s2_512/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_2_3x3_s2_512/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21289,14 +21943,20 @@
             128
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_3_1x1_128/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_3_1x1_128/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_3_1x1_128/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_3_1x1_128/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21306,21 +21966,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_3_3x3_s2_256_depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_3_3x3_s2_256_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_3_3x3_s2_256_depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_3_3x3_s2_256_depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_3_3x3_s2_256_depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_3_3x3_s2_256_depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21330,14 +21999,20 @@
             256
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_3_3x3_s2_256/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_3_3x3_s2_256/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_3_3x3_s2_256/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_3_3x3_s2_256/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21347,14 +22022,20 @@
             128
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_4_1x1_128/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_4_1x1_128/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_4_1x1_128/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_4_1x1_128/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21364,21 +22045,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_4_3x3_s2_256_depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_4_3x3_s2_256_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_4_3x3_s2_256_depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_4_3x3_s2_256_depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_4_3x3_s2_256_depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_4_3x3_s2_256_depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21388,14 +22078,20 @@
             256
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_4_3x3_s2_256/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_4_3x3_s2_256/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             256
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_4_3x3_s2_256/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_4_3x3_s2_256/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21405,14 +22101,20 @@
             64
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_5_1x1_64/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_5_1x1_64/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             64
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_5_1x1_64/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_1_Conv2d_5_1x1_64/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21422,21 +22124,30 @@
             1
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_5_3x3_s2_128_depthwise/depthwise_weights"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_5_3x3_s2_128_depthwise/depthwise_weights",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             64
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_5_3x3_s2_128_depthwise/BatchNorm/batchnorm/mul"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_5_3x3_s2_128_depthwise/BatchNorm/batchnorm/mul",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             64
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_5_3x3_s2_128_depthwise/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_5_3x3_s2_128_depthwise/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21446,14 +22157,20 @@
             128
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_5_3x3_s2_128/Conv2D/merged_input"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_5_3x3_s2_128/Conv2D/merged_input",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
             128
           ],
           "dtype": "float32",
-          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_5_3x3_s2_128/BatchNorm/batchnorm/sub"
+          "name": "FeatureExtractor/MobilenetV2/layer_19_2_Conv2d_5_3x3_s2_128/BatchNorm/batchnorm/sub",
+          "quantization": {
+            "dtype": "float16"
+          }
         },
         {
           "shape": [
@@ -21538,11 +22255,9 @@
         }
       ],
       "paths": [
-        "group1-shard1of5.bin",
-        "group1-shard2of5.bin",
-        "group1-shard3of5.bin",
-        "group1-shard4of5.bin",
-        "group1-shard5of5.bin"
+        "group1-shard1of3.bin",
+        "group1-shard2of3.bin",
+        "group1-shard3of3.bin"
       ]
     }
   ]

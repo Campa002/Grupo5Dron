@@ -14,6 +14,10 @@
  *
  * DronGiroscopio (lo usa la cabina):
  *  - Permiso explícito en iOS 13+.
+ *  - La inclinación es respecto de la PANTALLA (vertical y las dos horizontales): "adelante" es hacia el
+ *    borde de arriba de lo que se ve. En vertical natural es igual que siempre.
+ *  - Si la orientación de la pantalla cambia con la inclinación activada, se desactiva (emite 0, 0) y avisa
+ *    con onCambioOrientacion: hay que volver a activarla, y así se recalibra.
  *  - Calibración: la primera lectura después de activar (o de calibrar() o de cambiar de sensor) es el "centro".
  *  - Zona muerta, límite de ángulo, sensibilidad y suavizado (EMA), iguales que antes.
  *  - Al desactivar, emite pitch y roll en 0.
@@ -21,22 +25,59 @@
  * Uso:
  *   const giro = new DronGiroscopio({ onChange: ({pitch, roll}) => { ... } });
  *   giro.onFuente = (fuente) => { ... };  // 'giroscopio' | 'acelerometro' | 'ninguno'
+ *   giro.onCambioOrientacion = (angulo) => { ... };  // ya se desactivó: avisar y pedir recalibrar
  *   await giro.activar();
  *   giro.desactivar();
  */
 
+const GRADOS = 180 / Math.PI;
+
 /**
- * beta y gamma (grados) a partir de la gravedad que mide el acelerómetro, con la misma convención que
- * deviceorientation en Android: beta = 0 apoyado boca arriba y 90 parado (pantalla hacia vos);
- * gamma positivo al bajar el costado derecho. Rango: beta (-180, 180], gamma [-90, 90].
- * @param {number} x @param {number} y @param {number} z  accelerationIncludingGravity (m/s²)
+ * beta y gamma (grados) a partir del vector "arriba" que mide el acelerómetro (accelerationIncludingGravity,
+ * en ejes del teléfono). Es la inversa exacta de la convención de deviceorientation (W3C, Z-X'-Y''):
+ * beta = 0 apoyado boca arriba y 90 parado (pantalla hacia vos); gamma positivo al bajar el costado derecho.
+ * Rango: beta [-180, 180], gamma [-90, 90].
+ * @param {number} x @param {number} y @param {number} z
  */
 function inclinacionDesdeGravedad(x, y, z) {
-    const grados = 180 / Math.PI;
+    const s = z < 0 ? -1 : 1; // signo de cos(beta) (cos(gamma) nunca es negativo)
     return {
-        beta: Math.atan2(y, z) * grados,
-        gamma: Math.atan2(-x, Math.hypot(y, z)) * grados,
+        beta: Math.atan2(y, s * Math.hypot(x, z)) * GRADOS,
+        gamma: Math.atan2(-x * s, Math.abs(z)) * GRADOS,
     };
+}
+
+/** Vector "arriba" (unitario, ejes del teléfono) que corresponde a beta y gamma de deviceorientation. */
+function arribaDesdeInclinacion(beta, gamma) {
+    const b = beta / GRADOS;
+    const g = gamma / GRADOS;
+    return { x: -Math.sin(g) * Math.cos(b), y: Math.sin(b), z: Math.cos(g) * Math.cos(b) };
+}
+
+/**
+ * Ángulo de la pantalla respecto de la posición natural del teléfono: 0, 90, 180 o 270.
+ * 90 = teléfono girado en sentido antihorario (el borde de arriba queda a la izquierda).
+ */
+function anguloPantalla() {
+    let a = 0;
+    if (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.angle === 'number') a = screen.orientation.angle;
+    else if (typeof window !== 'undefined' && typeof window.orientation === 'number') a = window.orientation;
+    return ((Math.round(a / 90) * 90) % 360 + 360) % 360;
+}
+
+/**
+ * Pasa beta y gamma (ejes del teléfono) a los ejes de la PANTALLA: "adelante/atrás" es respecto del borde
+ * de arriba de lo que se ve y "costados" respecto de sus lados, en vertical y en las dos horizontales.
+ * Con el ángulo 0 (vertical natural) devuelve los mismos valores, sin cuentas: es el comportamiento de siempre.
+ */
+function inclinacionEnPantalla(beta, gamma, angulo) {
+    if (!angulo) return { beta, gamma };
+    const v = arribaDesdeInclinacion(beta, gamma);
+    const t = angulo / GRADOS;
+    const c = Math.round(Math.cos(t));
+    const s = Math.round(Math.sin(t));
+    // Componentes del vector en los ejes de la pantalla (derecha y arriba de lo que se ve)
+    return inclinacionDesdeGravedad(v.x * c - v.y * s, v.x * s + v.y * c, v.z);
 }
 
 /** Texto para la interfaz según el sensor que se está usando. */
@@ -145,6 +186,7 @@ class DronGiroscopio {
      * @param {number}   [config.limiteAngulo]   - Ángulo máximo mapeado a 1.0. Default: 30.
      * @param {number}   [config.sensibilidad]   - Multiplicador [0.1, 2.0]. Default: 1.0.
      * @param {number}   [config.suavizado]      - Factor EMA [0, 1]. 0 = sin suavizado. Default: 0.3.
+     * @param {Function} [config.obtenerAngulo]  - () => 0 | 90 | 180 | 270 (para las pruebas). Default: anguloPantalla.
      */
     constructor({
         onChange = null,
@@ -152,10 +194,15 @@ class DronGiroscopio {
         limiteAngulo = 30,
         sensibilidad = 1.0,
         suavizado = 0.3,
+        obtenerAngulo = anguloPantalla,
     } = {}) {
         this.onChange     = onChange;
         /** @type {Function|null} (fuente) 'giroscopio' | 'acelerometro' | 'ninguno' */
         this.onFuente     = null;
+        /** @type {Function|null} (anguloNuevo) la pantalla giró con la inclinación activada (ya se desactivó) */
+        this.onCambioOrientacion = null;
+        this.obtenerAngulo = obtenerAngulo;
+        this.angulo = 0;   // orientación de la pantalla con la que se activó y calibró
         this.zonaMuerta   = zonaMuerta;
         this.limiteAngulo = limiteAngulo;
         this.sensibilidad = sensibilidad;
@@ -178,6 +225,7 @@ class DronGiroscopio {
         this.roll  = 0;
 
         this._lector = null;
+        this._onOrientacionPantalla = () => this._revisarOrientacion();
     }
 
     // ----------------------------------------------------------------
@@ -224,6 +272,7 @@ class DronGiroscopio {
         this.roll  = 0;
         this.permiso = true;
         this.fuente = null;
+        this.angulo = this.obtenerAngulo();
 
         this._lector = new LectorInclinacion({
             onLectura: ({ beta, gamma }) => this._procesarLectura(beta, gamma),
@@ -235,6 +284,10 @@ class DronGiroscopio {
         });
         this._lector.iniciar();
         this.activo = true;
+        if (typeof screen !== 'undefined' && screen.orientation?.addEventListener) {
+            screen.orientation.addEventListener('change', this._onOrientacionPantalla);
+        }
+        if (typeof window !== 'undefined') window.addEventListener('orientationchange', this._onOrientacionPantalla);
         return { ok: true };
     }
 
@@ -245,6 +298,10 @@ class DronGiroscopio {
         if (!this.activo) return;
         this._lector?.detener();
         this._lector = null;
+        if (typeof screen !== 'undefined' && screen.orientation?.removeEventListener) {
+            screen.orientation.removeEventListener('change', this._onOrientacionPantalla);
+        }
+        if (typeof window !== 'undefined') window.removeEventListener('orientationchange', this._onOrientacionPantalla);
         this.activo = false;
         this.pitch  = 0;
         this.roll   = 0;
@@ -263,13 +320,30 @@ class DronGiroscopio {
         this._baseGamma = null;
     }
 
+    /**
+     * Si la pantalla giró desde que se activó, se desactiva (ejes en 0) y se avisa.
+     * La calibración era para la otra orientación: hay que volver a activarla.
+     * @returns {boolean} true si se desactivó
+     */
+    _revisarOrientacion() {
+        if (!this.activo) return false;
+        const angulo = this.obtenerAngulo();
+        if (angulo === this.angulo) return false;
+        this.desactivar();
+        if (typeof this.onCambioOrientacion === 'function') this.onCambioOrientacion(angulo);
+        return true;
+    }
+
     // ----------------------------------------------------------------
     // Procesamiento interno (igual para el giroscopio y el acelerómetro)
     // ----------------------------------------------------------------
 
-    _procesarLectura(beta, gamma) {
+    _procesarLectura(betaTelefono, gammaTelefono) {
+        if (this._revisarOrientacion()) return;
+        // Inclinación respecto de la pantalla (en vertical natural, los mismos valores de siempre)
         // beta  ≈ inclinación adelante/atrás  → Pitch
         // gamma ≈ inclinación izquierda/derecha → Roll
+        const { beta, gamma } = inclinacionEnPantalla(betaTelefono, gammaTelefono, this.angulo);
 
         // Primera lectura → guardar como calibración base
         if (this._baseBeta === null) {
@@ -316,6 +390,9 @@ class DronGiroscopio {
 // Lector y utilidades accesibles desde Sensores y las pruebas
 DronGiroscopio.LectorInclinacion = LectorInclinacion;
 DronGiroscopio.inclinacionDesdeGravedad = inclinacionDesdeGravedad;
+DronGiroscopio.inclinacionEnPantalla = inclinacionEnPantalla;
+DronGiroscopio.arribaDesdeInclinacion = arribaDesdeInclinacion;
+DronGiroscopio.anguloPantalla = anguloPantalla;
 DronGiroscopio.textoFuente = textoFuenteInclinacion;
 
 // En Node (pruebas automáticas) se exporta como módulo; en el navegador queda como global
