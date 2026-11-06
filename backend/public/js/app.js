@@ -110,7 +110,10 @@ const App = (() => {
     }
 
     /**
-     * Carga y obtiene una plantilla parcial HTML (/pages/*.html).
+     * Carga y obtiene una plantilla parcial HTML (/pages/*.php).
+     * Las páginas son .php pero no dependen de PHP: en el APK no hay PHP y Capacitor las sirve como archivos
+     * (build-apk.js les quita cualquier bloque <?php ... ?>). Tienen extensión para que Capacitor
+     * no responda index.html en su lugar.
      * @param {string} nombre Nombre de la página (ej: 'inicio')
      * @returns {Promise<string>} Contenido HTML
      */
@@ -121,11 +124,16 @@ const App = (() => {
 
         try {
             // Sin parámetros en la URL (no llena la caché) y revalidando con el servidor: siempre la versión actual
-            const respuesta = await fetch(`/pages/${nombre}.html`, { cache: 'no-cache' });
+            const respuesta = await fetch(`/pages/${nombre}.php`, { cache: 'no-cache' });
             if (!respuesta.ok) {
                 throw new Error(`No se pudo cargar la vista "${nombre}" (HTTP ${respuesta.status})`);
             }
             const html = await respuesta.text();
+            // Una vista es un fragmento: si llega un documento completo (por ejemplo, index.html en vez del archivo),
+            // se avisa en lugar de meter la app dentro de sí misma
+            if (/<!doctype|<html[\s>]/i.test(html.slice(0, 500))) {
+                throw new Error(`La vista "${nombre}" llegó como una página completa: el archivo no se encontró`);
+            }
             cachePlantillas[nombre] = html;
             return html;
         } catch (error) {
@@ -568,7 +576,7 @@ const App = (() => {
     }
 
     /**
-     * Inicializa la vista de Diagnóstico de Sensores (/pages/sensores.html):
+     * Inicializa la vista de Diagnóstico de Sensores (/pages/sensores.php):
      * diagnóstico de disponibilidad y lectura en vivo del giroscopio.
      * @param {HTMLElement} contenedor
      * @returns {Function} limpieza que deja de escuchar el sensor al salir de la página

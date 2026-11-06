@@ -4,7 +4,8 @@ Script de verificación de referencias de recursos — Grupo 5: Control de Siste
 Verifica que:
  1. Cada <script src> y <link href> local en index.php exista en backend/public.
  2. Cada ruta en RECURSOS_ESTATICOS de sw.js exista en backend/public.
- 3. Cada vista/página referenciada en app.js exista en backend/public/pages/.
+ 3. Cada vista/página referenciada en app.js exista en backend/public/pages/ (como .php).
+ 4. No quede ningún .html en pages/ y avisa si una página trae código PHP (en el APK se quita).
 """
 import os
 import re
@@ -77,7 +78,20 @@ m_rutas = re.search(r'const\s+rutasValidas\s*=\s*\[(.*?)\];', app_content)
 if m_rutas:
     paginas = re.findall(r'["\']([^"\']+)["\']', m_rutas.group(1))
     for p in paginas:
-        verificar_archivo(f"/pages/{p}.html", 'app.js rutasValidas')
+        verificar_archivo(f"/pages/{p}.php", 'app.js rutasValidas')
+
+# 4. Las páginas son .php pero no pueden depender de PHP (en el APK no hay PHP).
+#    No tiene que quedar ningún .html en pages/, y si una página trae bloques PHP se avisa:
+#    build-apk.js los quita al generar www/, así que en el APK no van a estar.
+dir_paginas = os.path.join(BASE_PUB, 'pages')
+for nombre in sorted(os.listdir(dir_paginas)):
+    ruta = os.path.join(dir_paginas, nombre)
+    if nombre.lower().endswith('.html'):
+        faltantes.append(f"pages/{nombre} (las páginas tienen que ser .php)")
+    elif nombre.endswith('.php'):
+        with open(ruta, 'r', encoding='utf-8') as f:
+            if re.search(r'<\?(php|=)', f.read()):
+                print(f"[AVISO] pages/{nombre} tiene código PHP: en el APK se quita (las páginas no pueden depender de PHP).")
 
 print(f"=== REVISION DE REFERENCIAS ESTATICAS ===")
 print(f"Total de referencias verificadas: {verificados}")
@@ -87,5 +101,5 @@ if faltantes:
         print("  - " + f)
     sys.exit(1)
 else:
-    print("[OK] TODAS las referencias (65) existen correctamente en backend/public.")
+    print(f"[OK] TODAS las referencias ({verificados}) existen correctamente en backend/public.")
     sys.exit(0)

@@ -132,6 +132,12 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - Arreglo: shards renombrados a `.bin` y `paths` de `model.json`.
     - Se agregaron: un paso de CI que lista el modelo en el repo, en www, en los assets y en el APK; "Verificar modelo" en Prueba Tello; y un `.gitattributes` preventivo.
     - Verificado en el navegador emulando la regla de Capacitor: reproduce el mismo error con los nombres viejos y carga bien con los nuevos.
+22. **Sin emojis (6/11).** Íconos SVG propios en `app.css` (sin librerías), puntos de estado en CSS, EMERGENCIA roja en mayúsculas. Queda solo 🧭 del giroscopio. En el aula se cambiaron solo textos e íconos.
+23. **Páginas .html → .php (6/11).** Pedido de Luciano: que no haya archivos .html en el proyecto.
+    - Las diez vistas de `pages/` pasaron a `.php` con el mismo contenido; `app.js` las pide como `/pages/x.php`; `sw.js` v8.
+    - En el APK no hay PHP: `build-apk.js` copia las páginas con el mismo nombre y les quita cualquier bloque PHP; si quedara alguno, el build falla.
+    - Capacitor 5.7.8 sirve los archivos con extensión desde los assets (no cae en index.html). El content-type de `.php` lo decide Android (`URLConnection.guessContentTypeFromName`); a `fetch().text()` no le importa. `cargarPlantilla` además rechaza una respuesta que sea una página completa.
+    - Verificado emulando a Capacitor (www/ generado, rutas sin "." → index.html) con tres content-types distintos para `.php`.
 
 ## 4. Hardware
 

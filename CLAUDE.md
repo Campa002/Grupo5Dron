@@ -28,8 +28,8 @@ App móvil con una pantalla principal que permite elegir entre "Control del Aula
 ## Alcance actual: SOLO EL DRON
 
 - El módulo del AULA está en pausa y lo continúa un compañero. Su estado completo quedó en la rama `aula-completo` y el tag `respaldo-pre-limpieza`.
-- NO modifiques la lógica del aula: `backend/public/js/aula.js`, `backend/public/js/admin.js`, `backend/public/pages/aula.html`, `backend/api/comandos.php`, `dispositivos.php`, `botones.php`, `esp32.php`, ni `posibles-implementaciones/aula-esp32/`.
-- El código compartido (`app.js`, `api.js`, `auth.js`, `index.php`, `sw.js`, `app.css`, `login.html`, backend de auth/usuarios/config/perfiles) se puede tocar, pero sin romper el aula. Avisale a Luciano ANTES de cambiar algo compartido.
+- NO modifiques la lógica del aula: `backend/public/js/aula.js`, `backend/public/js/admin.js`, `backend/public/pages/aula.php`, `backend/public/pages/admin.php`, `backend/api/comandos.php`, `dispositivos.php`, `botones.php`, `esp32.php`, ni `posibles-implementaciones/aula-esp32/`.
+- El código compartido (`app.js`, `api.js`, `auth.js`, `index.php`, `sw.js`, `app.css`, `login.php`, backend de auth/usuarios/config/perfiles) se puede tocar, pero sin romper el aula. Avisale a Luciano ANTES de cambiar algo compartido.
 
 ## Arquitectura
 
@@ -40,7 +40,7 @@ Celular (APK Capacitor 5, frontend local en https://localhost)
 ```
 
 - Frontend: PWA en HTML/CSS/JS vanilla, en `backend/public/`, router por hash (`#/inicio`, `#/dron`, `#/prueba-tello`, `#/sensores`, `#/config-dron`, `#/aula`, `#/admin`, `#/acerca`, `#/login`).
-- El APK empaqueta ese frontend: `scripts/build-apk.js` genera `capacitor/www/` (generado, ignorado por git) con un `index.html` estático a partir de `index.php`.
+- El APK empaqueta ese frontend: `scripts/build-apk.js` genera `capacitor/www/` (generado, ignorado por git) con un `index.html` estático a partir de `index.php` y copia las páginas (`pages/*.php`) con el mismo nombre, quitándoles cualquier bloque `<?php ... ?>`.
 - Plugin nativo propio `DronNative` en Java (`capacitor/android_plugin/DronNativePlugin.java`) para UDP y para forzar el uso del WiFi del Tello aunque no tenga internet. El navegador solo no puede mandar UDP: por eso existe el APK.
 - NO hay ESP32 en el dron. El celular habla directo con el Tello.
 - El módulo del dron funciona SIN internet y SIN cuenta:
@@ -90,7 +90,7 @@ backend/
     js/config-dron.js       perfiles (cache offline), timeout del failsafe
     js/sensores.js          diagnóstico de sensores del celular
     js/app.js, api.js, auth.js   compartidos (router, modo sin cuenta, Prueba Tello, sesión offline)
-    pages/*.html            vistas parciales
+    pages/*.php             vistas parciales (fragmentos HTML; no dependen de PHP)
     libs/tfjs, libs/coco-ssd  modelo de visión LOCAL (~19 MB, sí va al repo)
 capacitor/        capacitor.config.json, package.json, network_security_config.xml, android_plugin/
 scripts/          build-apk.js, check_js.py, check_refs.py, generar_hash.php
@@ -124,6 +124,7 @@ docs/contexto/    informe, historial, reportes
 - Archivos con finales de línea CRLF: si una edición falla, revisá eso.
 - Nada de recursos externos (CDN, Google Fonts): el APK tiene que andar sin internet.
 - Todo archivo que use la app tiene que tener extensión. En el APK, Capacitor responde index.html a cualquier ruta sin "." (html5mode). Por eso los shards del modelo son `group1-shardNofM.bin`. Si se cambia el modelo, renombrar los shards y sus `paths` en `model.json`.
+- Las páginas son .php pero no pueden depender de PHP para funcionar en el APK. No hay archivos `.html` en el proyecto (`check_refs.py` falla si aparece uno en `pages/` y avisa si una página trae código PHP). `build-apk.js` quita todo bloque `<?php ... ?>` / `<?= ... ?>` al generar `www/` y falla si queda alguno. Capacitor sirve `/pages/x.php` como archivo porque tiene extensión; `cargarPlantilla` (app.js) no depende del content-type y avisa si en lugar de la vista llega una página completa.
 - `.gitattributes` marca como binarios `backend/public/libs/**`, imágenes, `.bin` y keystores (la PC tiene `core.autocrlf=true`).
 - Sin credenciales reales en el repo. `config.php` y `config.h` están en `.gitignore`.
 - Seguridad de vuelo. No debilites:

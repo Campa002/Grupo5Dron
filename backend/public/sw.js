@@ -9,7 +9,7 @@
  */
 
 // Subir este número cuando cambie la lista de recursos precacheados
-const CACHE_NAME = 'grupo5dron-v7';
+const CACHE_NAME = 'grupo5dron-v8';
 
 // Si la red tarda más que esto y hay copia en caché, se usa la copia (la red sigue actualizando en segundo plano)
 const ESPERA_RED_MS = 3000;
@@ -44,16 +44,16 @@ const RECURSOS_ESTATICOS = [
     '/js/dron.js',
     '/img/icon-192.png',
     '/img/icon-512.png',
-    '/pages/login.html',
-    '/pages/inicio.html',
-    '/pages/aula.html',
-    '/pages/admin.html',
-    '/pages/acerca.html',
-    '/pages/dron.html',
-    '/pages/sensores.html',
-    '/pages/prueba-tello.html',
-    '/pages/config-dron.html',
-    '/pages/cambiar-password.html',
+    '/pages/login.php',
+    '/pages/inicio.php',
+    '/pages/aula.php',
+    '/pages/admin.php',
+    '/pages/acerca.php',
+    '/pages/dron.php',
+    '/pages/sensores.php',
+    '/pages/prueba-tello.php',
+    '/pages/config-dron.php',
+    '/pages/cambiar-password.php',
 ];
 
 // Instalación: cachear recursos de a uno para que un fallo no frene a los demás
