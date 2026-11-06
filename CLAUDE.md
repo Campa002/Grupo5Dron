@@ -110,6 +110,10 @@ docs/contexto/    informe, historial, reportes
 - Pruebas automáticas: `node --test tests/seguimiento.test.js` (selector y controlador del seguimiento con recorridos sintéticos).
 - Pruebas en navegador: Playwright con Microsoft Edge del sistema (`chromium.launch({ channel: 'msedge' })`). Para el TelloAdapter sin dron, se puede inyectar un mock de `window.Capacitor.Plugins.DronNative` que respete el contrato de arriba.
 - APK: se compila en GitHub Actions en cada push a `main`. Artefacto: `Grupo5Dron-app-debug`.
+- Firma del APK debug:
+  - Si existe el secreto `DEBUG_KEYSTORE_BASE64`, el paso 10b lo instala como `~/.android/debug.keystore` (alias `androiddebugkey`, contraseña `android`) y el paso 11b verifica con `apksigner` que el APK quedó firmado con esa clave.
+  - Sin el secreto, o si no es válido, se usa la clave por defecto (cambia en cada build) y el build no falla.
+  - El keystore nunca va al repo (`.gitignore`: `*.keystore`, `*.jks`, `*.keystore.b64`).
 - NO agregues `android-actions/setup-android` al workflow: el SDK ya viene en el runner y esa acción rompió el build.
 - Mantené Capacitor 5.x con Node 20 y JDK 17. No actualices Capacitor sin que Luciano lo pida.
 
@@ -200,7 +204,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 
 ## Próximos pasos (lista única)
 
-1. **Primera prueba real con el Tello.** Commit, APK de CI e instalación (si dice "App no instalada", desinstalar la anterior: cada build de CI firma con otra clave debug). Después: "Usar el dron sin cuenta", `#/prueba-tello` (command, battery?, streamon), "Copiar informe" y pegarlo. Luego la cabina: despegar, aterrizar, paso, freno, giroscopio, failsafe, emergencia.
+1. **Primera prueba real con el Tello.** Commit, APK de CI e instalación. Con el secreto de firma cargado, los APK nuevos se instalan encima. La primera vez con la clave fija hay que desinstalar la versión anterior. Después: "Usar el dron sin cuenta", `#/prueba-tello` (command, battery?, streamon), "Copiar informe" y pegarlo. Luego la cabina: despegar, aterrizar, paso, freno, giroscopio, failsafe, emergencia.
 2. **Corregir lo que salga de esa prueba.** Lo más probable: red sin internet (`vincularRedWifi`), video en el WebView, si el `rc` interfiere con los pasos y la unidad de `vgx`/`vgy`.
 3. ~~Fase 2, funciones~~: hecha (ver "Estado").
 4. ~~Fase 3, interfaz~~: hecha (ver "Estado").
@@ -208,7 +212,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 6. **Seguimiento v2** (una sola tubería: candidatos → selector de objetivo → suavizado → controlador; ensayo y control real comparten todo):
    - ~~S1~~: hecha (ver "Estado"). Pasan a S3: cancelar el seguimiento real con cualquier toque de joystick y aplicar las condiciones de activación.
    - ~~S2~~: hecha (ver "Estado").
-   - Firma fija del APK debug (etapa aparte, al final de S2): keystore como secreto de GitHub en base64, nunca en el repo, con la clave por defecto si falta el secreto.
+   - ~~Firma fija del APK debug~~: hecha en el workflow. Falta que Luciano genere la clave y cargue el secreto `DEBUG_KEYSTORE_BASE64`.
    - S3 (después de la primera prueba con el Tello): habilitar el control real (con cancelación por toque de joystick y las condiciones de activación) y ajustar ganancias con el dron.
    - S4 (después de la primera prueba): "Mis objetos" (MobileNet local para embeddings, IndexedDB, selector por objeto guardado y por toque con rastreador).
 7. **Hosting:** subir el backend, importar `schema.sql` y crear `config.php` (con `https://localhost` en CORS). Cada cuenta del seed pide cambiar `password` en su primer login.

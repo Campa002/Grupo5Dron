@@ -35,3 +35,9 @@ desktop.ini
 
 # Junction local para desarrollo
 backend/public/api
+
+# Claves de firma del APK (nunca al repo: van como secreto de GitHub)
+*.keystore
+*.jks
+*.keystore.b64
+*.keystore.txt

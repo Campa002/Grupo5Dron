@@ -147,11 +147,64 @@ jobs:
         run: |
           npx cap sync android
 
+      # Firma fija del APK debug: así cada APK nuevo se instala encima del anterior sin desinstalar.
+      # Gradle firma los debug con ~/.android/debug.keystore (alias androiddebugkey, contraseña android).
+      # Si el secreto DEBUG_KEYSTORE_BASE64 no existe o no es válido, se usa la clave por defecto (el build no se rompe).
+      - name: 10b. Instalar la clave de firma fija (si existe el secreto)
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "${DEBUG_KEYSTORE_BASE64}" ]; then
+            echo "::notice::No existe el secreto DEBUG_KEYSTORE_BASE64: se usa la clave debug por defecto (cambia en cada build)."
+            echo "### 🔑 Firma: clave debug por defecto (cambia en cada build)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          TMP="$RUNNER_TEMP/debug.keystore"
+          if ! printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 -d > "$TMP" 2>/dev/null \
+             || ! keytool -list -keystore "$TMP" -storepass android -alias androiddebugkey > /dev/null 2>&1; then
+            echo "::warning::El secreto DEBUG_KEYSTORE_BASE64 no es un keystore válido (alias androiddebugkey, contraseña android): se usa la clave por defecto."
+            echo "### ⚠️ Firma: el secreto no es válido, se usó la clave por defecto" >> "$GITHUB_STEP_SUMMARY"
+            rm -f "$TMP"
+            exit 0
+          fi
+          # Ubicación por defecto del keystore debug (y las alternativas, si el runner las define)
+          DESTINOS="$HOME/.android"
+          [ -n "${ANDROID_USER_HOME:-}" ] && DESTINOS="$DESTINOS $ANDROID_USER_HOME"
+          [ -n "${ANDROID_SDK_HOME:-}" ] && DESTINOS="$DESTINOS $ANDROID_SDK_HOME/.android"
+          for d in $DESTINOS; do mkdir -p "$d"; cp "$TMP" "$d/debug.keystore"; done
+          HUELLA=$(keytool -list -v -keystore "$TMP" -storepass android -alias androiddebugkey | grep -m1 'SHA256:' | sed 's/.*SHA256: *//')
+          rm -f "$TMP"
+          echo "HUELLA_CLAVE=$HUELLA" >> "$GITHUB_ENV"
+          echo "Clave fija instalada en: $DESTINOS"
+          echo "SHA-256 de la clave: $HUELLA"
+
       - name: 11. Compilar APK Debug con Gradle
         working-directory: capacitor/android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
+
+      - name: 11b. Verificar con qué clave quedó firmado el APK
+        run: |
+          APK="capacitor/android/app/build/outputs/apk/debug/app-debug.apk"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/*/ 2>/dev/null | sort -V | tail -1)
+          if [ -z "$BT" ] || [ ! -x "${BT}apksigner" ]; then
+            echo "::notice::No se encontró apksigner: no se verifica la firma."
+            exit 0
+          fi
+          FIRMA=$("${BT}apksigner" verify --print-certs "$APK" | grep -m1 'SHA-256 digest' | sed 's/.*digest: *//')
+          echo "SHA-256 del certificado del APK: $FIRMA"
+          echo "### 🔑 Certificado del APK (SHA-256): \`$FIRMA\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${HUELLA_CLAVE:-}" ]; then
+            ESPERADA=$(printf '%s' "$HUELLA_CLAVE" | tr -d ':' | tr 'A-F' 'a-f')
+            if [ "$FIRMA" = "$ESPERADA" ]; then
+              echo "✅ El APK quedó firmado con la clave fija."
+              echo "✅ Firmado con la clave fija: se instala encima del anterior sin desinstalar." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::warning::El APK NO quedó firmado con la clave fija (esperada $ESPERADA)."
+              echo "⚠️ El APK no quedó firmado con la clave fija." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
 
       - name: 12. Publicar artefacto APK Debug
         uses: actions/upload-artifact@v4

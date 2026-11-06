@@ -121,6 +121,10 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - Panel en el video, ajustes editables (24, con validación), "Copiar registro" en CSV y demo con la cámara del celular en Sensores.
     - Probado con una cámara falsa de Edge que transmite una foto real con personas: detecta con WebGL a ~10 FPS y fija a una persona.
     - Pendiente de la prueba real: con una persona parada, la altura tiende a bajar hacia su centro (la cintura); ajustar en S3 con el dron.
+20. **Firma fija del APK debug (6/11).**
+    - El workflow instala el keystore del secreto `DEBUG_KEYSTORE_BASE64` en la ubicación por defecto de Gradle y verifica la firma con `apksigner`; sin secreto, usa la clave por defecto.
+    - Probado en local con un keystore generado con el mismo comando que usa Luciano: sin secreto, secreto inválido, secreto válido, y la huella de `keytool` coincide con el SHA-256 que imprime `apksigner`.
+    - Decisión: alias `androiddebugkey` y contraseña `android` (los que Gradle usa para debug), así no hay que tocar la configuración de Gradle. La protección es que el archivo es privado.
 
 ## 4. Hardware
 
