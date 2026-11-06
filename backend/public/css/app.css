@@ -1766,6 +1766,92 @@ body:not(.modo-tecnico) .solo-tecnico { display: none !important; }
 /* Interruptor más grande (área táctil de 44 px) */
 .switch { min-height: 2.75rem; }
 
+/* Ayuda corta de una sección (cabina) y explicación de las herramientas del modo técnico */
+.cab-ayuda {
+    margin-bottom: var(--espacio-sm);
+    font-size: var(--tamano-sm);
+    color: var(--color-texto-secundario);
+}
+.ayuda-tecnica {
+    list-style: none;
+    margin-bottom: var(--espacio-sm);
+    font-size: var(--tamano-xs);
+    color: var(--color-texto-secundario);
+}
+.ayuda-tecnica li { margin-bottom: 0.25rem; }
+.ayuda-tecnica b { color: var(--color-texto); }
+
+/* Mis objetos */
+.entrada-oculta {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    opacity: 0;
+}
+.btn.deshabilitado { opacity: 0.5; pointer-events: none; }
+.form-objeto { margin-top: var(--espacio-md); }
+.fotos-objeto {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+    gap: var(--espacio-sm);
+    margin-bottom: var(--espacio-sm);
+}
+.fotos-objeto li { position: relative; aspect-ratio: 1; }
+.fotos-objeto img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-sm);
+}
+.fotos-objeto__quitar {
+    position: absolute;
+    top: -0.5rem;
+    right: -0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    cursor: pointer;
+}
+/* Círculo oscuro con la cruz blanca encima: se ve sobre cualquier foto */
+.fotos-objeto__quitar::before {
+    content: '';
+    position: absolute;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    background: rgba(5, 11, 22, 0.9);
+    border: 1px solid var(--color-borde-claro);
+}
+.fotos-objeto__quitar .ico { position: relative; width: 1.1rem; height: 1.1rem; }
+.lista-objetos { list-style: none; }
+.lista-objetos__item {
+    display: flex;
+    align-items: center;
+    gap: var(--espacio-md);
+    padding: var(--espacio-sm) 0;
+    border-bottom: 1px solid var(--color-borde);
+}
+.lista-objetos__item img {
+    width: 3.5rem;
+    height: 3.5rem;
+    flex-shrink: 0;
+    object-fit: cover;
+    background: #000000;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-sm);
+}
+.lista-objetos__texto { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; }
+
 /* === ÍCONOS PROPIOS (inicio) === */
 /*
  * Íconos SVG propios (24x24, trazo), embebidos como data: URI: sin archivos, sin librerías ni CDN.

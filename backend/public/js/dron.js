@@ -89,6 +89,7 @@ const Dron = (() => {
     let _onResize = null;
     let _timerResize = null;
     let _tamanoJoystick = 0;
+    let _objetosGuardados = [];    // "Mis objetos" (para "¿Qué seguir?")
 
     // ----------------------------------------------------------------
     // Misiones guardadas
@@ -178,6 +179,9 @@ const Dron = (() => {
 
         _agregarEventosCabina();
         _actualizarSelectMisiones();
+        if (typeof DronObjetos !== 'undefined') {
+            App.llenarQueSeguir(_q('#sel-que-seguir')).then(lista => { if (gen === _generacion) _objetosGuardados = lista; });
+        }
         await _conectar();
     }
 
@@ -219,19 +223,19 @@ const Dron = (() => {
     async function _iniciarVideo() {
         const a = _adaptador;
         if (!a) return;
-        if (!a.tieneVideo()) { _textoVideo('Simulador: sin video'); return; }
-        if (typeof DronVideoDecoder === 'undefined') { _textoVideo('Falta el módulo de video'); return; }
+        if (!a.tieneVideo()) { _textoVideo('Simulador: no tiene cámara'); return; }
+        if (typeof DronVideoDecoder === 'undefined') { _textoVideo('No se puede mostrar el video'); return; }
 
         _video = new DronVideoDecoder({
             canvasEl: _q('#canvas-video'),
             onFrameRendered: (n) => { if (n === 1) _textoVideo(''); },
         });
-        if (!_video.soportaWebCodecs) { _textoVideo('Este WebView no soporta WebCodecs: no hay video'); return; }
+        if (!_video.soportaWebCodecs) { _textoVideo('Este celular no puede mostrar el video del dron'); return; }
 
-        _textoVideo('Esperando video del Tello...');
+        _textoVideo('Esperando el video del dron...');
         try {
             const ok = await a.iniciarVideo(d => _video?.procesarChunk(d?.data));
-            if (a === _adaptador && !ok) _textoVideo('El Tello no confirmó "streamon"');
+            if (a === _adaptador && !ok) _textoVideo('El dron no prendió la cámara');
         } catch (err) {
             if (a === _adaptador) _textoVideo('No se pudo abrir el video: ' + err.message);
         }
@@ -289,7 +293,7 @@ const Dron = (() => {
     /** true mientras el failsafe tiene suspendidos los envíos automáticos (solo Aterrizar o EMERGENCIA). */
     function _failsafeBloquea() {
         if (!_adaptador?.enviosSuspendidos) return false;
-        App.mostrarToast('Failsafe activo: solo se puede usar Aterrizar o EMERGENCIA.', 'advertencia');
+        App.mostrarToast('Se cortó la conexión con el dron: solo podés usar Aterrizar o EMERGENCIA.', 'advertencia');
         return true;
     }
 
@@ -307,7 +311,7 @@ const Dron = (() => {
         // 2. Desde acá no sale ningún comando automático (ni rc continuo ni keep-alive).
         //    Si el enlace está caído a medias, así el Tello activa su aterrizaje automático (~15 s sin comandos).
         a.suspenderEnviosAutomaticos();
-        App.mostrarToast(`FAILSAFE: sin telemetría hace ${(msSinTelemetria / 1000).toFixed(1)} s. Frenando y aterrizando...`, 'error', 8000);
+        App.mostrarToast(`Se cortó la conexión con el dron (hace ${(msSinTelemetria / 1000).toFixed(1)} s): frenando y aterrizando...`, 'error', 8000);
 
         // 3. Dos intentos de "land"
         _accionVuelo = true;
@@ -318,7 +322,7 @@ const Dron = (() => {
                 if (a !== _adaptador) return;
                 _accionVuelo = false;
                 _actualizarEstadoUI('conectado');
-                App.mostrarToast('Failsafe: aterrizaje confirmado.', 'advertencia', 6000);
+                App.mostrarToast('Aterrizaje de seguridad confirmado.', 'advertencia', 6000);
                 return;
             } catch (err) {
                 console.warn(`[Dron] Failsafe: intento ${intento} de aterrizaje sin confirmar:`, err.message);
@@ -329,9 +333,9 @@ const Dron = (() => {
         _esperandoVueltaTelemetria = !_hayTelemetria();
         _actualizarEstadoUI(a.enVuelo ? 'failsafe' : 'conectado');
         if (a.enVuelo) {
-            _mostrarAvisoFijo('El dron no confirmó el aterrizaje. La app dejó de mandar comandos para que el Tello ' +
-                'aterrice solo (lo hace a los ~15 s sin comandos). Si sigue en el aire, usá EMERGENCIA o Aterrizar. ' +
-                'Si vuelve la conexión, se reintenta el aterrizaje automáticamente.');
+            _mostrarAvisoFijo('El dron no avisó que aterrizó. La app dejó de mandarle órdenes para que aterrice solo ' +
+                '(tarda unos 15 segundos). Si sigue en el aire, tocá EMERGENCIA o Aterrizar. ' +
+                'Si vuelve la conexión, la app intenta aterrizar de nuevo.');
         }
     }
 
@@ -339,7 +343,7 @@ const Dron = (() => {
     async function _reintentarAterrizajeFailsafe() {
         const a = _adaptador;
         if (!a) return;
-        App.mostrarToast('Volvió la telemetría: reintentando el aterrizaje del failsafe...', 'advertencia', 6000);
+        App.mostrarToast('Volvió la conexión: intentando aterrizar de nuevo...', 'advertencia', 6000);
         _accionVuelo = true;
         _actualizarEstadoUI('aterrizando');
         try {
@@ -348,7 +352,7 @@ const Dron = (() => {
             _accionVuelo = false;
             _ocultarAvisoFijo();
             _actualizarEstadoUI('conectado');
-            App.mostrarToast('Failsafe: aterrizaje confirmado.', 'advertencia', 6000);
+            App.mostrarToast('Aterrizaje de seguridad confirmado.', 'advertencia', 6000);
         } catch (err) {
             if (a !== _adaptador) return;
             console.warn('[Dron] Failsafe: el reintento de aterrizaje no se confirmó:', err.message);
@@ -371,13 +375,15 @@ const Dron = (() => {
         on('#btn-toggle-giro', _toggleGiroscopio);
         on('#btn-toggle-seguimiento', _toggleSeguimiento);
         on('#btn-copiar-registro-seg', _copiarRegistroSeguimiento);
+        on('#btn-probar-cpu', _probarCuadroEnCpu);
+        _q('#sel-que-seguir')?.addEventListener('change', _elegirQueSeguir);
         on('#btn-reconectar', _conectar);
         on('#btn-ir-config-dron', () => { window.location.hash = '#/config-dron'; });
         on('#btn-cab-menu', () => App.abrirMenu());
         on('#btn-cerrar-aviso-fijo', _ocultarAvisoFijo);
         on('#btn-calibrar-giro', () => {
             _giroscopio?.calibrar();
-            App.mostrarToast('Inclinación calibrada: la posición actual del teléfono es el "centro".', 'info');
+            App.mostrarToast('Listo: esta posición del celular ahora es "quieto".', 'info');
         });
 
         // Movimientos por paso
@@ -408,7 +414,7 @@ const Dron = (() => {
         if (!a || !a.conectado) { App.mostrarToast('El dron no está conectado.', 'advertencia'); return; }
         if (a.enVuelo || _accionVuelo) return;
         if (!_hayTelemetria()) {
-            App.mostrarToast('No llega telemetría del dron (puerto 8890): no se puede despegar, porque el failsafe lo haría aterrizar enseguida. Revisá la conexión en "Prueba Tello".', 'error', 9000);
+            App.mostrarToast('No llegan datos del dron, así que no puede despegar (aterrizaría enseguida por seguridad). Revisá la conexión en "Prueba Tello".', 'error', 9000);
             return;
         }
         if (!confirm(
@@ -489,7 +495,7 @@ const Dron = (() => {
         _joystickDer?.centrar();
         a.frenar();
         const txt = _q('#estado-paso-texto');
-        if (txt) txt.textContent = 'Freno: rc 0 0 0 0 enviado';
+        if (txt) txt.textContent = 'Freno enviado: el dron se queda quieto.';
     }
 
     // ----------------------------------------------------------------
@@ -525,7 +531,7 @@ const Dron = (() => {
         const a = _adaptador;
         if (!a || !a.enVuelo) { App.mostrarToast('El dron tiene que estar en vuelo para moverse.', 'advertencia'); return; }
         if (_failsafeBloquea()) return;
-        if (_maniobraEnCurso()) { App.mostrarToast('Hay otra maniobra en curso. Esperá a que termine o usá el freno.', 'advertencia'); return; }
+        if (_maniobraEnCurso()) { App.mostrarToast('El dron todavía está haciendo otro movimiento. Esperá o tocá el botón rojo para frenarlo.', 'advertencia'); return; }
 
         _apagarModosAutomaticos();
         _pasoEnEjecucion = true;
@@ -570,7 +576,7 @@ const Dron = (() => {
         const a = _adaptador;
         if (!a || !a.enVuelo) { App.mostrarToast('El dron tiene que estar en vuelo para iniciar la misión.', 'advertencia'); return; }
         if (_failsafeBloquea()) return;
-        if (_maniobraEnCurso()) { App.mostrarToast('Hay otra maniobra en curso.', 'advertencia'); return; }
+        if (_maniobraEnCurso()) { App.mostrarToast('El dron todavía está haciendo otro movimiento.', 'advertencia'); return; }
 
         const mision = _obtenerMisiones().find(m => m.id === _q('#sel-mision-activa')?.value);
         if (!mision) { App.mostrarToast('Elegí una misión válida.', 'advertencia'); return; }
@@ -592,7 +598,7 @@ const Dron = (() => {
             for (let i = 0; i < mision.pasos.length; i++) {
                 if (_cancelarMisionFlag || a !== _adaptador) { resultado = 'cancelada'; break; }
                 const p = mision.pasos[i];
-                if (info) info.innerHTML = `<strong>Paso ${i + 1}/${mision.pasos.length}:</strong> ${_esc(p.accion)} ${_esc(String(p.valor))} (esperando "ok" del dron)...`;
+                if (info) info.innerHTML = `<strong>Paso ${i + 1} de ${mision.pasos.length}:</strong> ${_esc(p.accion)} ${_esc(String(p.valor))} (esperando que el dron termine)...`;
                 try {
                     await _ejecutarAccion(a, p.accion, p.valor);
                 } catch (err) {
@@ -630,8 +636,8 @@ const Dron = (() => {
         const nombre = (prompt('Nombre de la nueva misión:', 'Patrulla del aula') || '').trim();
         if (!nombre) return;
         const texto = prompt(
-            'Pasos separados por coma.\nAcciones: ' + ACCIONES_MISION.join(', ') +
-            '\n(distancias en cm, giros en grados con signo, esperar en segundos)\nEjemplo: adelante 50, girar 90, subir 30',
+            'Escribí los pasos separados por coma.\nPodés usar: ' + ACCIONES_MISION.join(', ') +
+            '\n(distancias en cm; giros en grados, positivo a la derecha; esperar en segundos)\nEjemplo: adelante 50, girar 90, subir 30',
             'adelante 50, girar 90, adelante 50');
         if (!texto) return;
 
@@ -700,11 +706,11 @@ const Dron = (() => {
             _modoGiro = true;
             _adaptador?.actualizarEjes({ lr: 0, fb: 0 });
             _joystickDer?.centrar();
-            App.mostrarToast('Control por inclinación activado: inclinate para controlar avance y lateral.', 'exito');
+            App.mostrarToast('Inclinación activada: inclinate el celular para avanzar y moverte de costado.', 'exito');
         } else {
             let msg = 'No se pudo activar el control por inclinación.';
             if (resultado.motivo === 'permiso_denegado') msg = 'Permiso de los sensores denegado. Habilitalo en los ajustes.';
-            if (resultado.motivo === 'no_disponible') msg = 'Este dispositivo no tiene sensores de inclinación.';
+            if (resultado.motivo === 'no_disponible') msg = 'Este celular no tiene sensores de inclinación.';
             App.mostrarToast(msg, 'advertencia');
         }
         _actualizarBotonGiro();
@@ -725,8 +731,8 @@ const Dron = (() => {
     function _onFuenteInclinacion(fuente) {
         if (!_modoGiro) return;
         if (fuente === 'acelerometro') {
-            App.mostrarToast('Este celular no tiene giroscopio: la inclinación se calcula con el acelerómetro. ' +
-                'El giro sobre el eje vertical no se puede medir: girá con el joystick izquierdo.', 'advertencia', 8000);
+            App.mostrarToast('Este celular no tiene giroscopio: la inclinación se mide con el acelerómetro. ' +
+                'El giro no se puede medir: para girar, usá el joystick izquierdo.', 'advertencia', 8000);
         } else if (fuente === 'ninguno') {
             _apagarGiro(); // sus ejes vuelven a cero
             App.mostrarToast('No llegan datos de inclinación: este dispositivo no los da. Usá los joysticks.', 'advertencia', 7000);
@@ -761,15 +767,15 @@ const Dron = (() => {
         if (!_seguimiento) { App.mostrarToast('El seguimiento no está disponible.', 'advertencia'); return; }
         if (_modoSeguimiento) {
             _apagarSeguimiento();
-            App.mostrarToast('Ensayo de seguimiento desactivado.', 'info');
+            App.mostrarToast('Ensayo apagado.', 'info');
             return;
         }
         if (_failsafeBloquea()) return;
         if (_maniobraEnCurso()) { App.mostrarToast('Esperá a que termine la maniobra en curso.', 'advertencia'); return; }
         if (!_seguimiento.modeloCargado) {
-            App.mostrarToast('Cargando el modelo de seguimiento...', 'info');
+            App.mostrarToast('Preparando el seguimiento...', 'info');
             const res = await _seguimiento.inicializar();
-            if (!res.ok) { App.mostrarToast(`No se pudo cargar el modelo de seguimiento: ${res.error}`, 'advertencia', 7000); return; }
+            if (!res.ok) { App.mostrarToast(`No se pudo preparar el seguimiento: ${res.error}`, 'advertencia', 7000); return; }
             if (res.aviso) App.mostrarToast(res.aviso, 'advertencia', 8000);
         }
         _modoSeguimiento = true;
@@ -777,13 +783,13 @@ const Dron = (() => {
         _panelSeguimiento?.destruir();
         _panelSeguimiento = new DronSeguimiento.Panel(_q('#cab-panel-seg'));
         _seguimiento.onEstado = (nuevo) => {
-            if (_modoSeguimiento && nuevo === 'perdido') App.mostrarToast('Seguimiento: se perdió a la persona. Comando: quieto.', 'advertencia', 5000);
+            if (_modoSeguimiento && nuevo === 'perdido') App.mostrarToast('Se perdió lo que seguías: el dron se quedaría quieto.', 'advertencia', 5000);
         };
         _seguimiento.activar();
         _mostrarEnsayo('ENSAYO · buscando una persona...');
         const btnRegistro = _q('#btn-copiar-registro-seg');
         if (btnRegistro) btnRegistro.hidden = false;
-        App.mostrarToast('Ensayo de seguimiento: calcula y muestra los comandos, NO los envía al dron.', 'info', 6000);
+        App.mostrarToast('Ensayo: la app muestra lo que haría el dron, pero no lo mueve.', 'info', 6000);
         _actualizarBotonSeguimiento();
     }
 
@@ -801,6 +807,37 @@ const Dron = (() => {
             }
             chip.hidden = false;
         }
+    }
+
+    /** "¿Qué seguir?": una persona o un objeto guardado. Si el ensayo está activo, vuelve a empezar con lo elegido. */
+    async function _elegirQueSeguir() {
+        const sel = _q('#sel-que-seguir');
+        if (!sel || !_seguimiento) return;
+        const objeto = _objetosGuardados.find(o => o.id === sel.value) || null;
+        const res = await _seguimiento.elegirObjeto(objeto);
+        if (!res.ok) {
+            App.mostrarToast(res.error, 'advertencia', 7000);
+            sel.value = 'persona';
+            await _seguimiento.elegirObjeto(null);
+        }
+        if (_modoSeguimiento) {
+            _seguimiento.desactivar();
+            _seguimiento.activar();
+        }
+    }
+
+    /** Modo técnico: el mismo cuadro con WebGL y con CPU (pausa el ensayo unos segundos). */
+    async function _probarCuadroEnCpu() {
+        const btn = _q('#btn-probar-cpu');
+        const salida = _q('#cab-resultado-cpu');
+        if (!_seguimiento || !btn || !salida) return;
+        btn.disabled = true;
+        salida.hidden = false;
+        salida.textContent = 'Probando en el procesador: puede tardar unos segundos...';
+        const r = await _seguimiento.probarCuadroEnCpu();
+        if (!_q('#btn-probar-cpu')) return;
+        salida.textContent = DronSeguimiento.textoPruebaCpu(r, 'person');
+        btn.disabled = false;
     }
 
     /** Copia el registro por cuadro del último ensayo (CSV separado por ";"). */
@@ -910,7 +947,7 @@ const Dron = (() => {
             despegando: ['acento', 'Despegando...'],
             en_vuelo: ['acento', 'En vuelo'],
             aterrizando: ['acento', 'Aterrizando...'],
-            failsafe: ['alerta', 'Failsafe: sin enviar comandos'],
+            failsafe: ['alerta', 'Sin conexión: aterriza solo'],
             desconectado: ['error', 'Desconectado'],
         };
         _estadoUI = estado;
@@ -938,7 +975,7 @@ const Dron = (() => {
         if (!btn) return;
         const esperando = _estadoUI === 'conectado' && !_hayTelemetria();
         btn.disabled = _estadoUI !== 'conectado' || esperando;
-        const texto = esperando ? 'Esperando telemetría…' : 'Despegar';
+        const texto = esperando ? 'Esperando datos del dron…' : 'Despegar';
         if (btn.dataset.texto !== texto) {
             App.textoConIcono(btn, esperando ? '' : 'despegar', texto);
             btn.dataset.texto = texto;
@@ -1026,7 +1063,7 @@ const Dron = (() => {
                         <button id="btn-aterrizar" class="btn btn--secundario" disabled>${App.icono('aterrizar')} Aterrizar</button>
                     </div>
                     <div class="cab-joystick">
-                        <span class="cab-joy-etq">${App.icono('flechas-v')} Subir/bajar · ${App.icono('flechas-h')} Girar</span>
+                        <span class="cab-joy-etq">${App.icono('flechas-v')} Subir y bajar · ${App.icono('flechas-h')} Girar</span>
                         <div id="joystick-izquierdo"></div>
                     </div>
                 </div>
@@ -1039,7 +1076,7 @@ const Dron = (() => {
                     <div class="sobre-imagen">
                         <div class="sobre-imagen__grupo">
                             <span id="estado-conexion" class="chip"><span class="punto punto--advertencia" aria-hidden="true"></span>Conectando...</span>
-                            <span id="estado-telemetria" class="chip chip--alerta" hidden><span class="punto punto--alerta" aria-hidden="true"></span>Sin telemetría</span>
+                            <span id="estado-telemetria" class="chip chip--alerta" hidden><span class="punto punto--alerta" aria-hidden="true"></span>Sin datos del dron</span>
                             <span id="cab-chip-seguimiento" class="chip" hidden></span>
                         </div>
                         <div class="sobre-imagen__grupo sobre-imagen__grupo--der">
@@ -1056,15 +1093,20 @@ const Dron = (() => {
                         <button id="btn-toggle-seguimiento" class="btn btn--secundario">${App.icono('objetivo')} Ensayo: OFF</button>
                     </div>
                     <div class="cab-joystick">
-                        <span class="cab-joy-etq">${App.icono('flechas-v')} Avanzar · ${App.icono('flechas-h')} Lateral</span>
+                        <span class="cab-joy-etq">${App.icono('flechas-v')} Avanzar · ${App.icono('flechas-h')} De costado</span>
                         <div id="joystick-derecho"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Modo técnico: detalle del seguimiento, lo que ve el modelo y el registro -->
+            <!-- Modo técnico: detalle del seguimiento, lo que ve el modelo, prueba en CPU y registro -->
             <section class="cab-panel solo-tecnico">
                 <p class="etiqueta">Modo técnico · Seguimiento</p>
+                <ul class="ayuda-tecnica">
+                    <li><b>Lo que ve el modelo:</b> la imagen que analiza el detector, con todo lo que encuentra y su puntaje (desde el 10 %).</li>
+                    <li><b>Probar este cuadro en CPU:</b> analiza la misma imagen con la placa de video (WebGL) y con el procesador (CPU) para ver si la placa analiza mal.</li>
+                    <li><b>Copiar registro:</b> copia una tabla (CSV) con cada imagen analizada, para mandarla y revisarla.</li>
+                </ul>
                 <div class="detalle-seguimiento">
                     <figure class="miniatura-modelo">
                         <canvas id="cab-miniatura" width="160" height="120"></canvas>
@@ -1072,19 +1114,37 @@ const Dron = (() => {
                     </figure>
                     <div id="cab-panel-seg" class="detalle-seguimiento__panel" data-vacio="Activá el ensayo para ver el detalle."></div>
                 </div>
-                <button id="btn-copiar-registro-seg" class="btn btn--secundario mt-sm" hidden>${App.icono('copiar')} Copiar registro</button>
+                <div class="par-botones mt-sm">
+                    <button id="btn-probar-cpu" class="btn btn--secundario">${App.icono('probeta')} Probar este cuadro en CPU</button>
+                    <button id="btn-copiar-registro-seg" class="btn btn--secundario" hidden>${App.icono('copiar')} Copiar registro</button>
+                </div>
+                <pre id="cab-resultado-cpu" class="panel-seguimiento mt-sm" hidden></pre>
             </section>
 
             <div class="cab-acciones">
                 <button id="btn-reconectar" class="btn btn--primario" hidden>${App.icono('recargar')} Reconectar</button>
-                <button id="btn-calibrar-giro" class="btn btn--secundario">${App.icono('objetivo')} Calibrar inclinación</button>
                 <button id="btn-ir-config-dron" class="btn btn--secundario">${App.icono('llave-ajuste')} Config. dron</button>
             </div>
 
+            <!-- Inclinación y seguimiento -->
+            <section class="cab-panel">
+                <p class="etiqueta">01 — Inclinación y seguimiento</p>
+                <h3 class="cab-panel__titulo">Inclinación y seguimiento</h3>
+                <p class="cab-ayuda">Inclinación: movés el dron inclinando el celular. Sostené el celular como lo vas a usar y tocá Calibrar: esa posición será "quieto".</p>
+                <p class="cab-ayuda">Seguimiento (ensayo): la app busca lo que elijas y muestra qué haría el dron, pero no lo mueve.</p>
+                <div class="cab-opciones">
+                    <button id="btn-calibrar-giro" class="btn btn--secundario">${App.icono('objetivo')} Calibrar</button>
+                    <label>¿Qué seguir?
+                        <select id="sel-que-seguir" class="cab-select"><option value="persona">Una persona</option></select>
+                    </label>
+                </div>
+            </section>
+
             <!-- Movimientos por paso -->
             <section class="cab-panel">
-                <p class="etiqueta">01 — Por pasos</p>
+                <p class="etiqueta">02 — Por pasos</p>
                 <h3 class="cab-panel__titulo">Movimientos por paso</h3>
+                <p class="cab-ayuda">Cada botón mueve el dron la distancia elegida y lo deja quieto. El botón rojo lo frena.</p>
                 <div class="cab-opciones">
                     <label>Distancia
                         <select id="sel-paso-distancia" class="cab-select">
@@ -1126,8 +1186,9 @@ const Dron = (() => {
 
             <!-- Misiones -->
             <section class="cab-panel">
-                <p class="etiqueta">02 — Automático</p>
+                <p class="etiqueta">03 — Automático</p>
                 <h3 class="cab-panel__titulo">Misiones</h3>
+                <p class="cab-ayuda">Una lista de pasos que el dron hace solo. Elegí una y tocá Iniciar; Cancelar la frena.</p>
                 <div class="cab-mision">
                     <select id="sel-mision-activa" class="cab-select" aria-label="Misión"></select>
                     <button id="btn-ejecutar-mision" class="btn btn--primario">${App.icono('play')} Iniciar</button>

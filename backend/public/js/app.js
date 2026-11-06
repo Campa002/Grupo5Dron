@@ -21,7 +21,7 @@ const App = (() => {
     let navegacionActual = 0;
 
     // Pantallas del módulo del dron: se usan sin cuenta (la app abre en el inicio, sin pasar por el login)
-    const RUTAS_DRON = ['dron', 'prueba-tello', 'sensores', 'config-dron'];
+    const RUTAS_DRON = ['dron', 'prueba-tello', 'sensores', 'config-dron', 'objetos'];
 
     // Rutas que no piden sesión: el inicio (con las dos opciones), las del dron y el login
     const RUTAS_SIN_CUENTA = ['inicio', 'login', ...RUTAS_DRON];
@@ -393,6 +393,14 @@ const App = (() => {
                 Auth.inicializarPaginaCambiarPassword();
                 break;
 
+            case 'objetos': {
+                const contenedorObj = document.getElementById('app-contenido');
+                if (typeof DronObjetos !== 'undefined' && contenedorObj) {
+                    limpiezaPaginaActual = inicializarPaginaObjetos(contenedorObj);
+                }
+                break;
+            }
+
             case 'prueba-tello': {
                 const contenedorPrueba = document.getElementById('app-contenido');
                 if (contenedorPrueba) {
@@ -680,6 +688,9 @@ const App = (() => {
         const videoDemo = q('#demo-seg-video');
         const estadoDemo = q('#demo-seg-estado');
         const chipDemo = q('#demo-seg-chip');
+        const selQueSeguir = q('#demo-que-seguir');
+        const btnCpu = q('#btn-demo-cpu');
+        let objetosGuardados = [];
         let demo = null;
         let panelDemo = null;
         let camara = null;
@@ -702,6 +713,23 @@ const App = (() => {
             if (cajaDemo) cajaDemo.hidden = true;
             if (chipDemo) { chipDemo.hidden = true; delete chipDemo.dataset.texto; }
             if (btnDemo) { textoConIcono(btnDemo, 'play', 'Probar con la cámara'); btnDemo.disabled = false; }
+            if (btnCpu) btnCpu.hidden = true;
+        }
+
+        /** "¿Qué seguir?": una persona o un objeto guardado; si la cámara está andando, vuelve a empezar. */
+        async function elegirQueSeguir() {
+            if (!demo) return;
+            const objeto = objetosGuardados.find(o => o.id === selQueSeguir.value) || null;
+            const res = await demo.elegirObjeto(objeto);
+            if (!res.ok) {
+                mostrarToast(res.error, 'advertencia', 7000);
+                selQueSeguir.value = 'persona';
+                await demo.elegirObjeto(null);
+            }
+            if (demo.activo) {
+                demo.desactivar();
+                demo.activar();
+            }
         }
 
         async function iniciarDemo() {
@@ -733,11 +761,12 @@ const App = (() => {
             if (!demo) {
                 demo = new DronSeguimiento({ videoEl: videoDemo, canvasDebug: q('#demo-seg-canvas'), miniatura: q('#demo-seg-miniatura') });
             }
+            await elegirQueSeguir();
             if (!demo.modeloCargado) {
-                estadoDemo.textContent = 'Cargando el modelo de detección...';
+                estadoDemo.textContent = 'Preparando el seguimiento...';
                 const res = await demo.inicializar();
                 if (paginaCerrada) { detenerDemo(); return; }
-                if (!res.ok) { textoConIcono(estadoDemo, 'cruz', `No se pudo cargar el modelo: ${res.error}`); detenerDemo(); return; }
+                if (!res.ok) { textoConIcono(estadoDemo, 'cruz', `No se pudo preparar el seguimiento: ${res.error}`); detenerDemo(); return; }
                 estadoDemo.textContent = res.aviso || '';
             }
             panelDemo = new DronSeguimiento.Panel(q('#demo-seg-panel'));
@@ -755,8 +784,24 @@ const App = (() => {
             textoConIcono(btnDemo, 'detener', 'Detener');
             btnDemo.disabled = false;
             btnCopiarDemo.hidden = false;
+            if (btnCpu) btnCpu.hidden = false;
         }
 
+        selQueSeguir?.addEventListener('change', elegirQueSeguir);
+        if (selQueSeguir && typeof DronObjetos !== 'undefined') {
+            llenarQueSeguir(selQueSeguir).then(lista => { objetosGuardados = lista; });
+        }
+        btnCpu?.addEventListener('click', async () => {
+            const salida = q('#demo-resultado-cpu');
+            if (!demo || !salida) return;
+            btnCpu.disabled = true;
+            salida.hidden = false;
+            salida.textContent = 'Probando en el procesador: puede tardar unos segundos...';
+            const r = await demo.probarCuadroEnCpu();
+            if (paginaCerrada) return;
+            salida.textContent = DronSeguimiento.textoPruebaCpu(r, 'person');
+            btnCpu.disabled = false;
+        });
         videoDemo?.addEventListener('loadedmetadata', ajustarProporcion);
         videoDemo?.addEventListener('resize', ajustarProporcion); // el celular giró
         btnDemo?.addEventListener('click', () => (camara ? detenerDemo() : iniciarDemo()));
@@ -780,6 +825,181 @@ const App = (() => {
             lector = null;
             detenerDemo(); // apaga la cámara al salir de la pantalla
         };
+    }
+
+    /**
+     * Inicializa "Mis objetos" (/pages/objetos.php): alta con 3 a 15 fotos, lista y borrado.
+     * @param {HTMLElement} contenedor
+     * @returns {Function} limpieza (libera las vistas previas de las fotos)
+     */
+    function inicializarPaginaObjetos(contenedor) {
+        const q = sel => contenedor.querySelector(sel);
+        const form = q('#form-objeto');
+        const btnAgregar = q('#btn-agregar-objeto');
+        const inputNombre = q('#objeto-nombre');
+        const listaFotos = q('#objeto-fotos');
+        const cuenta = q('#objeto-cuenta');
+        const error = q('#objeto-error');
+        const progreso = q('#objeto-progreso');
+        const resultado = q('#objeto-resultado');
+        const lista = q('#lista-objetos');
+        let fotos = []; // {archivo, url}
+        let guardando = false;
+
+        const mostrarError = (texto) => { error.textContent = texto; error.hidden = !texto; };
+
+        function liberarFotos() {
+            fotos.forEach(f => URL.revokeObjectURL(f.url));
+            fotos = [];
+        }
+
+        function dibujarFotos() {
+            listaFotos.replaceChildren(...fotos.map((f, i) => {
+                const li = document.createElement('li');
+                const img = document.createElement('img');
+                img.src = f.url;
+                img.alt = `Foto ${i + 1}`;
+                const quitar = document.createElement('button');
+                quitar.type = 'button';
+                quitar.className = 'fotos-objeto__quitar';
+                quitar.setAttribute('aria-label', `Quitar la foto ${i + 1}`);
+                quitar.append(Object.assign(document.createElement('span'), { className: 'ico ico--cruz' }));
+                quitar.addEventListener('click', () => {
+                    URL.revokeObjectURL(f.url);
+                    fotos.splice(i, 1);
+                    dibujarFotos();
+                });
+                li.append(img, quitar);
+                return li;
+            }));
+            const v = DronObjetos.validarFotos(fotos.length);
+            cuenta.textContent = fotos.length ? v.mensaje : `Todavía no hay fotos (de ${DronObjetos.MIN_FOTOS} a ${DronObjetos.MAX_FOTOS}).`;
+            cuenta.className = `texto-sm mb-sm ${fotos.length && !v.ok ? 'texto-advertencia' : ''}`;
+            mostrarError('');
+        }
+
+        function agregarArchivos(archivos) {
+            for (const archivo of archivos) {
+                if (archivo.type && !archivo.type.startsWith('image/')) continue;
+                fotos.push({ archivo, url: URL.createObjectURL(archivo) });
+            }
+            dibujarFotos();
+        }
+
+        function cerrarFormulario() {
+            liberarFotos();
+            form.reset();
+            dibujarFotos();
+            form.hidden = true;
+            btnAgregar.hidden = false;
+            progreso.hidden = true;
+        }
+
+        async function dibujarLista() {
+            let objetos = [];
+            try {
+                objetos = await DronObjetos.listar();
+            } catch (e) {
+                lista.replaceChildren(Object.assign(document.createElement('li'), { className: 'texto-sm texto-error', textContent: e.message }));
+                return;
+            }
+            if (!contenedor.isConnected) return;
+            if (!objetos.length) {
+                lista.replaceChildren(Object.assign(document.createElement('li'), { className: 'texto-sm texto-secundario', textContent: 'Todavía no hay objetos guardados.' }));
+                return;
+            }
+            lista.replaceChildren(...objetos.map(o => {
+                const li = document.createElement('li');
+                li.className = 'lista-objetos__item';
+                const img = document.createElement('img');
+                img.src = o.miniatura || '';
+                img.alt = '';
+                const texto = document.createElement('div');
+                texto.className = 'lista-objetos__texto';
+                texto.append(Object.assign(document.createElement('strong'), { textContent: o.nombre }),
+                    Object.assign(document.createElement('span'), { className: 'texto-xs texto-secundario', textContent: `${o.fotos} fotos` }));
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn btn--secundario btn--icono';
+                btn.setAttribute('aria-label', `Borrar «${o.nombre}»`);
+                btn.innerHTML = icono('borrar');
+                btn.addEventListener('click', async () => {
+                    if (!confirm(`¿Borrar «${o.nombre}»?\n\nSe borran sus fotos analizadas de este teléfono.`)) return;
+                    try {
+                        await DronObjetos.borrar(o.id);
+                        mostrarToast(`Se borró «${o.nombre}».`, 'info');
+                    } catch (e) {
+                        mostrarToast(`No se pudo borrar: ${e.message}`, 'error');
+                    }
+                    dibujarLista();
+                });
+                li.append(img, texto, btn);
+                return li;
+            }));
+        }
+
+        btnAgregar.addEventListener('click', () => {
+            resultado.hidden = true;
+            form.hidden = false;
+            btnAgregar.hidden = true;
+            inputNombre.focus();
+        });
+        q('#btn-cancelar-objeto').addEventListener('click', cerrarFormulario);
+        for (const sel of ['#objeto-galeria', '#objeto-camara']) {
+            const input = q(sel);
+            input.addEventListener('change', () => {
+                agregarArchivos([...input.files]);
+                input.value = ''; // permite volver a elegir las mismas
+            });
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (guardando) return;
+            const nombre = inputNombre.value.trim();
+            if (!nombre) { mostrarError('Ponele un nombre al objeto.'); inputNombre.focus(); return; }
+            const v = DronObjetos.validarFotos(fotos.length);
+            if (!v.ok) { mostrarError(`No se puede guardar. ${v.mensaje}`); return; }
+            guardando = true;
+            mostrarError('');
+            const botones = form.querySelectorAll('button, input, label.btn');
+            botones.forEach(b => { b.disabled = true; b.classList.add('deshabilitado'); });
+            progreso.hidden = false;
+            try {
+                const { objeto, detalle } = await DronObjetos.crearObjeto(nombre, fotos.map(f => f.archivo), (n, total) => {
+                    progreso.textContent = `Analizando la foto ${n} de ${total}...`;
+                });
+                const encontradas = detalle.filter(d => d.encontrado).length;
+                resultado.textContent = encontradas
+                    ? `Guardado «${objeto.nombre}». Lo encontré en ${encontradas} de ${detalle.length} fotos; en las otras usé la foto entera.`
+                    : `Guardado «${objeto.nombre}», pero no lo encontré en ninguna foto: usé las fotos enteras. Si no lo reconoce, puede que después no lo encuentre al seguirlo.`;
+                resultado.hidden = false;
+                cerrarFormulario();
+                dibujarLista();
+            } catch (err) {
+                mostrarError(`No se pudo guardar: ${err.message}`);
+            } finally {
+                guardando = false;
+                botones.forEach(b => { b.disabled = false; b.classList.remove('deshabilitado'); });
+                progreso.hidden = true;
+            }
+        });
+
+        dibujarFotos();
+        dibujarLista();
+        return () => liberarFotos();
+    }
+
+    /**
+     * Llena un selector "¿Qué seguir?" con "Una persona" y los objetos guardados.
+     * @returns {Promise<Array>} los objetos (con sus huellas)
+     */
+    async function llenarQueSeguir(select) {
+        let objetos = [];
+        try { objetos = await DronObjetos.listar(); } catch (_) { /* sin objetos guardados */ }
+        const opciones = [new Option('Una persona', 'persona'), ...objetos.map(o => new Option(o.nombre, o.id))];
+        select.replaceChildren(...opciones);
+        return objetos;
     }
 
     /**
@@ -878,7 +1098,7 @@ const App = (() => {
         }, 1000);
 
         if (badge) {
-            textoConPunto(badge, tieneNativo ? 'exito' : 'advertencia', tieneNativo ? 'Plugin nativo activo' : 'Navegador: sin plugin nativo (respuestas simuladas)');
+            textoConPunto(badge, tieneNativo ? 'exito' : 'advertencia', tieneNativo ? 'App instalada: lista para hablar con el dron' : 'Estás en el navegador: la prueba no habla con el dron');
             badge.style.color = tieneNativo ? 'var(--color-exito)' : 'var(--color-advertencia)';
         }
 
@@ -963,7 +1183,7 @@ const App = (() => {
             const avisos = [];
             const terminar = () => {
                 if (faltas.length) mostrarResultado(false, 'Todavía no', `Falta: ${faltas.join('; ')}.`);
-                else mostrarResultado(true, 'Listo para volar', avisos.length ? `Ojo: ${avisos.join('; ')}.` : 'El dron responde, informa la batería y manda telemetría y video.');
+                else mostrarResultado(true, 'Listo para volar', avisos.length ? `Ojo: ${avisos.join('; ')}.` : 'El dron responde y manda su batería, sus datos y el video.');
                 probando = false;
                 if (btn) btn.disabled = false;
             };
@@ -983,7 +1203,7 @@ const App = (() => {
             else marcarPaso('app', 'advertencia', `WiFi sin vincular (${red.motivo || 'sin motivo'}). Se prueba igual.`);
 
             // 02 — Respuesta del dron
-            marcarPaso('command', 'acento', 'Enviando "command"...');
+            marcarPaso('command', 'acento', 'Conectando con el dron...');
             const rc = await enviarPrueba('command');
             if (paginaCerrada) return;
             if (!rc || !DronAdaptadores.esOk(rc.respuesta)) {
@@ -992,7 +1212,7 @@ const App = (() => {
                 terminar();
                 return;
             }
-            marcarPaso('command', 'exito', `Respondió "ok" en ${rc.ms} ms.`);
+            marcarPaso('command', 'exito', `Respondió bien (en ${(rc.ms / 1000).toFixed(1)} s).`);
 
             // 03 — Batería
             marcarPaso('bateria', 'acento', 'Preguntando la batería...');
@@ -1010,17 +1230,17 @@ const App = (() => {
             }
 
             // 04 — Telemetría (la cabina no deja despegar sin ella)
-            marcarPaso('telemetria', 'acento', 'Esperando telemetría (puerto 8890)...');
+            marcarPaso('telemetria', 'acento', 'Esperando los datos del dron...');
             const llegoTel = await esperarHasta(() => estadoDiag.telemetriaTotal > 0, 3000);
             if (paginaCerrada) return;
-            if (llegoTel) marcarPaso('telemetria', 'exito', 'Llega telemetría.');
+            if (llegoTel) marcarPaso('telemetria', 'exito', 'Llegan los datos del dron (batería, altura).');
             else {
-                marcarPaso('telemetria', 'error', 'No llega. Sin telemetría la cabina no deja despegar.');
-                faltas.push('que llegue la telemetría');
+                marcarPaso('telemetria', 'error', 'No llegan. Sin estos datos la cabina no deja despegar.');
+                faltas.push('que lleguen los datos del dron');
             }
 
             // 05 — Video (no impide volar)
-            marcarPaso('video', 'acento', 'Pidiendo el video ("streamon")...');
+            marcarPaso('video', 'acento', 'Pidiendo el video...');
             const bytesAntes = estadoDiag.totalBytesVideo;
             const rv = await enviarPrueba('streamon');
             if (paginaCerrada) return;
@@ -1066,7 +1286,7 @@ const App = (() => {
          * (en el APK, Capacitor responde index.html a las rutas sin extensión).
          */
         async function verificarModelo() {
-            const base = './libs/coco-ssd/';
+            const MODELOS = [['detector (COCO-SSD)', './libs/coco-ssd/'], ['Mis objetos (MobileNet)', './libs/mobilenet/']];
             const caja = q('#diag-modelo-detalle');
             const lineas = [];
             const leer = async (ruta) => {
@@ -1083,28 +1303,32 @@ const App = (() => {
                     const r = await leer(lib);
                     lineas.push(`${lib.split('/').pop()}: ${r.bytes.toLocaleString()} bytes · ${r.tipo} · HTTP ${r.status}`);
                 }
-                const mj = await leer(base + 'model.json');
-                lineas.push(`model.json: ${mj.bytes.toLocaleString()} bytes · ${mj.tipo} · HTTP ${mj.status}`);
-                if (mj.esHtml) throw new Error('model.json llegó como HTML (no es el archivo del modelo)');
-                const modelo = JSON.parse(new TextDecoder().decode(mj.datos));
                 let esperado = 0;
-                const rutas = [];
-                for (const g of modelo.weightsManifest) {
-                    rutas.push(...g.paths);
-                    // Un peso cuantizado (el modelo está en float16) ocupa lo que su tipo cuantizado, no su dtype
-                    for (const w of g.weights) esperado += (w.shape || []).reduce((a, b) => a * b, 1) * (bytesPorTipo[w.quantization?.dtype || w.dtype] || 4);
-                }
                 let recibido = 0;
+                let archivos = 0;
                 const problemas = [];
-                for (const ruta of rutas) {
-                    const r = await leer(base + ruta);
-                    recibido += r.bytes;
-                    const nota = r.esHtml ? ' ← LLEGÓ HTML (index.html), NO EL ARCHIVO' : (r.status !== 200 ? ` ← HTTP ${r.status}` : '');
-                    if (nota) problemas.push(ruta);
-                    lineas.push(`${ruta}: ${r.bytes.toLocaleString()} bytes · ${r.tipo}${nota}`);
+                for (const [nombre, base] of MODELOS) {
+                    const mj = await leer(base + 'model.json');
+                    lineas.push(`${nombre} · model.json: ${mj.bytes.toLocaleString()} bytes · ${mj.tipo} · HTTP ${mj.status}`);
+                    if (mj.esHtml) throw new Error(`${base}model.json llegó como HTML (no es el archivo del modelo)`);
+                    const modelo = JSON.parse(new TextDecoder().decode(mj.datos));
+                    const rutas = [];
+                    for (const g of modelo.weightsManifest) {
+                        rutas.push(...g.paths);
+                        // Un peso cuantizado (los modelos están en float16) ocupa lo que su tipo cuantizado, no su dtype
+                        for (const w of g.weights) esperado += (w.shape || []).reduce((a, b) => a * b, 1) * (bytesPorTipo[w.quantization?.dtype || w.dtype] || 4);
+                    }
+                    for (const ruta of rutas) {
+                        const r = await leer(base + ruta);
+                        recibido += r.bytes;
+                        archivos++;
+                        const nota = r.esHtml ? ' ← LLEGÓ HTML (index.html), NO EL ARCHIVO' : (r.status !== 200 ? ` ← HTTP ${r.status}` : '');
+                        if (nota) problemas.push(base + ruta);
+                        lineas.push(`${ruta}: ${r.bytes.toLocaleString()} bytes · ${r.tipo}${nota}`);
+                    }
                 }
                 estadoDiag.modelo = (!problemas.length && recibido === esperado)
-                    ? `OK: ${rutas.length} archivos de pesos, ${recibido.toLocaleString()} bytes (coincide con model.json)`
+                    ? `OK: ${MODELOS.length} modelos, ${archivos} archivos de pesos, ${recibido.toLocaleString()} bytes (coincide con model.json)`
                     : `FALLA: recibidos ${recibido.toLocaleString()} de ${esperado.toLocaleString()} bytes${problemas.length ? ` · con problemas: ${problemas.join(', ')}` : ''}`;
                 if (problemas.length || recibido !== esperado) registrarError(`Modelo: ${estadoDiag.modelo}`);
             } catch (e) {
@@ -1314,5 +1538,6 @@ const App = (() => {
         textoConPunto,
         modoTecnico,
         cambiarModoTecnico,
+        llenarQueSeguir,
     };
 })();

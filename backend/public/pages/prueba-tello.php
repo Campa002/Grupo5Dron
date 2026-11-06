@@ -10,6 +10,7 @@
 
     <!-- Pasos numerados con un resultado claro -->
     <section class="bloque">
+        <p class="bloque__texto">Tocá "Probar conexión": la app revisa, una por una, las cosas que hacen falta para volar.</p>
         <ol class="pasos-prueba">
             <li class="paso-prueba">
                 <span class="paso-prueba__num" aria-hidden="true">01</span>
@@ -25,7 +26,7 @@
             </li>
             <li class="paso-prueba">
                 <span class="paso-prueba__num" aria-hidden="true">04</span>
-                <div><span class="paso-prueba__nombre">Telemetría</span><span class="paso-prueba__estado" id="paso-telemetria">Sin probar</span></div>
+                <div><span class="paso-prueba__nombre">Datos del dron</span><span class="paso-prueba__estado" id="paso-telemetria">Sin probar</span></div>
             </li>
             <li class="paso-prueba">
                 <span class="paso-prueba__num" aria-hidden="true">05</span>
@@ -40,12 +41,21 @@
             <button id="btn-probar-todo" class="btn btn--primario"><span class="ico ico--play" aria-hidden="true"></span> Probar conexión</button>
             <button id="btn-copiar-diagnostico" class="btn btn--secundario"><span class="ico ico--copiar" aria-hidden="true"></span> Copiar informe</button>
         </div>
-        <p class="texto-xs texto-secundario mt-sm"><span id="tello-entorno-badge">Detectando...</span></p>
+        <p class="texto-xs texto-secundario mt-sm">"Copiar informe" copia el resultado para mandarlo si algo falla.</p>
+        <p class="texto-xs texto-secundario mt-xs"><span id="tello-entorno-badge">Detectando...</span></p>
     </section>
 
     <!-- Modo técnico: destino, comandos sueltos, registro UDP, diagnóstico detallado y errores -->
     <div class="solo-tecnico">
         <p class="etiqueta">Modo técnico</p>
+        <ul class="ayuda-tecnica">
+            <li><b>Destino:</b> a qué dirección (IP) y puerto le habla la app. El Tello usa siempre 192.168.10.1 y el puerto 8889.</li>
+            <li><b>Comandos de prueba:</b> manda una orden suelta del Tello (su "SDK") y muestra la respuesta, sin despegar.</li>
+            <li><b>Respuestas UDP:</b> lo que se manda y lo que vuelve (UDP es el tipo de conexión que usa el Tello).</li>
+            <li><b>Diagnóstico detallado:</b> el plugin (la parte de la app que usa el WiFi del dron), el video, los datos del dron (telemetría, por el puerto 8890) y los modelos.</li>
+            <li><b>Archivos de los modelos:</b> revisa que lleguen completos los del detector y los de "Mis objetos".</li>
+            <li><b>WebView:</b> el navegador interno del celular. <b>Errores:</b> los últimos 20 problemas, con la hora.</li>
+        </ul>
 
         <div class="tarjeta mb-md">
             <h3 class="tarjeta__titulo">Destino</h3>
@@ -93,17 +103,17 @@
                 <div class="dato-diagnostico"><span>Red WiFi vinculada</span><strong id="diag-wifi-status">Pendiente</strong></div>
                 <div class="dato-diagnostico"><span>Soporte de video (WebCodecs)</span><strong id="diag-webcodecs-status">Verificando...</strong></div>
                 <div class="dato-diagnostico"><span>Respuestas ("command" / "battery?")</span><strong id="diag-latencia-cmd">Sin probar</strong></div>
-                <div class="dato-diagnostico"><span>Telemetría (UDP 8890)</span><strong id="diag-telemetria-pps">0 pps</strong></div>
+                <div class="dato-diagnostico"><span>Datos del dron (telemetría, UDP 8890)</span><strong id="diag-telemetria-pps">0 pps</strong></div>
                 <div class="dato-diagnostico"><span>Video (UDP 11111)</span><strong id="diag-video-bytes">0 bytes</strong></div>
                 <div class="dato-diagnostico"><span>URL de la API</span><strong id="diag-api-url" style="word-break:break-all;">—</strong></div>
                 <div class="dato-diagnostico"><span>Sesión</span><strong id="diag-conexion-estado">—</strong></div>
-                <div class="dato-diagnostico"><span>Modelo de seguimiento (COCO-SSD)</span><strong id="diag-modelo">Sin verificar</strong></div>
+                <div class="dato-diagnostico"><span>Modelos (detector y Mis objetos)</span><strong id="diag-modelo">Sin verificar</strong></div>
             </div>
 
             <div class="mt-sm">
                 <div class="flex justify-between items-center mb-xs gap-sm">
-                    <span class="texto-sm font-semibold texto-secundario">Archivos del modelo (tamaño recibido y tipo)</span>
-                    <button id="btn-verificar-modelo" class="btn btn--secundario">Verificar modelo</button>
+                    <span class="texto-sm font-semibold texto-secundario">Archivos de los modelos (tamaño recibido y tipo)</span>
+                    <button id="btn-verificar-modelo" class="btn btn--secundario">Verificar modelos</button>
                 </div>
                 <pre id="diag-modelo-detalle" class="consola-prueba consola-prueba--errores" style="color:#cbd5e1;">Sin verificar.</pre>
             </div>

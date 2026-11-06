@@ -65,11 +65,15 @@ const DronSeguimiento = (() => {
         alturaMaxCm: 250,
         bateriaMin: 30,
         fpsMinReal: 4,
-        // "Mis objetos" (etapa S4), criterio tipo RAC
+        // "Mis objetos", criterio tipo RAC
         confirmacionUmbral: 0.75,
         confirmacionVentana: 8,
         perdidaVentana: 5,
         perdidaMinimo: 3,
+        // "Mis objetos": rendimiento en el celular (no editables)
+        maxComparar: 3,                // como mucho 3 candidatos comparados por cuadro (buscando)
+        reverificarMs: 1000,           // siguiendo: se vuelve a comparar el objetivo cada ~1 s
+        avisoNoEncuentraMs: 3000,      // sin nada parecido durante este tiempo → "No encuentro ..."
     });
 
     /**
@@ -97,11 +101,10 @@ const DronSeguimiento = (() => {
         alturaMinCm:          { grupo: 'Control real (etapa S3)', etiqueta: 'Altura mínima', unidad: 'cm', min: 30, max: 500, paso: 10 },
         alturaMaxCm:          { grupo: 'Control real (etapa S3)', etiqueta: 'Altura máxima', unidad: 'cm', min: 50, max: 1000, paso: 10 },
         bateriaMin:           { grupo: 'Control real (etapa S3)', etiqueta: 'Batería mínima', unidad: '%', min: 10, max: 90, paso: 5 },
-        // "etapa: 'S4'": no se muestran en pantalla hasta esa etapa (siguen validándose si están guardados)
-        confirmacionUmbral:   { grupo: 'Mis objetos (etapa S4)', etapa: 'S4', etiqueta: 'Similitud mínima por detección', unidad: '%', escala: 100, min: 0.5, max: 0.99, paso: 0.01 },
-        confirmacionVentana:  { grupo: 'Mis objetos (etapa S4)', etapa: 'S4', etiqueta: 'Detecciones seguidas para confirmar', unidad: '', min: 2, max: 20, paso: 1 },
-        perdidaVentana:       { grupo: 'Mis objetos (etapa S4)', etapa: 'S4', etiqueta: 'Ventana para darlo por perdido', unidad: 'detecciones', min: 2, max: 15, paso: 1 },
-        perdidaMinimo:        { grupo: 'Mis objetos (etapa S4)', etapa: 'S4', etiqueta: 'Fallas dentro de la ventana para perderlo', unidad: '', min: 1, max: 15, paso: 1 },
+        confirmacionUmbral:   { grupo: 'Mis objetos', etiqueta: 'Parecido mínimo con las fotos', unidad: '%', escala: 100, min: 0.5, max: 0.99, paso: 0.01 },
+        confirmacionVentana:  { grupo: 'Mis objetos', etiqueta: 'Detecciones seguidas para confirmar', unidad: '', min: 2, max: 20, paso: 1 },
+        perdidaVentana:       { grupo: 'Mis objetos', etiqueta: 'Ventana para darlo por perdido', unidad: 'detecciones', min: 2, max: 15, paso: 1 },
+        perdidaMinimo:        { grupo: 'Mis objetos', etiqueta: 'Fallas dentro de la ventana para perderlo', unidad: '', min: 1, max: 15, paso: 1 },
     });
 
     /**
@@ -332,34 +335,155 @@ const DronSeguimiento = (() => {
             // 'siguiendo' o 'perdiendo': asociar con la posición prevista a partir de la última detección
             // CRUDA y su velocidad (la suavizada va atrasada y, en un cruce, queda del lado de la otra persona).
             // La extrapolación se limita a 1 s para que una pérdida larga no la mande lejos.
-            const ob = this.objetivo;
-            const dt = Math.max(0, (t - ob.t) / 1000);
-            const dtPrev = Math.min(dt, 1);
-            const prevista = { cx: ob.rx + ob.vx * dtPrev, cy: ob.ry + ob.vy * dtPrev, h: ob.rh };
-            const c = this._mejor(prevista, validos, this.a.costoMaxAsociacion);
+            const c = this._mejor(this._prevista(t), validos, this.a.costoMaxAsociacion);
             if (c) {
-                const ap = this.a.suavizadoPosicion;
-                const at = this.a.suavizadoTamano;
-                const vxInst = dt > 0 ? (c.cx - ob.rx) / dt : ob.vx;
-                const vyInst = dt > 0 ? (c.cy - ob.ry) / dt : ob.vy;
-                this.objetivo = {
-                    // Suavizado: solo para el control
-                    cx: ob.cx + ap * (c.cx - ob.cx),
-                    cy: ob.cy + ap * (c.cy - ob.cy),
-                    w: ob.w + at * (c.w - ob.w),
-                    h: ob.h + at * (c.h - ob.h),
-                    // Crudo y velocidad: para asociar en el próximo cuadro
-                    rx: c.cx, ry: c.cy, rh: c.h,
-                    vx: 0.5 * ob.vx + 0.5 * vxInst,
-                    vy: 0.5 * ob.vy + 0.5 * vyInst,
-                    t,
-                    score: c.score,
-                };
+                this._actualizarObjetivo(c, t);
                 this.ultimaVista = t;
                 this.estado = 'siguiendo';
             } else {
                 this.estado = 'perdiendo';
                 this.revisarTiempo(t);
+            }
+        }
+
+        /** Posición prevista del objetivo en t (extrapolación limitada a 1 s). */
+        _prevista(t) {
+            const ob = this.objetivo;
+            const dtPrev = Math.min(Math.max(0, (t - ob.t) / 1000), 1);
+            return { cx: ob.rx + ob.vx * dtPrev, cy: ob.ry + ob.vy * dtPrev, h: ob.rh };
+        }
+
+        /** Suaviza el objetivo con la detección asociada `c` y actualiza su velocidad. */
+        _actualizarObjetivo(c, t) {
+            const ob = this.objetivo;
+            const dt = Math.max(0, (t - ob.t) / 1000);
+            const ap = this.a.suavizadoPosicion;
+            const at = this.a.suavizadoTamano;
+            const vxInst = dt > 0 ? (c.cx - ob.rx) / dt : ob.vx;
+            const vyInst = dt > 0 ? (c.cy - ob.ry) / dt : ob.vy;
+            this.objetivo = {
+                // Suavizado: solo para el control
+                cx: ob.cx + ap * (c.cx - ob.cx),
+                cy: ob.cy + ap * (c.cy - ob.cy),
+                w: ob.w + at * (c.w - ob.w),
+                h: ob.h + at * (c.h - ob.h),
+                // Crudo y velocidad: para asociar en el próximo cuadro
+                rx: c.cx, ry: c.cy, rh: c.h,
+                vx: 0.5 * ob.vx + 0.5 * vxInst,
+                vy: 0.5 * ob.vy + 0.5 * vyInst,
+                t,
+                score: c.score,
+                sim: typeof c.sim === 'number' ? c.sim : ob.sim,
+            };
+        }
+    }
+
+    // ================================================================
+    // Selector de "Mis objetos" (puro): cualquier clase del detector, comparada con las huellas guardadas
+    // Criterio tipo RAC: se fija con 8 detecciones seguidas parecidas (75 %) y se pierde con 3 fallas de 5.
+    // Rendimiento: buscando, se comparan como mucho 3 candidatos por cuadro; siguiendo, solo el objetivo
+    // y cada ~1 s (entre medio se lo sigue por posición).
+    // Cada candidato puede traer `sim` (parecido 0-1) si se lo comparó en este cuadro.
+    // ================================================================
+    class SelectorObjeto extends Selector {
+        constructor(ajustes, nombre = 'objeto') {
+            super(ajustes);
+            this.nombre = nombre;
+            this.noEncuentra = false;      // sin nada parecido durante avisoNoEncuentraMs
+            this.coincidencias = 0;        // candidatos parecidos en el último cuadro
+            this._ventana = [];            // aciertos (true) y fallas (false) de las últimas detecciones
+            this._ultimaVerificacion = 0;
+            this._tSinCoincidencia = null;
+        }
+
+        /** Cualquier clase con la confianza mínima del detector. */
+        _validos(candidatos) {
+            return candidatos
+                .filter(c => c.score >= this.a.umbralConfianza && c.w > 0 && c.h > 0)
+                .map(conCentro);
+        }
+
+        /**
+         * Qué candidatos hay que comparar con las huellas en este cuadro (índices de `candidatos`).
+         * Buscando: los 3 de más confianza. Siguiendo: el asociado al objetivo, si pasó ~1 s de la última vez.
+         */
+        aVerificar(candidatos, t) {
+            const validos = candidatos
+                .map((c, i) => ({ ...conCentro(c), i }))
+                .filter(c => c.score >= this.a.umbralConfianza && c.w > 0 && c.h > 0);
+            if (this.estado === 'siguiendo' || this.estado === 'perdiendo') {
+                if (t - this._ultimaVerificacion < this.a.reverificarMs) return [];
+                const c = this._mejor(this._prevista(t), validos, this.a.costoMaxAsociacion);
+                return c ? [c.i] : [];
+            }
+            return validos.sort((a, b) => b.score - a.score).slice(0, this.a.maxComparar).map(c => c.i);
+        }
+
+        actualizar(candidatos, t) {
+            const validos = this._validos(candidatos);
+            if (this.estado === 'siguiendo' || this.estado === 'perdiendo') {
+                this._seguirObjeto(validos, t);
+                return;
+            }
+            // Buscando (o perdido): el más parecido, con el parecido mínimo
+            const parecidos = validos.filter(v => typeof v.sim === 'number' && v.sim >= this.a.confirmacionUmbral);
+            this.coincidencias = parecidos.length;
+            if (!parecidos.length) {
+                this._reiniciarConfirmacion();
+                if (this._tSinCoincidencia === null) this._tSinCoincidencia = t;
+                this.noEncuentra = t - this._tSinCoincidencia >= this.a.avisoNoEncuentraMs;
+                return;
+            }
+            this._tSinCoincidencia = null;
+            this.noEncuentra = false;
+            const c = parecidos.reduce((m, v) => (v.sim > m.sim ? v : m));
+            const previo = this._candidatoPrevio;
+            const mismo = previo && this._costo(previo, c) <= this.a.costoMaxAsociacion;
+            this._confirmaciones = mismo ? this._confirmaciones + 1 : 1;
+            const dt = mismo ? (t - this._tPrevio) / 1000 : 0;
+            this._candidatoPrevio = c;
+            this._tPrevio = t;
+            if (this._confirmaciones >= this.a.confirmacionVentana) {
+                this.objetivo = {
+                    cx: c.cx, cy: c.cy, w: c.w, h: c.h,
+                    rx: c.cx, ry: c.cy, rh: c.h,
+                    vx: dt > 0 ? (c.cx - previo.cx) / dt : 0,
+                    vy: dt > 0 ? (c.cy - previo.cy) / dt : 0,
+                    t, score: c.score, sim: c.sim,
+                };
+                this.ultimaVista = t;
+                this._ultimaVerificacion = t;
+                this._ventana = [];
+                this.estado = 'siguiendo';
+                this._reiniciarConfirmacion();
+            }
+        }
+
+        _seguirObjeto(validos, t) {
+            const c = this._mejor(this._prevista(t), validos, this.a.costoMaxAsociacion);
+            let acierto = !!c;
+            if (c && typeof c.sim === 'number') {
+                this._ultimaVerificacion = t;
+                acierto = c.sim >= this.a.confirmacionUmbral;
+            }
+            this._ventana.push(acierto);
+            if (this._ventana.length > this.a.perdidaVentana) this._ventana.shift();
+            this.coincidencias = acierto ? 1 : 0;
+            if (acierto) {
+                this._actualizarObjetivo(c, t);
+                this.ultimaVista = t;
+                this.estado = 'siguiendo';
+            } else {
+                this.estado = 'perdiendo';
+            }
+            if (this._ventana.filter(a => !a).length >= this.a.perdidaMinimo) {
+                this.estado = 'perdido';
+                this.perdidoDesde = t;
+                this.ultimaPosicion = this.objetivo;
+                this.objetivo = null;
+                this._ventana = [];
+                this._tSinCoincidencia = t;
+                this._reiniciarConfirmacion();
             }
         }
     }
@@ -368,9 +492,10 @@ const DronSeguimiento = (() => {
     // Seguidor (puro): selector + controlador + vencimiento + aceleración gradual
     // ================================================================
     class Seguidor {
-        constructor(ajustes) {
+        /** @param {Object} ajustes @param {Selector} [selector] por defecto, el de personas */
+        constructor(ajustes, selector = null) {
             this.a = ajustes;
-            this.selector = new Selector(ajustes);
+            this.selector = selector || new Selector(ajustes);
             this.comando = { yaw: 0, ud: 0, fb: 0 };
             this._tUltimoTick = null;
         }
@@ -452,6 +577,54 @@ const DronSeguimiento = (() => {
     // ================================================================
     // Visión (navegador): COCO-SSD sobre una imagen reducida
     // ================================================================
+    // Flags de empaquetado de WebGL: guardan 4 valores por píxel de textura. En GPUs que no pueden escribir
+    // texturas float32 (muchas Mali), TensorFlow usa float16 y el empaquetado suma error y fallas de algunos
+    // drivers. El arreglo conocido es apagarlo (más lento, pero preciso). Solo se aplica en esas GPUs.
+    const FLAGS_EMPAQUETADO = ['WEBGL_PACK', 'WEBGL_PACK_DEPTHWISECONV', 'WEBGL_PACK_BINARY_OPERATIONS', 'WEBGL_PACK_UNARY_OPERATIONS',
+        'WEBGL_PACK_ARRAY_OPERATIONS', 'WEBGL_PACK_IMAGE_OPERATIONS', 'WEBGL_PACK_REDUCE', 'WEBGL_PACK_CLIP', 'WEBGL_PACK_NORMALIZATION',
+        'WEBGL_LAZILY_UNPACK', 'WEBGL_CONV_IM2COL'];
+
+    // Puntaje mínimo de lo que devuelve el detector: bajo, para mostrar TODO en la miniatura y en la prueba en CPU.
+    // El umbral para seguir (umbralConfianza, 50 %) se aplica después y no cambia.
+    const PUNTAJE_MINIMO_CRUDO = 0.1;
+
+    let _detector = null;
+
+    /**
+     * Carga UNA vez el detector (COCO-SSD) para toda la app: la cabina, la demo y "Mis objetos" lo comparten.
+     * @returns {Promise<{modelo:Object, backend:string, gpu:Object|null}>}
+     */
+    function cargarDetector() {
+        if (!_detector) {
+            _detector = (async () => {
+                if (typeof tf === 'undefined' || typeof cocoSsd === 'undefined') {
+                    throw new Error('Faltan TensorFlow.js o COCO-SSD (libs/).');
+                }
+                // Preferir WebGL; si no está, queda el que haya (CPU es inutilizable para controlar)
+                try { if (tf.getBackend() !== 'webgl') await tf.setBackend('webgl'); } catch (_) { /* sin WebGL */ }
+                await tf.ready();
+                const backend = tf.getBackend();
+                let gpu = null;
+                if (backend === 'webgl') {
+                    try {
+                        const float32 = tf.env().getBool('WEBGL_RENDER_FLOAT32_CAPABLE');
+                        // Antes de cargar el modelo (los shaders se compilan con estos flags)
+                        if (!float32) FLAGS_EMPAQUETADO.forEach(f => tf.env().set(f, false));
+                        gpu = { version: tf.env().getNumber('WEBGL_VERSION'), float32, empaquetado: tf.env().getBool('WEBGL_PACK') };
+                    } catch (_) { /* sin datos */ }
+                }
+                const modelo = await cocoSsd.load({ modelUrl: './libs/coco-ssd/model.json' });
+                // Calentamiento: la primera inferencia compila los shaders y es lenta
+                const c = document.createElement('canvas');
+                c.width = 64; c.height = 48;
+                await modelo.detect(c);
+                return { modelo, backend, gpu };
+            })();
+            _detector.catch(() => { _detector = null; }); // si falla, se puede reintentar
+        }
+        return _detector;
+    }
+
     class Vision {
         constructor(ajustes) {
             this.a = ajustes;
@@ -469,26 +642,14 @@ const DronSeguimiento = (() => {
         }
 
         async cargar() {
-            if (typeof tf === 'undefined' || typeof cocoSsd === 'undefined') {
-                throw new Error('Faltan TensorFlow.js o COCO-SSD (libs/).');
-            }
-            // Preferir WebGL; si no está, queda el que haya (CPU es inutilizable para controlar)
-            try { if (tf.getBackend() !== 'webgl') await tf.setBackend('webgl'); } catch (_) { /* sin WebGL */ }
-            await tf.ready();
-            this.backend = tf.getBackend();
-            if (this.backend === 'webgl') {
-                try {
-                    this.gpu = { version: tf.env().getNumber('WEBGL_VERSION'), float32: tf.env().getBool('WEBGL_RENDER_FLOAT32_CAPABLE') };
-                } catch (_) { /* sin datos */ }
-            }
-            this.modelo = await cocoSsd.load({ modelUrl: './libs/coco-ssd/model.json' });
+            const d = await cargarDetector();
+            this.modelo = d.modelo;
+            this.backend = d.backend;
+            this.gpu = d.gpu;
             this.canvas = document.createElement('canvas');
             this.ctx = this.canvas.getContext('2d', { willReadFrequently: false });
             this._muestra = document.createElement('canvas');
             this._muestra.width = 16; this._muestra.height = 16;
-            // Calentamiento: la primera inferencia compila los shaders y es lenta
-            this.canvas.width = 64; this.canvas.height = 48;
-            await this.modelo.detect(this.canvas);
             return { backend: this.backend };
         }
 
@@ -511,23 +672,33 @@ const DronSeguimiento = (() => {
          * @returns {Promise<{ms:number, candidatos:Array, crudos:Array}|null>} null si la fuente no tiene imagen.
          * candidatos: normalizados a la imagen original; crudos: en píxeles del lienzo analizado (miniatura).
          */
-        async detectar(fuente) {
+        /** Dibuja la fuente en `lienzo` con el marco de análisis (bordes si hace falta). @returns marco o null */
+        prepararLienzo(fuente, lienzo) {
             const fw = fuente.videoWidth || fuente.width || 0;
             const fh = fuente.videoHeight || fuente.height || 0;
             if (fw < 32 || fh < 32) return null;
             const m = marcoAnalisis(fw, fh, this.a.anchoAnalisis);
-            if (this.canvas.width !== m.cw || this.canvas.height !== m.ch) { this.canvas.width = m.cw; this.canvas.height = m.ch; }
+            if (lienzo.width !== m.cw || lienzo.height !== m.ch) { lienzo.width = m.cw; lienzo.height = m.ch; }
+            const ctx = lienzo.getContext('2d');
             if (m.bordes) {
-                this.ctx.fillStyle = '#000';
-                this.ctx.fillRect(0, 0, m.cw, m.ch);
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, m.cw, m.ch);
             }
-            this.ctx.drawImage(fuente, m.dx, m.dy, m.dw, m.dh);
+            ctx.drawImage(fuente, m.dx, m.dy, m.dw, m.dh);
+            return m;
+        }
+
+        async detectar(fuente) {
+            const m = this.prepararLienzo(fuente, this.canvas);
+            if (!m) return null;
+            const fw = fuente.videoWidth || fuente.width;
+            const fh = fuente.videoHeight || fuente.height;
             this.marco = m;
             this.fuenteW = fw;
             this.fuenteH = fh;
             this._medirBrillo(m);
             const t0 = performance.now();
-            const preds = await this.modelo.detect(this.canvas, 20, Math.min(0.3, this.a.umbralConfianza));
+            const preds = await this.modelo.detect(this.canvas, 20, Math.min(PUNTAJE_MINIMO_CRUDO, this.a.umbralConfianza));
             const ms = performance.now() - t0;
             return {
                 ms,
@@ -576,6 +747,26 @@ const DronSeguimiento = (() => {
             this._fps = 0;
             this._tUltimaInferencia = null;
             this._ultimosCandidatos = [];
+            /** Objeto de "Mis objetos" a seguir ({id, nombre, huellas}); null = una persona */
+            this.objeto = null;
+        }
+
+        /**
+         * Elige qué seguir: null = una persona; o un objeto de "Mis objetos" (carga MobileNet para las huellas).
+         * Vale desde la próxima activación.
+         * @returns {Promise<{ok:boolean, error?:string}>}
+         */
+        async elegirObjeto(objeto) {
+            if (!objeto) { this.objeto = null; return { ok: true }; }
+            if (typeof DronObjetos === 'undefined') return { ok: false, error: 'Falta el módulo de Mis objetos.' };
+            if (!Array.isArray(objeto.huellas) || !objeto.huellas.length) return { ok: false, error: 'El objeto no tiene fotos analizadas.' };
+            try {
+                await DronObjetos.cargarModelo();
+            } catch (e) {
+                return { ok: false, error: `No se pudo cargar el modelo de huellas: ${e?.message || e}` };
+            }
+            this.objeto = objeto;
+            return { ok: true };
         }
 
         async inicializar() {
@@ -603,7 +794,8 @@ const DronSeguimiento = (() => {
             // Los ajustes se releen al activar: lo que se cambie en Config. del dron vale desde la próxima activación
             this.ajustes = ajustesActuales(this._ajustesExtra);
             this.vision.a = this.ajustes;
-            this.seguidor = new Seguidor(this.ajustes);
+            const selector = this.objeto ? new SelectorObjeto(this.ajustes, this.objeto.nombre) : null;
+            this.seguidor = new Seguidor(this.ajustes, selector);
             this.registro = [];
             this._tActivacion = performance.now();
             this.activo = true;
@@ -637,6 +829,8 @@ const DronSeguimiento = (() => {
                 comando: this.seguidor ? { ...this.seguidor.comando } : { yaw: 0, ud: 0, fb: 0 },
                 objetivo: this.seguidor?.selector.objetivo ? { ...this.seguidor.selector.objetivo } : null,
                 candidatos: this._contarValidos(this._ultimosCandidatos),
+                objeto: this.objeto ? this.objeto.nombre : null,
+                noEncuentra: !!this.seguidor?.selector.noEncuentra,
                 condiciones: this.condiciones(),
                 imagen: this._infoImagen(),
                 imagenNegra: this.vision.brillo !== null && this.vision.brillo < 6,
@@ -651,8 +845,12 @@ const DronSeguimiento = (() => {
             return { fuente: `${v.fuenteW}×${v.fuenteH}`, analizada: `${v.marco.cw}×${v.marco.ch}`, bordes: v.marco.bordes, brillo: v.brillo };
         }
 
-        /** Detecciones de la clase buscada que superan el umbral de confianza. */
+        /**
+         * Personas que superan el umbral; con un objeto, los parecidos según el selector (buscando: los comparados
+         * en ese cuadro; siguiendo: 1 mientras lo sigue, aunque ese cuadro no se haya comparado).
+         */
         _contarValidos(candidatos) {
+            if (this.objeto) return this.seguidor?.selector.coincidencias ?? 0;
             return candidatos.filter(c => c.clase === this.ajustes.claseObjetivo && c.score >= this.ajustes.umbralConfianza).length;
         }
 
@@ -689,8 +887,9 @@ const DronSeguimiento = (() => {
             const filas = [
                 // Primera línea: con qué imagen se trabajó (para leer el registro de un celular a distancia)
                 `# camara ${img?.fuente || '?'} · analizada ${img?.analizada || '?'}${img?.bordes ? ' con bordes' : ''} · backend ${this.vision.backend || '?'}`
-                    + (this.vision.gpu ? ` · WebGL ${this.vision.gpu.version} float32 ${this.vision.gpu.float32 ? 'sí' : 'no'}` : ''),
-                't_ms;estado;personas;inferencia_ms;fps;obj_cx;obj_cy;obj_alto;obj_score;cmd_giro;cmd_altura;cmd_avance;en_vuelo;altura_cm;bateria;brillo',
+                    + (this.vision.gpu ? ` · WebGL ${this.vision.gpu.version} float32 ${this.vision.gpu.float32 ? 'sí' : 'no'}` : '')
+                    + ` · sigue: ${this.objeto ? this.objeto.nombre : 'una persona'}`,
+                `t_ms;estado;${this.objeto ? 'parecidos' : 'personas'};inferencia_ms;fps;obj_cx;obj_cy;obj_alto;obj_score;cmd_giro;cmd_altura;cmd_avance;en_vuelo;altura_cm;bateria;brillo`,
             ];
             for (const e of this.registro) {
                 filas.push([
@@ -705,17 +904,22 @@ const DronSeguimiento = (() => {
 
         async _cicloInferencia() {
             if (!this.activo) return;
+            // Pausado mientras corre "Probar este cuadro en CPU" (no se pueden mezclar los dos backends)
+            if (this._pausado) { this._timerInferencia = setTimeout(() => this._cicloInferencia(), 200); return; }
             const t0 = performance.now();
             try {
-                const r = await this.vision.detectar(this.fuente);
+                this._inferenciaEnCurso = this.vision.detectar(this.fuente);
+                const r = await this._inferenciaEnCurso;
                 if (!this.activo) return;
                 const t = performance.now();
                 if (r) {
                     this._msInferencia = this._msInferencia === null ? r.ms : 0.8 * this._msInferencia + 0.2 * r.ms;
+                    if (this.objeto) await this._compararConObjeto(r);
+                    if (!this.activo) return;
                     this._ultimosCandidatos = r.candidatos;
-                    this.seguidor.procesarDeteccion(r.candidatos, t);
+                    this.seguidor.procesarDeteccion(r.candidatos, this.objeto ? performance.now() : t);
                     this._dibujar(r.candidatos);
-                    this._dibujarMiniatura(r.crudos);
+                    this._dibujarMiniatura(r.crudos, r.candidatos);
                 } else {
                     this._ultimosCandidatos = [];
                     this.seguidor.procesarDeteccion([], t);
@@ -734,6 +938,50 @@ const DronSeguimiento = (() => {
             const objetivoMs = limitar((this._msInferencia || 100) * 1.2, 1000 / a.fpsMax, 1000 / a.fpsMin);
             const espera = Math.max(0, objetivoMs - (performance.now() - t0));
             this._timerInferencia = setTimeout(() => this._cicloInferencia(), espera);
+        }
+
+        /**
+         * "Mis objetos": compara con las huellas guardadas solo los candidatos que pide el selector
+         * (como mucho 3 buscando; el objetivo cada ~1 s siguiendo). Deja el parecido en `sim`.
+         */
+        async _compararConObjeto(r) {
+            const indices = this.seguidor.selector.aVerificar(r.candidatos, performance.now());
+            for (const i of indices) {
+                const h = await DronObjetos.huella(this.vision.canvas, r.crudos[i].bbox);
+                r.candidatos[i].sim = DronObjetos.mejorParecido(h, this.objeto.huellas);
+            }
+        }
+
+        /**
+         * Modo técnico: analiza el cuadro actual con WebGL (GPU) y con el backend CPU de TensorFlow, para ver
+         * si la GPU da otros puntajes. Pausa el ciclo mientras tanto. La CPU es lenta (segundos en el celular).
+         * @returns {Promise<{ok:boolean, error?:string, webgl?:Array, cpu?:Array, msWebgl?:number, msCpu?:number, tamano?:string}>}
+         */
+        async probarCuadroEnCpu() {
+            if (!this.modeloCargado) return { ok: false, error: 'Primero activá el ensayo o la cámara: el modelo no está cargado.' };
+            if (typeof tf === 'undefined') return { ok: false, error: 'Falta TensorFlow.js.' };
+            const lienzo = document.createElement('canvas');
+            this._pausado = true;
+            const anterior = tf.getBackend();
+            try {
+                await this._inferenciaEnCurso?.catch(() => {});
+                const m = this.vision.prepararLienzo(this.fuente, lienzo);
+                if (!m) return { ok: false, error: 'No hay imagen para analizar.' };
+                const resumen = preds => preds.map(p => ({ clase: p.class, score: p.score })).sort((a, b) => b.score - a.score);
+                let t0 = performance.now();
+                const webgl = resumen(await this.vision.modelo.detect(lienzo, 20, PUNTAJE_MINIMO_CRUDO));
+                const msWebgl = Math.round(performance.now() - t0);
+                await tf.setBackend('cpu');
+                t0 = performance.now();
+                const cpu = resumen(await this.vision.modelo.detect(lienzo, 20, PUNTAJE_MINIMO_CRUDO));
+                const msCpu = Math.round(performance.now() - t0);
+                return { ok: true, webgl, cpu, msWebgl, msCpu, tamano: `${m.cw}×${m.ch}`, backendAnterior: anterior };
+            } catch (e) {
+                return { ok: false, error: e?.message || String(e) };
+            } finally {
+                try { if (tf.getBackend() !== anterior) await tf.setBackend(anterior); } catch (_) { /* queda el que haya */ }
+                this._pausado = false;
+            }
         }
 
         _tickControl() {
@@ -782,7 +1030,7 @@ const DronSeguimiento = (() => {
          * Miniatura de "lo que ve el modelo": el lienzo analizado tal cual (con los bordes) y todas sus
          * detecciones, también las de otras clases y las de poca confianza. Solo si la miniatura está visible.
          */
-        _dibujarMiniatura(crudos) {
+        _dibujarMiniatura(crudos, candidatos = []) {
             const mini = this.miniatura;
             const v = this.vision;
             if (!mini || !mini.isConnected || mini.offsetParent === null || !v.marco) return;
@@ -794,14 +1042,22 @@ const DronSeguimiento = (() => {
             ctx.drawImage(v.canvas, 0, 0, ancho, alto);
             ctx.lineWidth = 2;
             ctx.font = `600 ${Math.max(10, Math.round(ancho / 22))}px system-ui, sans-serif`;
-            for (const p of crudos || []) {
-                const esObjetivo = p.class === this.ajustes.claseObjetivo;
-                ctx.strokeStyle = esObjetivo ? (p.score >= this.ajustes.umbralConfianza ? '#22c55e' : '#f59e0b') : 'rgba(203, 213, 225, 0.8)';
+            (crudos || []).forEach((p, i) => {
+                // Todas las detecciones (desde el 10 %), con su puntaje; con un objeto, también el parecido
+                const sim = candidatos[i]?.sim;
+                let color = 'rgba(203, 213, 225, 0.8)';
+                if (this.objeto) {
+                    if (typeof sim === 'number') color = sim >= this.ajustes.confirmacionUmbral ? '#22c55e' : '#f59e0b';
+                } else if (p.class === this.ajustes.claseObjetivo) {
+                    color = p.score >= this.ajustes.umbralConfianza ? '#22c55e' : '#f59e0b';
+                }
+                ctx.strokeStyle = color;
                 const [x, y, w, h] = p.bbox.map(n => n * escala);
                 ctx.strokeRect(x, y, w, h);
-                ctx.fillStyle = ctx.strokeStyle;
-                ctx.fillText(`${p.class === 'person' ? 'persona' : p.class} ${Math.round(p.score * 100)}%`, x + 2, Math.max(10, y - 3));
-            }
+                ctx.fillStyle = color;
+                const parecido = typeof sim === 'number' ? ` · parecido ${Math.round(sim * 100)}%` : '';
+                ctx.fillText(`${nombreClase(p.class)} ${Math.round(p.score * 100)}%${parecido}`, x + 2, Math.max(10, y - 3));
+            });
         }
 
         _limpiarDebug() {
@@ -814,14 +1070,35 @@ const DronSeguimiento = (() => {
     // Texto del ensayo y panel superpuesto (cabina y demo de la cámara)
     // ================================================================
     const pct = v => (v >= 0 ? '+' : '') + Math.round(v * 100);
+    const nombreClase = c => (c === 'person' ? 'persona' : c);
 
+    /** Lo que haría el dron, en palabras ("avanzaría, giraría a la derecha"). */
+    function describirComando(cmd) {
+        const partes = [];
+        const umbral = 0.03;
+        if (Math.abs(cmd.fb) >= umbral) partes.push(cmd.fb > 0 ? 'avanzaría' : 'retrocedería');
+        if (Math.abs(cmd.yaw) >= umbral) partes.push(cmd.yaw > 0 ? 'giraría a la derecha' : 'giraría a la izquierda');
+        if (Math.abs(cmd.ud) >= umbral) partes.push(cmd.ud > 0 ? 'subiría' : 'bajaría');
+        return partes.length ? partes.join(', ') : 'se quedaría quieto';
+    }
+
+    /** Comando en números (modo técnico): valores del "rc" del Tello, de -100 a 100. */
+    function comandoEnNumeros(cmd) {
+        return `giro ${pct(cmd.yaw)} · altura ${pct(cmd.ud)} · avance ${pct(cmd.fb)}`;
+    }
+
+    /** Cartel del ensayo (abajo de la imagen): qué haría el dron, sin moverlo. */
     function textoEnsayo(cmd, info) {
-        const comando = `giro ${pct(cmd.yaw)} · altura ${pct(cmd.ud)} · avance ${pct(cmd.fb)}`;
+        const que = info.objeto ? `«${info.objeto}»` : 'la persona';
         switch (info.estado) {
-            case 'buscando': return 'ENSAYO · buscando una persona...';
-            case 'siguiendo': return `ENSAYO (no se envía) · ${comando}`;
-            case 'perdiendo': return `ENSAYO · perdiéndola: el comando baja a 0 · ${comando}`;
-            case 'perdido': return 'ENSAYO · persona perdida: comando quieto';
+            case 'buscando':
+                if (info.objeto && info.noEncuentra) return `No encuentro «${info.objeto}». Probá con más fotos o más luz.`;
+                return `Ensayo: buscando ${info.objeto ? que : 'una persona'}...`;
+            case 'siguiendo': return `Ensayo (no mueve el dron): ${describirComando(cmd)}`;
+            case 'perdiendo': return `Ensayo: se está perdiendo ${que}; el dron frenaría de a poco`;
+            case 'perdido':
+                if (info.objeto && info.noEncuentra) return `No encuentro «${info.objeto}». Probá con más fotos o más luz.`;
+                return `Ensayo: se perdió ${que}; el dron se quedaría quieto`;
             default: return '';
         }
     }
@@ -832,6 +1109,16 @@ const DronSeguimiento = (() => {
      */
     function estadoCorto(info) {
         if (info.imagenNegra) return { texto: 'Sin imagen de la cámara', color: 'error' };
+        if (info.objeto) {
+            const n = `«${info.objeto}»`;
+            switch (info.estado) {
+                case 'buscando': return info.noEncuentra ? { texto: `No encuentro ${n}`, color: 'error' } : { texto: `Buscando ${n}`, color: 'acento' };
+                case 'siguiendo': return { texto: `Siguiendo ${n}`, color: 'exito' };
+                case 'perdiendo': return { texto: `Perdiendo ${n}`, color: 'advertencia' };
+                case 'perdido': return { texto: info.noEncuentra ? `No encuentro ${n}` : `Se perdió ${n}`, color: 'error' };
+                default: return { texto: 'Seguimiento apagado', color: '' };
+            }
+        }
         switch (info.estado) {
             case 'buscando': return { texto: 'Buscando persona', color: 'acento' };
             case 'siguiendo': return { texto: 'Persona fijada', color: 'exito' };
@@ -857,17 +1144,18 @@ const DronSeguimiento = (() => {
             const ahora = performance.now();
             if (!forzar && ahora - this._ultimo < 200) return; // 5 veces por segundo alcanza
             this._ultimo = ahora;
-            const backend = info.backend === 'webgl' ? 'WebGL' : `${String(info.backend || '?').toUpperCase()} (lento)`;
-            const nombres = { buscando: 'buscando', siguiendo: 'siguiendo', perdiendo: 'perdiéndola', perdido: 'perdida', apagado: 'apagado' };
+            const backend = info.backend === 'webgl' ? 'WebGL (placa de video)' : `${String(info.backend || '?').toUpperCase()} (lento)`;
+            const nombres = { buscando: 'buscando', siguiendo: 'siguiendo', perdiendo: 'perdiéndolo', perdido: 'perdido', apagado: 'apagado' };
             const cond = info.condiciones;
             const lineaReal = !cond ? '' : cond.ok ? 'Control real (S3): se cumplen las condiciones'
                 : `Control real (S3): falta ${cond.motivos[0]}${cond.motivos.length > 1 ? ` (+${cond.motivos.length - 1})` : ''}`;
             const demora = info.edadMs !== null ? ` · hace ${info.edadMs} ms` : '';
             const img = info.imagen;
-            const gpu = info.gpu ? ` · WebGL ${info.gpu.version}, float32 ${info.gpu.float32 ? 'sí' : 'no'}` : '';
+            const gpu = info.gpu ? ` · WebGL ${info.gpu.version}, float32 ${info.gpu.float32 ? 'sí' : 'no'}${info.gpu.empaquetado === false ? ', empaquetado apagado' : ''}` : '';
             const lineas = [
-                `Visión: ${backend} · ${info.fps} FPS · ${info.inferenciaMs ?? '--'} ms${demora}`,
-                `Estado: ${nombres[info.estado] || info.estado} · personas: ${info.candidatos}`,
+                `Visión (backend): ${backend} · ${info.fps} FPS (análisis por segundo) · ${info.inferenciaMs ?? '--'} ms por análisis${demora}`,
+                `Estado: ${nombres[info.estado] || info.estado} · ${info.objeto ? `parecidos a «${info.objeto}»` : 'personas'}: ${info.candidatos}`,
+                `Comando (rc, de -100 a 100): ${comandoEnNumeros(info.comando)}`,
                 img ? `Imagen: cámara ${img.fuente} → modelo ${img.analizada}${img.bordes ? ' con bordes' : ''} · brillo ${img.brillo ?? '--'}${gpu}` : '',
                 info.imagenNegra ? 'ATENCIÓN: al modelo le llega una imagen negra' : '',
                 lineaReal,
@@ -878,6 +1166,27 @@ const DronSeguimiento = (() => {
         destruir() {
             this.el.remove();
         }
+    }
+
+    /** Texto del resultado de "Probar este cuadro en CPU" (modo técnico). */
+    function textoPruebaCpu(r, claseObjetivo = 'person') {
+        if (!r.ok) return `No se pudo probar: ${r.error}`;
+        const lista = l => (l.length ? l.map(d => `${nombreClase(d.clase)} ${Math.round(d.score * 100)} %`).join(', ') : 'nada');
+        const mejor = l => Math.max(0, ...l.filter(d => d.clase === claseObjetivo).map(d => d.score));
+        const g = mejor(r.webgl);
+        const c = mejor(r.cpu);
+        let conclusion = 'Los dos dan lo mismo: la GPU no es el problema (revisá la imagen, la luz o la distancia).';
+        if (Math.abs(g - c) >= 0.15) {
+            conclusion = c > g
+                ? 'La CPU encuentra más que la GPU: el problema es la precisión de WebGL en este celular.'
+                : 'La GPU encuentra más que la CPU: la diferencia no explica que no detecte.';
+        }
+        return [
+            `Mismo cuadro (${r.tamano}), todo desde el 10 %:`,
+            `WebGL (GPU, ${r.msWebgl} ms): ${lista(r.webgl)}`,
+            `CPU (procesador, ${r.msCpu} ms): ${lista(r.cpu)}`,
+            conclusion,
+        ].join('\n');
     }
 
     /** Copia texto al portapapeles (con respaldo para WebViews sin API de portapapeles). */
@@ -913,7 +1222,11 @@ const DronSeguimiento = (() => {
     Seguimiento.guardarAjustes = guardarAjustes;
     Seguimiento.restaurarAjustes = restaurarAjustes;
     Seguimiento.textoEnsayo = textoEnsayo;
+    Seguimiento.describirComando = describirComando;
+    Seguimiento.SelectorObjeto = SelectorObjeto;
+    Seguimiento.cargarDetector = cargarDetector;
     Seguimiento.estadoCorto = estadoCorto;
+    Seguimiento.textoPruebaCpu = textoPruebaCpu;
     Seguimiento.marcoAnalisis = marcoAnalisis;
     Seguimiento.recuadroEnFuente = recuadroEnFuente;
     Seguimiento.Panel = Panel;

@@ -95,6 +95,8 @@ backend/
     js/app.js, api.js, auth.js   compartidos (router, uso sin cuenta, Prueba Tello, sesión offline)
     pages/*.php             vistas parciales (fragmentos HTML; no dependen de PHP)
     libs/tfjs, libs/coco-ssd  modelo de visión LOCAL (pesos en float16, ~10 MB, sí va al repo)
+    libs/mobilenet            MobileNet v1 0.25 cortado en la "huella" (256 números) para Mis objetos, float16, 437 KB
+    js/dron-objetos.js        Mis objetos: huellas, IndexedDB y alta con 3 a 15 fotos
 capacitor/        capacitor.config.json, package.json, network_security_config.xml, android_plugin/
 scripts/          build-apk.js, check_js.py, check_refs.py, generar_hash.php
 posibles-implementaciones/  firmware del aula, adaptadores genéricos (HTTP, UDP/TCP), herramientas viejas
@@ -110,7 +112,7 @@ docs/contexto/    informe, historial, reportes
   - MySQL: base `grupo5dron_db` importada desde `backend/sql/schema.sql`; `backend/config/config.php` local con root sin contraseña.
 - Usuarios del seed: la contraseña de todos es `password` y tienen `debe_cambiar_password = 1`: la app obliga a cambiarla en el primer login (`auth.php?action=cambiar_mi_password`). Para volver al estado inicial de la base local, reimportá `schema.sql`.
 - CORS: `config.php` tiene que incluir `https://localhost` en `cors_origenes` (ya está en `config.example.php`) para que el APK pueda usar la API.
-- Pruebas automáticas: `node --test tests/seguimiento.test.js tests/inclinacion.test.js` (seguimiento con recorridos sintéticos, marco con bordes de la imagen analizada, inclinación por acelerómetro con eventos simulados).
+- Pruebas automáticas: `node --test tests/seguimiento.test.js tests/inclinacion.test.js tests/objetos.test.js` (selector de Mis objetos, seguimiento con recorridos sintéticos, marco con bordes de la imagen analizada, inclinación por acelerómetro con eventos simulados).
 - Pruebas en navegador: Playwright con Microsoft Edge del sistema (`chromium.launch({ channel: 'msedge' })`). Para el TelloAdapter sin dron, se puede inyectar un mock de `window.Capacitor.Plugins.DronNative` que respete el contrato de arriba.
 - APK: se compila en GitHub Actions en cada push a `main`. Artefacto: `Grupo5Dron-app-debug`.
 - Firma del APK debug:
@@ -140,6 +142,7 @@ docs/contexto/    informe, historial, reportes
 - Interfaz en español, tema oscuro con azul institucional, sin violetas.
 - Diseño (estilo de racvision.org, con nuestros colores): una etiqueta chica arriba de cada título (`.etiqueta`), títulos en mayúsculas (`.titulo-grande`, `.bloque__titulo`), bloques numerados "01 —" (`.bloque`), pares de botones (`.par-botones`), datos en grande (`.dato-grande`) y estados sobre la imagen (`.sobre-imagen` + `.chip`). Poco texto en la vista normal.
 - Modo técnico: lo que sirve para diagnosticar va con la clase `solo-tecnico` (oculta salvo `body.modo-tecnico`). Se activa en Config. Dron (`App.modoTecnico()`, `App.cambiarModoTecnico()`, clave `grupo5dron_modo_tecnico`) y arranca apagado. Lo oculto sigue funcionando (por ejemplo, el failsafe).
+- Lenguaje simple (pedido de Luciano del 6/11): en la interfaz normal nada de rc, UDP, telemetría, backend ni FPS; cada sección con una ayuda corta de una o dos líneas. En el modo técnico se pueden usar, con la explicación entre paréntesis, y cada herramienta lleva una línea que dice para qué sirve.
 - Sin emojis en la interfaz (el único que queda es 🧭 del giroscopio). Íconos: SVG propios en `app.css` (bloque "ÍCONOS PROPIOS", clases `.ico .ico--nombre`, color `currentColor`), desde JS con `App.icono(nombre)`, `App.textoConIcono(el, nombre, texto)` y `App.textoConPunto(el, color, texto)` para estados. Íconos decorativos con `aria-hidden` y siempre con texto visible o `aria-label`.
 - Git: Luciano hace commit y push salvo que te pida lo contrario. Nunca uses `git push --force` ni `git reset --hard`.
 - No escribas documentación final salvo que te lo pida (se hace al final del proyecto).
@@ -155,6 +158,12 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 - Limpio: sin código muerto, sin funciones duplicadas, sin `console.log` de depuración sueltos, sin archivos referenciados que no existen.
 
 ## Estado al 6/11/2026
+
+- Detección en el A06 (GPU Mali), Mis objetos y lenguaje simple (6/11, historial §3, punto 28):
+  - Si la GPU no puede escribir float32, se apaga el empaquetado de WebGL (`WEBGL_PACK*`, `WEBGL_CONV_IM2COL`): el arreglo conocido para Mali. Modo técnico: "Probar este cuadro en CPU" (mismo cuadro con WebGL y con CPU, lado a lado) y la miniatura con todas las detecciones desde el 10 % (el umbral para seguir sigue en 50 %).
+  - Un solo detector en memoria para toda la app (`DronSeguimiento.cargarDetector`).
+  - Mis objetos (`#/objetos`): de 3 a 15 fotos; el recuadro más grande del detector o la foto entera; huella con MobileNet; IndexedDB. "¿Qué seguir?" en la cabina y en Sensores. `SelectorObjeto`: confirmar con 8 (75 %), perder con 3 de 5, como mucho 3 comparaciones por cuadro, re-verificación cada ~1 s; "No encuentro «nombre»" a los 3 s. Sigue en ensayo.
+  - WASM NO se agregó (propuesto, ver historial).
 
 - Primera prueba del APK en un Samsung Galaxy A06 (Android 16, sin dron, sin giroscopio ni magnetómetro). Arreglos del 6/11 (historial §3, punto 24):
   - Detección: la imagen que va al modelo respeta la proporción (vertical → cuadrado con bordes; 4:3 del Tello sin cambios). `Seguimiento.marcoAnalisis`. Miniatura "lo que ve el modelo", brillo del cuadro y datos de WebGL en el modo técnico; el CSV trae una primera línea con cámara, imagen analizada y backend. La caja de la demo toma la proporción de la cámara.
@@ -237,6 +246,6 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
    - ~~S2~~: hecha (ver "Estado").
    - ~~Firma fija del APK debug~~: hecha en el workflow. Falta que Luciano genere la clave y cargue el secreto `DEBUG_KEYSTORE_BASE64`.
    - S3 (después de la primera prueba con el Tello): habilitar el control real (con cancelación por toque de joystick y las condiciones de activación) y ajustar ganancias con el dron.
-   - S4 (después de la primera prueba): "Mis objetos" (MobileNet local para embeddings, IndexedDB, selector por objeto guardado y por toque con rastreador).
+   - ~~S4~~: "Mis objetos" simple, hecho el 6/11 (ver "Estado"). La selección por toque con rastreador no se hizo (no se pidió).
 7. **Hosting:** subir el backend, importar `schema.sql` y crear `config.php` (con `https://localhost` en CORS). Cada cuenta del seed pide cambiar `password` en su primer login.
 8. **Al final:** documentación (README, manual de usuario, manual del programador, API, plan de pruebas, limitaciones) y corrección del informe (por ejemplo, el LED IR figura en GPIO35, que es solo de entrada).

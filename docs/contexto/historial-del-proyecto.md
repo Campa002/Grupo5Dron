@@ -151,6 +151,11 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - La app abre en el inicio; el dron se usa sin cuenta sin tocar ningún botón (se sacó "Usar el dron sin cuenta" y su flag). Aula y administración piden iniciar sesión al entrar y después vuelven a la pantalla pedida, también pasando por el cambio de contraseña obligatorio. El backend no cambió: aula y admin siguen exigiendo sesión válida.
     - Sesión vencida: en el inicio y en el dron se sigue sin cuenta; en el aula y la administración pide login y vuelve.
     - Se borró la página Acerca (y su ícono y estilos). `#/acerca` va al inicio.
+28. **Detección en el A06, Mis objetos y lenguaje simple (6/11).**
+    - El A06 seguía sin detectar frente a un espejo. Sospecha de Luciano: precisión de la GPU Mali. Si la GPU no tiene float32 se apaga el empaquetado de WebGL (en la PC, simulándolo, detecta igual: 84 %). Para confirmarlo en el celular: "Probar este cuadro en CPU" en el modo técnico.
+    - Propuesto y NO agregado (decide Luciano): backend WASM como respaldo. Costo: ~150 KB de JS + 425 KB del .wasm con SIMD (+311 KB sin SIMD de respaldo). Sin hilos (hace falta aislamiento de origen). Velocidad estimada en el A06: 1 a 2 análisis por segundo (no medido; en la PC el backend CPU tardó ~3 s por cuadro y WASM con SIMD suele ser 10 a 20 veces más rápido). Sirve para ensayo, no para el control real (pide 4 por segundo).
+    - Mis objetos: MobileNet v1 0.25 de tfjs-models (storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224), cortado en global_average_pooling2d_1, pesos juntados en un .bin y pasados a float16 (437 KB). En la PC: guardar 15 fotos tarda ~9 s; el perro de prueba se fija en ~2 s; un dibujo que el detector no reconoce da "No encuentro".
+    - Textos de la interfaz en lenguaje simple, con ayuda corta por sección; los términos técnicos solo en el modo técnico, explicados.
 
 ## 4. Hardware
 

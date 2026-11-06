@@ -28,6 +28,7 @@
     <!-- Modo técnico: accesos a las herramientas y estado del ESP32 -->
     <div class="solo-tecnico">
         <p class="etiqueta">Modo técnico</p>
+        <p class="texto-xs texto-secundario mb-sm">Accesos directos a las herramientas y el estado del ESP32 del aula (la placa que manda las órdenes infrarrojas).</p>
         <div class="grilla-accesos mb-lg">
             <a href="#/sensores" class="acceso">
                 <span class="acceso__icono" style="font-size: 2.2rem;"><span class="ico ico--sensores" aria-hidden="true"></span></span>

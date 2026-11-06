@@ -87,7 +87,7 @@ function inclinacionEnPantalla(beta, gamma, angulo) {
 function textoFuenteInclinacion(fuente) {
     switch (fuente) {
         case 'giroscopio': return 'Sensor: giroscopio.';
-        case 'acelerometro': return 'Giroscopio: no disponible, usando acelerómetro. El giro sobre el eje vertical no se puede medir.';
+        case 'acelerometro': return 'Giroscopio: no disponible, usando acelerómetro. Sin giroscopio no se puede medir el giro (como una brújula).';
         case 'ninguno': return 'No llegan datos de inclinación: este dispositivo no tiene los sensores o el navegador no los da (en una PC es normal).';
         default: return 'Buscando el sensor de inclinación...';
     }

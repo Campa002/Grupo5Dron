@@ -365,9 +365,17 @@ test('recuadros: del lienzo con bordes a la imagen original, recortados a [0, 1]
     assert.ok(Math.abs(r3.w - 55 / 270) < 1e-9);
 });
 
-test('ajustes de "Mis objetos" marcados para la etapa S4 (no se muestran todavía)', () => {
-    const s4 = Object.entries(Seguimiento.RANGOS).filter(([, r]) => r.etapa === 'S4').map(([k]) => k).sort();
-    assert.deepEqual(s4, ['confirmacionUmbral', 'confirmacionVentana', 'perdidaMinimo', 'perdidaVentana']);
+test('ajustes de "Mis objetos" con los valores tipo RAC (75 %, 8 detecciones, 3 de 5)', () => {
+    const mis = Object.entries(Seguimiento.RANGOS).filter(([, r]) => r.grupo === 'Mis objetos').map(([k]) => k).sort();
+    assert.deepEqual(mis, ['confirmacionUmbral', 'confirmacionVentana', 'perdidaMinimo', 'perdidaVentana']);
+    assert.equal(A.maxComparar, 3);
+    assert.equal(A.reverificarMs, 1000);
+});
+
+test('cartel del ensayo en palabras: qué haría el dron', () => {
+    assert.equal(Seguimiento.describirComando({ yaw: 0, ud: 0, fb: 0 }), 'se quedaría quieto');
+    assert.equal(Seguimiento.describirComando({ yaw: 0.2, ud: 0, fb: 0.1 }), 'avanzaría, giraría a la derecha');
+    assert.equal(Seguimiento.describirComando({ yaw: -0.2, ud: -0.1, fb: -0.1 }), 'retrocedería, giraría a la izquierda, bajaría');
 });
 
 test('estado corto para la etiqueta sobre la imagen', () => {

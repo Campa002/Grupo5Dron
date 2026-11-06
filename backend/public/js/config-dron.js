@@ -205,8 +205,8 @@ const ConfigDron = (() => {
                 <p class="etiqueta">02 — Diagnóstico</p>
                 <h3 class="bloque__titulo">Modo técnico</h3>
                 <p class="bloque__texto">
-                    Muestra lo que sirve para diagnosticar: el registro UDP, el detalle del seguimiento, lo que ve el modelo,
-                    el registro CSV y los ajustes avanzados. Arranca apagado.
+                    Muestra herramientas para buscar problemas: registros de la conexión, el detalle del seguimiento,
+                    lo que analiza la cámara y ajustes avanzados. Arranca apagado.
                 </p>
                 <label class="switch" for="switch-modo-tecnico">
                     <input type="checkbox" id="switch-modo-tecnico">
@@ -218,9 +218,10 @@ const ConfigDron = (() => {
             <!-- 03 — Failsafe (modo técnico; el failsafe está siempre activo) -->
             <section class="bloque solo-tecnico">
                 <p class="etiqueta">03 — Seguridad</p>
-                <h3 class="bloque__titulo">Failsafe de telemetría</h3>
+                <h3 class="bloque__titulo">Aterrizaje de seguridad (failsafe)</h3>
                 <p class="bloque__texto">
-                    Siempre está activo. Tiempo máximo sin recibir telemetría (UDP 8890) antes de frenar y aterrizar.
+                    Siempre está activo. Si dejan de llegar los datos del dron (telemetría, por UDP 8890) durante este tiempo,
+                    la app lo frena y lo hace aterrizar.
                 </p>
                 <div class="flex items-center gap-sm flex-wrap">
                     <input type="number" id="input-failsafe-timeout" class="campo__input" style="width:8rem;" min="1000" max="30000" step="500" value="3500" aria-label="Tiempo del failsafe en milisegundos">
@@ -456,6 +457,15 @@ const ConfigDron = (() => {
     // Ajustes del seguimiento (definidos en DronSeguimiento.RANGOS)
     // ----------------------------------------------------------------
 
+    // Una línea por grupo de ajustes (modo técnico)
+    const AYUDA_GRUPOS = {
+        'Detección': 'Qué tan seguro tiene que estar el detector y cuántas veces por segundo analiza la imagen.',
+        'Control': 'Cuánto y qué tan rápido se movería el dron para seguir lo elegido.',
+        'Pérdida': 'Cuánto espera antes de darlo por perdido y dejar de moverse.',
+        'Control real (etapa S3)': 'Condiciones para que el seguimiento mueva el dron de verdad (todavía no se usa).',
+        'Mis objetos': 'Qué tan parecido a tus fotos tiene que ser, y cuántas veces seguidas, para seguirlo o darlo por perdido.',
+    };
+
     function _renderizarAjustesSeguimiento(contenedor) {
         const caja = contenedor.querySelector('#ajustes-seguimiento');
         if (!caja || typeof DronSeguimiento === 'undefined') return;
@@ -463,21 +473,19 @@ const ConfigDron = (() => {
         const actuales = DronSeguimiento.ajustesActuales();
         const redondear = v => Math.round(v * 10000) / 10000;
         const grupos = {};
-        for (const [clave, r] of Object.entries(R)) {
-            if (r.etapa === 'S4') continue; // "Mis objetos": se muestran recién en la etapa S4
-            (grupos[r.grupo] = grupos[r.grupo] || []).push([clave, r]);
-        }
+        for (const [clave, r] of Object.entries(R)) (grupos[r.grupo] = grupos[r.grupo] || []).push([clave, r]);
 
         caja.innerHTML = `
             <p class="etiqueta">05 — Seguimiento</p>
             <h3 class="bloque__titulo">Ajustes del seguimiento</h3>
             <p class="bloque__texto">
                 Se guardan en este teléfono y se aplican la próxima vez que actives el ensayo.
-                Por ahora el seguimiento funciona solo en ensayo (no envía comandos al dron).
+                Por ahora el seguimiento funciona solo en ensayo (no le manda órdenes al dron).
             </p>
             ${Object.entries(grupos).map(([grupo, campos]) => `
                 <fieldset style="border:1px solid var(--color-borde); border-radius: var(--radio-md); padding: var(--espacio-sm) var(--espacio-md); margin-bottom: var(--espacio-md);">
                     <legend class="texto-sm font-semibold" style="padding: 0 var(--espacio-xs);">${_esc(grupo)}</legend>
+                    ${AYUDA_GRUPOS[grupo] ? `<p class="texto-xs texto-secundario mb-sm">${_esc(AYUDA_GRUPOS[grupo])}</p>` : ''}
                     <div style="display:grid; gap: var(--espacio-sm) var(--espacio-md); grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));">
                         ${campos.map(([clave, r]) => `
                             <label class="campo" style="margin:0;">

@@ -34,7 +34,7 @@ const DronAdaptadores = (() => {
 
         _plugin() {
             const p = window.Capacitor?.Plugins?.DronNative;
-            if (!p) throw new Error('El plugin nativo DronNative no está disponible (hace falta la app instalada).');
+            if (!p) throw new Error('Hace falta la app instalada en el celular para hablar con el dron.');
             return p;
         },
 
@@ -165,7 +165,7 @@ const DronAdaptadores = (() => {
         async comandoOk(cmd, timeoutMs) {
             const resp = await this.enviarComando(cmd, timeoutMs);
             if (!esOk(resp)) {
-                throw new Error(`El dron respondió "${resp}" a "${cmd}"`);
+                throw new Error(`El dron no pudo hacerlo (respondió "${resp}" a "${cmd}")`);
             }
             return resp;
         }
@@ -446,7 +446,7 @@ const DronAdaptadores = (() => {
 
         async conectar() {
             if (!DronNativo.disponible()) {
-                throw new Error('Para controlar el Tello real hace falta la app instalada (APK). En el navegador usá el perfil Simulador.');
+                throw new Error('Para usar el dron real hace falta la app instalada en el celular. En la computadora elegí el perfil Simulador.');
             }
             await this._liberarRecursos();
 
@@ -467,7 +467,7 @@ const DronAdaptadores = (() => {
             if (!esOk(resp)) {
                 await this._liberarRecursos();
                 const motivoRed = this.redVinculada ? '' : ` La red WiFi no se pudo vincular (${red?.motivo || 'sin motivo'}).`;
-                throw new Error(`El Tello no respondió a "command" (respuesta: "${resp}"). ¿Está prendido y el celular conectado a su WiFi TELLO-XXXXXX?${motivoRed}`);
+                throw new Error(`El dron no respondió. ¿Está prendido y el celular conectado a su WiFi TELLO-XXXXXX? (respuesta: "${resp}")${motivoRed}`);
             }
 
             this.conectado = true;
@@ -541,7 +541,7 @@ const DronAdaptadores = (() => {
                     this.notificarTelemetria();
                     return true;
                 }
-                throw new Error(`El Tello no confirmó el despegue (respuesta: "${resp}").`);
+                throw new Error(`El dron no avisó que despegó (respuesta: "${resp}").`);
             }
             this.enVuelo = true;
             this.telemetria.estado = 'en vuelo';
@@ -567,7 +567,7 @@ const DronAdaptadores = (() => {
                     this.notificarTelemetria();
                     return true;
                 }
-                throw new Error(`El Tello no confirmó el aterrizaje (respuesta: "${resp}").`);
+                throw new Error(`El dron no avisó que aterrizó (respuesta: "${resp}").`);
             }
             this.enVuelo = false;
             this.enviosSuspendidos = false;
