@@ -119,21 +119,72 @@ test('sin ningún sensor (PC): avisa "ninguno"', async () => {
     assert.deepEqual(fuentes, ['ninguno']);
 });
 
-test('DronGiroscopio: con giroscopio, misma calibración, zona muerta y escala que antes', () => {
+test('DronGiroscopio: calibración, zona muerta y escala (avance: bajar el borde de arriba avanza)', () => {
     const cambios = [];
     const giro = new DronGiroscopio({ onChange: c => cambios.push(c), suavizado: 0 });
     // La primera lectura solo calibra
-    giro._procesarLectura(10, 5);
+    giro._procesarLectura(40, 5);
     assert.equal(cambios.length, 0);
     // Dentro de la zona muerta (3°): nada
-    giro._procesarLectura(12, 7);
+    giro._procesarLectura(38, 7);
     assert.equal(cambios.length, 0);
-    // 15° de más adelante sobre 30° de límite → pitch 0,5
+    // Borde de arriba 15° hacia abajo (beta baja) sobre 30° de límite → avanza 0,5
     giro._procesarLectura(25, 5);
     assert.deepEqual(cambios.at(-1), { pitch: 0.5, roll: 0 });
-    // Más allá del límite → 1
-    giro._procesarLectura(80, -40);
+    // Borde de arriba hacia vos (beta sube) → retrocede
+    giro._procesarLectura(55, 5);
+    assert.deepEqual(cambios.at(-1), { pitch: -0.5, roll: 0 });
+    // Más allá del límite → ±1
+    giro._procesarLectura(-30, -40);
     assert.deepEqual(cambios.at(-1), { pitch: 1, roll: -1 });
+});
+
+test('DronGiroscopio: "Invertir avance" vuelve al sentido anterior (levantar el borde de arriba avanza)', () => {
+    const cambios = [];
+    const giro = new DronGiroscopio({ onChange: c => cambios.push(c), suavizado: 0 });
+    giro.invertirAvance = true;
+    giro._procesarLectura(40, 5);
+    giro._procesarLectura(55, 5);
+    assert.deepEqual(cambios.at(-1), { pitch: 0.5, roll: 0 });
+    giro._procesarLectura(25, 5);
+    assert.deepEqual(cambios.at(-1), { pitch: -0.5, roll: 0 });
+});
+
+test('DronGiroscopio: la opción "Invertir avance" se lee al activar', async () => {
+    const tenia = 'DeviceOrientationEvent' in globalThis;
+    if (!tenia) globalThis.DeviceOrientationEvent = class {};
+    try {
+        let invertir = true;
+        const giro = new DronGiroscopio({ obtenerInvertirAvance: () => invertir, obtenerAngulo: () => 0 });
+        assert.equal((await giro.activar()).ok, true);
+        assert.equal(giro.invertirAvance, true);
+        giro.desactivar();
+        invertir = false;
+        await giro.activar();
+        assert.equal(giro.invertirAvance, false);
+        giro.desactivar();
+    } finally {
+        if (!tenia) delete globalThis.DeviceOrientationEvent;
+    }
+});
+
+test('"Invertir avance": se guarda y se lee del teléfono', () => {
+    const datos = {};
+    const tenia = 'localStorage' in globalThis;
+    const anterior = globalThis.localStorage;
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, writable: true, value: {
+        getItem: k => (k in datos ? datos[k] : null), setItem: (k, v) => { datos[k] = String(v); }, removeItem: k => { delete datos[k]; },
+    } });
+    try {
+        assert.equal(DronGiroscopio.leerInvertirAvance(), false, 'arranca en el sentido normal');
+        DronGiroscopio.guardarInvertirAvance(true);
+        assert.equal(DronGiroscopio.leerInvertirAvance(), true);
+        DronGiroscopio.guardarInvertirAvance(false);
+        assert.equal(DronGiroscopio.leerInvertirAvance(), false);
+    } finally {
+        if (tenia) Object.defineProperty(globalThis, 'localStorage', { configurable: true, writable: true, value: anterior });
+        else delete globalThis.localStorage;
+    }
 });
 
 // ---------------------------------------------------------------
@@ -174,17 +225,22 @@ test('horizontal y vertical invertida: la inclinación vuelve a quedar en los ej
 });
 
 for (const angulo of [0, 90, 270]) {
-    test(`DronGiroscopio a ${angulo}°: inclinar hacia el borde de arriba de la pantalla es avanzar, y al costado es lateral`, () => {
+    test(`DronGiroscopio a ${angulo}°: inclinar hacia adelante de la pantalla es avanzar, y al costado es lateral`, () => {
         const cambios = [];
         const giro = new DronGiroscopio({ onChange: c => cambios.push(c), suavizado: 0, obtenerAngulo: () => angulo });
         giro.activo = true;
         giro.angulo = angulo;
         const leer = (b, c) => { const t = telefonoDesdePantalla(b, c, angulo); giro._procesarLectura(t.beta, t.gamma); };
         leer(45, 0);                 // calibra: celular a 45° respecto de la pantalla
-        leer(60, 0);                 // 15° más → pitch 0,5 y nada de lateral
+        leer(30, 0);                 // borde de arriba 15° hacia abajo → avanza 0,5 y nada de lateral
         assert.deepEqual(cambios.at(-1), { pitch: 0.5, roll: 0 });
+        leer(60, 0);                 // borde de arriba 15° hacia vos → retrocede 0,5
+        assert.deepEqual(cambios.at(-1), { pitch: -0.5, roll: 0 });
         leer(45, 15);                // 15° al costado derecho → roll 0,5 y nada de avance
         assert.deepEqual(cambios.at(-1), { pitch: 0, roll: 0.5 });
+        giro.invertirAvance = true;  // "Invertir avance": el sentido anterior
+        leer(60, 0);
+        assert.deepEqual(cambios.at(-1), { pitch: 0.5, roll: 0 });
     });
 }
 
@@ -198,7 +254,7 @@ test('DronGiroscopio: si la pantalla gira con la inclinación activada, se apaga
     giro.angulo = 90;
     let t = telefonoDesdePantalla(45, 0, 90);
     giro._procesarLectura(t.beta, t.gamma);
-    t = telefonoDesdePantalla(60, 0, 90);
+    t = telefonoDesdePantalla(30, 0, 90);
     giro._procesarLectura(t.beta, t.gamma);
     assert.deepEqual(cambios.at(-1), { pitch: 0.5, roll: 0 });
     angulo = 270;                    // el celular dio vuelta

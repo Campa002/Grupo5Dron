@@ -158,6 +158,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
   - Interfaz minimalista con modo técnico. Inicio: solo Aula y Dron. Cabina: estados, batería y altura sobre el video. Sensores: inclinación y detección. Prueba Tello: cinco pasos y "Listo para volar" o qué falta. "Mis objetos" oculto hasta S4.
   - Inclinación: `LectorInclinacion` (dron-giroscopio.js) usa deviceorientation y, si no llega con datos, el acelerómetro; sin giro vertical y con aviso. El diagnóstico de Sensores escucha los eventos de verdad.
   - Inclinación respecto de la PANTALLA (vertical y las dos horizontales, `inclinacionEnPantalla`); en vertical natural, los mismos valores de siempre. Si la pantalla gira con la inclinación activada, se apaga con los ejes en cero y pide volver a activarla (recalibra). Decisión de Luciano del 6/11.
+  - Sentido del avance (decisión de Luciano del 6/11): inclinar hacia adelante (el borde de arriba de la pantalla hacia abajo, alejándose) avanza, como empujar un joystick. "Invertir avance" (modo técnico, Config. Dron, clave `grupo5dron_invertir_avance`) vuelve al sentido anterior; se lee al activar la inclinación.
   - Modelo en float16 (`scripts/modelo_float16.py`): 9.017.328 bytes en 3 shards, mismas detecciones y FPS que float32 en la PC; `sw.js` v9.
 - Sin probar en el celular: si la detección mejora en el A06 y qué muestra la miniatura; el respaldo por acelerómetro con el sensor real (signos de adelante/atrás y costados).
 

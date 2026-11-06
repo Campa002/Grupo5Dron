@@ -18,6 +18,9 @@
  *    borde de arriba de lo que se ve. En vertical natural es igual que siempre.
  *  - Si la orientación de la pantalla cambia con la inclinación activada, se desactiva (emite 0, 0) y avisa
  *    con onCambioOrientacion: hay que volver a activarla, y así se recalibra.
+ *  - Sentido del avance (decisión de Luciano del 6/11): inclinar hacia adelante (el borde de arriba de la pantalla
+ *    hacia abajo, alejándose) es AVANZAR, como empujar un joystick. "Invertir avance" (modo técnico, Config. Dron)
+ *    vuelve al sentido anterior. Se lee al activar.
  *  - Calibración: la primera lectura después de activar (o de calibrar() o de cambiar de sensor) es el "centro".
  *  - Zona muerta, límite de ángulo, sensibilidad y suavizado (EMA), iguales que antes.
  *  - Al desactivar, emite pitch y roll en 0.
@@ -88,6 +91,22 @@ function textoFuenteInclinacion(fuente) {
         case 'ninguno': return 'No llegan datos de inclinación: este dispositivo no tiene los sensores o el navegador no los da (en una PC es normal).';
         default: return 'Buscando el sensor de inclinación...';
     }
+}
+
+// "Invertir avance" (modo técnico): '1' = sentido anterior (levantar el borde de arriba hacia vos avanza)
+const CLAVE_INVERTIR_AVANCE = 'grupo5dron_invertir_avance';
+
+/** @returns {boolean} true si está activada la opción "Invertir avance" */
+function leerInvertirAvance() {
+    try { return globalThis.localStorage?.getItem(CLAVE_INVERTIR_AVANCE) === '1'; } catch (_) { return false; }
+}
+
+/** Guarda la opción "Invertir avance" (vale desde la próxima vez que se active la inclinación). */
+function guardarInvertirAvance(invertir) {
+    try {
+        if (invertir) globalThis.localStorage?.setItem(CLAVE_INVERTIR_AVANCE, '1');
+        else globalThis.localStorage?.removeItem(CLAVE_INVERTIR_AVANCE);
+    } catch (_) { /* sin almacenamiento */ }
 }
 
 /**
@@ -187,6 +206,7 @@ class DronGiroscopio {
      * @param {number}   [config.sensibilidad]   - Multiplicador [0.1, 2.0]. Default: 1.0.
      * @param {number}   [config.suavizado]      - Factor EMA [0, 1]. 0 = sin suavizado. Default: 0.3.
      * @param {Function} [config.obtenerAngulo]  - () => 0 | 90 | 180 | 270 (para las pruebas). Default: anguloPantalla.
+     * @param {Function} [config.obtenerInvertirAvance] - () => boolean (para las pruebas). Default: la opción guardada.
      */
     constructor({
         onChange = null,
@@ -195,6 +215,7 @@ class DronGiroscopio {
         sensibilidad = 1.0,
         suavizado = 0.3,
         obtenerAngulo = anguloPantalla,
+        obtenerInvertirAvance = leerInvertirAvance,
     } = {}) {
         this.onChange     = onChange;
         /** @type {Function|null} (fuente) 'giroscopio' | 'acelerometro' | 'ninguno' */
@@ -203,6 +224,8 @@ class DronGiroscopio {
         this.onCambioOrientacion = null;
         this.obtenerAngulo = obtenerAngulo;
         this.angulo = 0;   // orientación de la pantalla con la que se activó y calibró
+        this.obtenerInvertirAvance = obtenerInvertirAvance;
+        this.invertirAvance = false; // true = sentido anterior (se lee al activar)
         this.zonaMuerta   = zonaMuerta;
         this.limiteAngulo = limiteAngulo;
         this.sensibilidad = sensibilidad;
@@ -273,6 +296,7 @@ class DronGiroscopio {
         this.permiso = true;
         this.fuente = null;
         this.angulo = this.obtenerAngulo();
+        this.invertirAvance = !!this.obtenerInvertirAvance();
 
         this._lector = new LectorInclinacion({
             onLectura: ({ beta, gamma }) => this._procesarLectura(beta, gamma),
@@ -359,9 +383,11 @@ class DronGiroscopio {
         if (Math.abs(deltaBeta)  < this.zonaMuerta) deltaBeta  = 0;
         if (Math.abs(deltaGamma) < this.zonaMuerta) deltaGamma = 0;
 
-        // Normalizar al rango [-1, 1] con límite de ángulo y sensibilidad
+        // Normalizar al rango [-1, 1] con límite de ángulo y sensibilidad.
+        // Avance: bajar el borde de arriba (beta disminuye) es avanzar; con "Invertir avance", al revés.
         const limitado = this.limiteAngulo / this.sensibilidad;
-        const pitchRaw = this._clamp(deltaBeta  / limitado, -1, 1);
+        const signoAvance = this.invertirAvance ? 1 : -1;
+        const pitchRaw = this._clamp(signoAvance * deltaBeta / limitado, -1, 1);
         const rollRaw  = this._clamp(deltaGamma / limitado, -1, 1);
 
         // Suavizado exponencial (EMA)
@@ -369,8 +395,9 @@ class DronGiroscopio {
         this._pitchSuav = pitchRaw  + alpha_ema * (this._pitchSuav - pitchRaw);
         this._rollSuav  = rollRaw   + alpha_ema * (this._rollSuav  - rollRaw);
 
-        const pitchFinal = parseFloat(this._pitchSuav.toFixed(3));
-        const rollFinal  = parseFloat(this._rollSuav.toFixed(3));
+        // "|| 0": sin -0 (con el signo del avance, una inclinación nula podía quedar como -0)
+        const pitchFinal = parseFloat(this._pitchSuav.toFixed(3)) || 0;
+        const rollFinal  = parseFloat(this._rollSuav.toFixed(3)) || 0;
 
         // Emitir sólo si hubo cambio
         if (pitchFinal !== this.pitch || rollFinal !== this.roll) {
@@ -393,6 +420,8 @@ DronGiroscopio.inclinacionDesdeGravedad = inclinacionDesdeGravedad;
 DronGiroscopio.inclinacionEnPantalla = inclinacionEnPantalla;
 DronGiroscopio.arribaDesdeInclinacion = arribaDesdeInclinacion;
 DronGiroscopio.anguloPantalla = anguloPantalla;
+DronGiroscopio.leerInvertirAvance = leerInvertirAvance;
+DronGiroscopio.guardarInvertirAvance = guardarInvertirAvance;
 DronGiroscopio.textoFuente = textoFuenteInclinacion;
 
 // En Node (pruebas automáticas) se exporta como módulo; en el navegador queda como global

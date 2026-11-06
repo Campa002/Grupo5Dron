@@ -146,6 +146,7 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - Antes, en horizontal la inclinación quedaba rotada 90° (usaba los ejes del teléfono). Ahora es respecto de la pantalla en vertical y en las dos horizontales; en vertical natural no cambia nada. Si la pantalla gira con la inclinación activada, se apaga con los ejes en cero y hay que volver a activarla (recalibra).
     - El acelerómetro usa ahora la inversa exacta de la convención de deviceorientation, así coincide con el giroscopio también en inclinaciones grandes.
     - Modelo en float16 con `scripts/modelo_float16.py`: 18 → 9 MB, 3 shards `.bin`. En la PC, mismas detecciones y puntajes que float32 salvo diferencias de milésimas (dos personas en el límite de 0,50 en una foto).
+26. **Sentido del avance por inclinación invertido (6/11).** Decisión de Luciano: inclinar el celular hacia adelante (el borde de arriba de la pantalla hacia abajo) avanza, como empujar un joystick. Antes avanzaba al levantar el borde de arriba hacia uno. "Invertir avance" en el modo técnico vuelve al sentido anterior. Probado con el simulador y el plugin falso en 0°, 90° y 270°, con giroscopio y acelerómetro, en los dos sentidos.
 
 ## 4. Hardware
 

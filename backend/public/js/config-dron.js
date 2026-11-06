@@ -229,7 +229,23 @@ const ConfigDron = (() => {
                 </div>
             </section>
 
-            <!-- 04 — Ajustes del seguimiento (modo técnico; se guardan en el teléfono) -->
+            <!-- 04 — Sentido del avance por inclinación (modo técnico) -->
+            <section class="bloque solo-tecnico">
+                <p class="etiqueta">04 — Inclinación</p>
+                <h3 class="bloque__titulo">Sentido del avance</h3>
+                <p class="bloque__texto">
+                    Normal: inclinar el celular hacia adelante (el borde de arriba de la pantalla hacia abajo) avanza,
+                    como empujar un joystick. Invertido: levantar el borde de arriba hacia vos avanza (el sentido anterior).
+                    Vale desde la próxima vez que actives la inclinación.
+                </p>
+                <label class="switch" for="switch-invertir-avance">
+                    <input type="checkbox" id="switch-invertir-avance">
+                    <span class="switch__control" aria-hidden="true"></span>
+                    <span class="switch__label">Invertir avance</span>
+                </label>
+            </section>
+
+            <!-- 05 — Ajustes del seguimiento (modo técnico; se guardan en el teléfono) -->
             <section class="bloque solo-tecnico" id="ajustes-seguimiento"></section>
 
         </div>`;
@@ -453,7 +469,7 @@ const ConfigDron = (() => {
         }
 
         caja.innerHTML = `
-            <p class="etiqueta">04 — Seguimiento</p>
+            <p class="etiqueta">05 — Seguimiento</p>
             <h3 class="bloque__titulo">Ajustes del seguimiento</h3>
             <p class="bloque__texto">
                 Se guardan en este teléfono y se aplican la próxima vez que actives el ensayo.
@@ -516,6 +532,17 @@ const ConfigDron = (() => {
             sw.addEventListener('change', () => {
                 App.cambiarModoTecnico(sw.checked);
                 App.mostrarToast(sw.checked ? 'Modo técnico activado.' : 'Modo técnico apagado.', 'info');
+            });
+        }
+
+        const swAvance = contenedor.querySelector('#switch-invertir-avance');
+        if (swAvance && typeof DronGiroscopio !== 'undefined') {
+            swAvance.checked = DronGiroscopio.leerInvertirAvance();
+            swAvance.addEventListener('change', () => {
+                DronGiroscopio.guardarInvertirAvance(swAvance.checked);
+                App.mostrarToast(swAvance.checked
+                    ? 'Avance invertido: levantar el borde de arriba hacia vos avanza. Vale al volver a activar la inclinación.'
+                    : 'Avance normal: inclinar hacia adelante avanza. Vale al volver a activar la inclinación.', 'info', 6000);
             });
         }
 
