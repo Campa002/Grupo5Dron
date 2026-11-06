@@ -1,0 +1,12 @@
+# Archivos que git nunca tiene que convertir (finales de línea ni diffs de texto).
+# La PC de desarrollo tiene core.autocrlf=true: sin esto, un binario que git no detecte
+# como tal podría quedar corrompido. Las librerías y el modelo de visión se suben tal cual.
+backend/public/libs/** binary
+*.bin binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.pdf binary
+*.keystore binary
+*.jks binary

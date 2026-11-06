@@ -722,6 +722,7 @@ const App = (() => {
         const diagConexion = q('#diag-conexion-estado');
         const diagUserAgent = q('#diag-user-agent');
         const diagErroresBox = q('#diag-errores-salida');
+        const diagModelo = q('#diag-modelo');
         const textareaRespaldo = q('#diag-textarea-respaldo');
 
         const DN = DronAdaptadores.DronNativo;
@@ -743,6 +744,8 @@ const App = (() => {
             apiUrl: API.getBaseUrl() || '(no configurada)',
             modoSesion: '',
             userAgent: navigator.userAgent,
+            modelo: 'Sin verificar',
+            modeloDetalle: [],
             errores: [],
         };
 
@@ -850,6 +853,61 @@ const App = (() => {
             agregarLog('info', `Escuchando UDP en: ${estadoDiag.escuchas}. Mandá "command" para que el Tello empiece a enviar telemetría.`);
         }
 
+        /**
+         * Verifica que los archivos del modelo lleguen completos: pide model.json y cada shard y compara
+         * los bytes recibidos con los que declara model.json. Detecta si en vez del archivo llega HTML
+         * (en el APK, Capacitor responde index.html a las rutas sin extensión).
+         */
+        async function verificarModelo() {
+            const base = './libs/coco-ssd/';
+            const caja = q('#diag-modelo-detalle');
+            const lineas = [];
+            const leer = async (ruta) => {
+                const r = await fetch(ruta, { cache: 'no-store' });
+                const datos = await r.arrayBuffer();
+                const tipo = r.headers.get('content-type') || '(sin tipo)';
+                const inicio = new TextDecoder().decode(new Uint8Array(datos.slice(0, 64)));
+                return { status: r.status, bytes: datos.byteLength, tipo, datos, esHtml: /text\/html/i.test(tipo) || /<!doctype|<html/i.test(inicio) };
+            };
+            const bytesPorTipo = { float32: 4, int32: 4, float16: 2, uint16: 2, int16: 2, uint8: 1, int8: 1, bool: 1 };
+            if (diagModelo) diagModelo.textContent = 'Verificando...';
+            try {
+                for (const lib of ['./libs/tfjs/tf.min.js', './libs/coco-ssd/coco-ssd.min.js']) {
+                    const r = await leer(lib);
+                    lineas.push(`${lib.split('/').pop()}: ${r.bytes.toLocaleString()} bytes · ${r.tipo} · HTTP ${r.status}`);
+                }
+                const mj = await leer(base + 'model.json');
+                lineas.push(`model.json: ${mj.bytes.toLocaleString()} bytes · ${mj.tipo} · HTTP ${mj.status}`);
+                if (mj.esHtml) throw new Error('model.json llegó como HTML (no es el archivo del modelo)');
+                const modelo = JSON.parse(new TextDecoder().decode(mj.datos));
+                let esperado = 0;
+                const rutas = [];
+                for (const g of modelo.weightsManifest) {
+                    rutas.push(...g.paths);
+                    for (const w of g.weights) esperado += (w.shape || []).reduce((a, b) => a * b, 1) * (bytesPorTipo[w.dtype] || 4);
+                }
+                let recibido = 0;
+                const problemas = [];
+                for (const ruta of rutas) {
+                    const r = await leer(base + ruta);
+                    recibido += r.bytes;
+                    const nota = r.esHtml ? ' ← LLEGÓ HTML (index.html), NO EL ARCHIVO' : (r.status !== 200 ? ` ← HTTP ${r.status}` : '');
+                    if (nota) problemas.push(ruta);
+                    lineas.push(`${ruta}: ${r.bytes.toLocaleString()} bytes · ${r.tipo}${nota}`);
+                }
+                estadoDiag.modelo = (!problemas.length && recibido === esperado)
+                    ? `✓ ${rutas.length} archivos de pesos, ${recibido.toLocaleString()} bytes (coincide con model.json)`
+                    : `✗ recibidos ${recibido.toLocaleString()} de ${esperado.toLocaleString()} bytes${problemas.length ? ` · con problemas: ${problemas.join(', ')}` : ''}`;
+                if (problemas.length || recibido !== esperado) registrarError(`Modelo: ${estadoDiag.modelo}`);
+            } catch (e) {
+                estadoDiag.modelo = `✗ ${e.message}`;
+                registrarError(`Modelo: ${e.message}`);
+            }
+            estadoDiag.modeloDetalle = lineas;
+            if (diagModelo) diagModelo.textContent = estadoDiag.modelo;
+            if (caja) caja.textContent = lineas.join('\n') || 'Sin datos.';
+        }
+
         async function ejecutarDiagnosticoCompleto() {
             if (diagPlugin) diagPlugin.textContent = 'Consultando...';
             if (diagWifi) diagWifi.textContent = 'Vinculando...';
@@ -884,6 +942,9 @@ const App = (() => {
             estadoDiag.apiUrl = API.getBaseUrl() || '(no configurada)';
             estadoDiag.modoSesion = textoModoSesion();
             estadoDiag.userAgent = navigator.userAgent;
+            // En el APK los archivos son locales (rápido): se verifica el modelo siempre.
+            // En el navegador serían 18 MB por la red: solo con el botón "Verificar modelo".
+            if (tieneNativo) await verificarModelo();
             actualizarUIResumen();
             agregarLog('info', 'Diagnóstico general completado.');
         }
@@ -899,6 +960,7 @@ const App = (() => {
             if (logBox) logBox.textContent = 'Consola limpia. Lista para nuevas pruebas.';
         });
         q('#btn-ejecutar-diagnostico')?.addEventListener('click', ejecutarDiagnosticoCompleto);
+        q('#btn-verificar-modelo')?.addEventListener('click', verificarModelo);
         q('#btn-limpiar-errores-diag')?.addEventListener('click', () => {
             estadoDiag.errores = [];
             if (diagErroresBox) diagErroresBox.textContent = 'Sin errores registrados.';
@@ -922,6 +984,8 @@ const App = (() => {
                 `• URL de la API:         ${estadoDiag.apiUrl}`,
                 `• Sesión:                ${estadoDiag.modoSesion}`,
                 `• WebView / UserAgent:   ${estadoDiag.userAgent}`,
+                `• Modelo de seguimiento: ${estadoDiag.modelo}`,
+                ...estadoDiag.modeloDetalle.map(l => `    ${l}`),
                 '----------------------------------------',
                 'ÚLTIMOS ERRORES REGISTRADOS:',
                 estadoDiag.errores.length ? estadoDiag.errores.join('\n') : 'Ninguno.',

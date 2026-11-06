@@ -123,6 +123,8 @@ docs/contexto/    informe, historial, reportes
 - Cambios puntuales. Respetá los nombres existentes de funciones, IDs, endpoints y tablas.
 - Archivos con finales de línea CRLF: si una edición falla, revisá eso.
 - Nada de recursos externos (CDN, Google Fonts): el APK tiene que andar sin internet.
+- Todo archivo que use la app tiene que tener extensión. En el APK, Capacitor responde index.html a cualquier ruta sin "." (html5mode). Por eso los shards del modelo son `group1-shardNofM.bin`. Si se cambia el modelo, renombrar los shards y sus `paths` en `model.json`.
+- `.gitattributes` marca como binarios `backend/public/libs/**`, imágenes, `.bin` y keystores (la PC tiene `core.autocrlf=true`).
 - Sin credenciales reales en el repo. `config.php` y `config.h` están en `.gitignore`.
 - Seguridad de vuelo. No debilites:
   - el botón de emergencia fijo y siempre visible;

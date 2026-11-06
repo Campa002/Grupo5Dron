@@ -206,6 +206,15 @@ jobs:
             fi
           fi
 
+      # Diagnóstico del modelo de seguimiento: el mismo archivo tiene que tener el mismo tamaño en el repo,
+      # en www/, en los assets de Android y dentro del APK
+      - name: 11c. Listar el modelo (repo, www, assets y APK)
+        run: |
+          echo "== Repo (backend/public/libs)"; ls -l backend/public/libs/coco-ssd backend/public/libs/tfjs
+          echo "== www (generado por build-apk.js)"; ls -l capacitor/www/libs/coco-ssd capacitor/www/libs/tfjs
+          echo "== Assets de Android"; ls -l capacitor/android/app/src/main/assets/public/libs/coco-ssd capacitor/android/app/src/main/assets/public/libs/tfjs
+          echo "== Dentro del APK"; unzip -l capacitor/android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'coco-ssd|tfjs' || echo "(no aparecen en el APK)"
+
       - name: 12. Publicar artefacto APK Debug
         uses: actions/upload-artifact@v4
         with:

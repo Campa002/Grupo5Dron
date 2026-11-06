@@ -72,6 +72,15 @@
             <div class="dato-diagnostico"><span>Video (UDP 11111)</span><strong id="diag-video-bytes">0 bytes</strong></div>
             <div class="dato-diagnostico"><span>URL de la API</span><strong id="diag-api-url" style="word-break:break-all;">—</strong></div>
             <div class="dato-diagnostico"><span>Sesión</span><strong id="diag-conexion-estado">—</strong></div>
+            <div class="dato-diagnostico"><span>Modelo de seguimiento (COCO-SSD)</span><strong id="diag-modelo">Sin verificar</strong></div>
+        </div>
+
+        <div class="mt-sm">
+            <div class="flex justify-between items-center mb-xs gap-sm">
+                <span class="texto-sm font-semibold texto-secundario">Archivos del modelo (tamaño recibido y tipo)</span>
+                <button id="btn-verificar-modelo" class="btn btn--secundario">Verificar modelo</button>
+            </div>
+            <pre id="diag-modelo-detalle" class="consola-prueba consola-prueba--errores" style="color:#cbd5e1;">Sin verificar.</pre>
         </div>
 
         <div class="mt-sm">

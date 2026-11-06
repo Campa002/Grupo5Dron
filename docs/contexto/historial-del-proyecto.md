@@ -125,6 +125,13 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - El workflow instala el keystore del secreto `DEBUG_KEYSTORE_BASE64` en la ubicación por defecto de Gradle y verifica la firma con `apksigner`; sin secreto, usa la clave por defecto.
     - Probado en local con un keystore generado con el mismo comando que usa Luciano: sin secreto, secreto inválido, secreto válido, y la huella de `keytool` coincide con el SHA-256 que imprime `apksigner`.
     - Decisión: alias `androiddebugkey` y contraseña `android` (los que Gradle usa para debug), así no hay que tocar la configuración de Gradle. La protección es que el archivo es privado.
+21. **Modelo de seguimiento roto en el APK (6/11).**
+    - Síntoma en el celular: "byte length of Float32Array should be a multiple of 4"; en la PC andaba.
+    - Causa: los shards del modelo no tenían extensión (`group1-shard1of5`) y Capacitor 5.7.8 responde index.html (6 KB) a toda ruta sin "." (html5mode, activado por defecto). Desactivar html5mode no sirve: Capacitor deja de servir esos archivos.
+    - No eran los finales de línea: git ya los trataba como binarios y los tamaños coincidían con `model.json` (18.034.528 bytes).
+    - Arreglo: shards renombrados a `.bin` y `paths` de `model.json`.
+    - Se agregaron: un paso de CI que lista el modelo en el repo, en www, en los assets y en el APK; "Verificar modelo" en Prueba Tello; y un `.gitattributes` preventivo.
+    - Verificado en el navegador emulando la regla de Capacitor: reproduce el mismo error con los nombres viejos y carga bien con los nuevos.
 
 ## 4. Hardware
 
