@@ -1,11 +1,18 @@
 /**
  * Service Worker — Grupo 5: Control de Sistemas y Dron
- * 
- * Estrategia de caché resiliente para funcionamiento offline parcial
- * y actualización en segundo plano.
+ *
+ * Solo se usa en el navegador (en el APK los archivos ya son locales y no se registra).
+ * Estrategia:
+ *  - API (/api/): siempre por red; sin conexión responde un JSON de error.
+ *  - Páginas, JS, CSS e imágenes: PRIMERO LA RED (así nunca se ven versiones viejas estando online)
+ *    y la copia en caché si no hay conexión o la red tarda más de 3 s.
  */
 
-const CACHE_NAME = 'grupo5dron-v5';
+// Subir este número cuando cambie la lista de recursos precacheados
+const CACHE_NAME = 'grupo5dron-v6';
+
+// Si la red tarda más que esto y hay copia en caché, se usa la copia (la red sigue actualizando en segundo plano)
+const ESPERA_RED_MS = 3000;
 
 // Recursos estáticos confirmados para precaché inicial
 const RECURSOS_ESTATICOS = [
@@ -49,93 +56,90 @@ const RECURSOS_ESTATICOS = [
     '/pages/cambiar-password.html',
 ];
 
-// Instalación: cachear recursos individualmente para evitar fallos en bloque
+// Instalación: cachear recursos de a uno para que un fallo no frene a los demás
 self.addEventListener('install', (evento) => {
     evento.waitUntil(
-        caches.open(CACHE_NAME).then(async (cache) => {
-            console.log('[SW] Cacheando recursos estáticos de forma resiliente');
-            await Promise.allSettled(
-                RECURSOS_ESTATICOS.map(async (url) => {
-                    try {
-                        const respuesta = await fetch(url, { cache: 'reload' });
-                        if (respuesta.ok) {
-                            await cache.put(url, respuesta);
-                        } else {
-                            console.warn(`[SW] No se pudo precachear ${url}: HTTP ${respuesta.status}`);
-                        }
-                    } catch (error) {
-                        console.warn(`[SW] Error al precachear ${url}:`, error);
+        caches.open(CACHE_NAME).then((cache) => Promise.allSettled(
+            RECURSOS_ESTATICOS.map(async (url) => {
+                try {
+                    const respuesta = await fetch(url, { cache: 'reload' });
+                    if (respuesta.ok) {
+                        await cache.put(url, respuesta);
+                    } else {
+                        console.warn(`[SW] No se pudo precachear ${url}: HTTP ${respuesta.status}`);
                     }
-                })
-            );
-        })
+                } catch (error) {
+                    console.warn(`[SW] Error al precachear ${url}:`, error);
+                }
+            })
+        ))
     );
-    // Activar inmediatamente
     self.skipWaiting();
 });
 
-// Activación: purgar cachés anteriores
+// Activación: borrar cachés de versiones anteriores
 self.addEventListener('activate', (evento) => {
     evento.waitUntil(
-        caches.keys().then((nombres) => {
-            return Promise.all(
-                nombres.map((nombre) => {
-                    if (nombre !== CACHE_NAME) {
-                        console.log('[SW] Eliminando caché antigua:', nombre);
-                        return caches.delete(nombre);
-                    }
-                })
-            );
-        })
+        caches.keys().then((nombres) => Promise.all(
+            nombres.filter((nombre) => nombre !== CACHE_NAME).map((nombre) => caches.delete(nombre))
+        ))
     );
     self.clients.claim();
 });
 
-// Fetch: red prioritaria para la API, caché dinámica en runtime para estáticos
-self.addEventListener('fetch', (evento) => {
-    const url = new URL(evento.request.url);
+/** Pide a la red revalidando con el servidor (sin usar la caché HTTP del navegador sin preguntar). */
+function pedirARed(request) {
+    // Las navegaciones no admiten opciones extra en fetch()
+    return request.mode === 'navigate' ? fetch(request) : fetch(request, { cache: 'no-cache' });
+}
 
-    // 1. Peticiones hacia la API REST -> Siempre por Red (Network Only)
+async function primeroLaRed(evento) {
+    const request = evento.request;
+    const cache = await caches.open(CACHE_NAME);
+
+    const red = pedirARed(request).then((respuesta) => {
+        if (respuesta && respuesta.status === 200 && respuesta.type === 'basic') {
+            evento.waitUntil(cache.put(request, respuesta.clone()));
+        }
+        return respuesta;
+    });
+
+    const copia = await cache.match(request, { ignoreSearch: true })
+        || (request.mode === 'navigate' ? await cache.match('/') : undefined);
+
+    if (!copia) {
+        // Sin copia: solo queda la red (si falla, el navegador muestra el error)
+        return red;
+    }
+    // Con copia: la red tiene ESPERA_RED_MS para responder; si falla o tarda, se usa la copia
+    const tiempoAgotado = new Promise((resolver) => setTimeout(() => resolver(null), ESPERA_RED_MS));
+    try {
+        const respuesta = await Promise.race([red, tiempoAgotado]);
+        if (respuesta && respuesta.ok) return respuesta;
+    } catch (_) {
+        // Sin conexión
+    }
+    red.catch(() => {}); // si sigue en curso, que no quede un rechazo sin atender
+    return copia;
+}
+
+self.addEventListener('fetch', (evento) => {
+    const request = evento.request;
+    if (request.method !== 'GET') return;
+    const url = new URL(request.url);
+    if (url.origin !== self.location.origin) return;
+
+    // 1. API REST: siempre por red
     if (url.pathname.startsWith('/api/')) {
         evento.respondWith(
-            fetch(evento.request).catch(() => {
-                return new Response(
-                    JSON.stringify({
-                        error: true,
-                        mensaje: 'Sin conexión con el servidor. Verificá tu red WiFi.',
-                    }),
-                    {
-                        status: 503,
-                        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-                    }
-                );
-            })
+            fetch(request).catch(() => new Response(
+                JSON.stringify({ error: true, mensaje: 'Sin conexión con el servidor. Verificá tu red WiFi.' }),
+                { status: 503, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+            ))
         );
         return;
     }
 
-    // 2. Recursos estáticos y páginas -> Cache First con actualización en segundo plano
-    evento.respondWith(
-        caches.match(evento.request).then((recursoEnCache) => {
-            const peticionRed = fetch(evento.request)
-                .then((respuestaRed) => {
-                    if (respuestaRed && respuestaRed.status === 200 && respuestaRed.type === 'basic') {
-                        const copia = respuestaRed.clone();
-                        caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(evento.request, copia);
-                        });
-                    }
-                    return respuestaRed;
-                })
-                .catch(() => {
-                    // Si falla la red y no estaba en caché, fallback a inicio si es navegación
-                    if (evento.request.mode === 'navigate') {
-                        return caches.match('/');
-                    }
-                    return null;
-                });
-
-            return recursoEnCache || peticionRed;
-        })
-    );
+    // 2. Páginas y archivos estáticos: primero la red, la caché si no hay conexión
+    evento.respondWith(primeroLaRed(evento));
 });

@@ -155,7 +155,6 @@ const Dron = (() => {
         window.addEventListener('resize', _onResize);
 
         _giroscopio = new DronGiroscopio({ onChange: _onGiroscopioCambio });
-        _giroscopio.restaurarConfiguracion();
 
         if (typeof DronSeguimiento !== 'undefined') {
             _seguimiento = new DronSeguimiento({

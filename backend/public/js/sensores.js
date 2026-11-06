@@ -34,9 +34,6 @@ const Sensores = (() => {
         pantalla:      { dpr: null, resolucion: null },
     };
 
-    /** @type {Function|null} */
-    let _onProgreso = null;
-
     // ----------------------------------------------------------------
     // Diagnóstico individual de cada sensor
     // ----------------------------------------------------------------
@@ -172,31 +169,14 @@ const Sensores = (() => {
 
     /**
      * Ejecuta todos los diagnósticos en paralelo y devuelve el estado completo.
-     * @param {Function} [onProgreso] - Callback(nombre, resultado) llamado a medida que cada sensor termina.
      * @returns {Promise<Object>} Copia del estado completo.
      */
-    async function diagnosticar(onProgreso = null) {
-        _onProgreso = onProgreso;
-
-        const tareas = [
-            diagnosticarGiroscopio().then(() => _notificar('giroscopio', estado.giroscopio)),
-            diagnosticarGPS().then(()        => _notificar('gps',        estado.gps)),
-            diagnosticarCamara().then(()     => _notificar('camara',     estado.camara)),
-        ];
-
-        // Síncronos, no hay necesidad de Promise
-        diagnosticarVibracion(); _notificar('vibracion', estado.vibracion);
-        diagnosticarRed();       _notificar('red',       estado.red);
-        diagnosticarPantalla();  _notificar('pantalla',  estado.pantalla);
-
-        await Promise.allSettled(tareas);
+    async function diagnosticar() {
+        diagnosticarVibracion();
+        diagnosticarRed();
+        diagnosticarPantalla();
+        await Promise.allSettled([diagnosticarGiroscopio(), diagnosticarGPS(), diagnosticarCamara()]);
         return obtenerEstado();
-    }
-
-    function _notificar(nombre, resultado) {
-        if (typeof _onProgreso === 'function') {
-            _onProgreso(nombre, resultado);
-        }
     }
 
     /**
@@ -289,7 +269,6 @@ const Sensores = (() => {
 
     return {
         diagnosticar,
-        obtenerEstado,
         obtenerResumen,
     };
 })();

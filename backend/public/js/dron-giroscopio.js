@@ -7,12 +7,11 @@
  *
  * Características:
  *  - Solicitud de permiso explícito en iOS 13+ (DeviceOrientationEvent.requestPermission)
- *  - Calibración: guarda la orientación base al activar el giroscopio
- *  - Zona muerta configurable (no envía si el movimiento es menor al umbral)
+ *  - Calibración: la primera lectura después de activar (o de calibrar()) es el "centro"
+ *  - Zona muerta (no envía si el movimiento es menor al umbral)
  *  - Suavizado exponencial (EMA) para reducir ruido
- *  - Sensibilidad ajustable en tiempo real
  *  - Límite máximo de ángulo de inclinación
- *  - Valores de respaldo seguros cuando no hay permiso / sensor
+ *  - Al desactivar, emite pitch y roll en 0
  *
  * Uso:
  *   const giro = new DronGiroscopio({ onChange: ({pitch, roll}) => { ... } });
@@ -22,8 +21,6 @@
 
 // eslint-disable-next-line no-unused-vars
 class DronGiroscopio {
-    'use strict';
-
     /**
      * @param {Object} config
      * @param {Function} [config.onChange]       - Callback ({ pitch, roll }) en [-1, 1].
@@ -48,8 +45,7 @@ class DronGiroscopio {
         this.activo     = false;
         this.permiso    = false; // true si el usuario otorgó permiso
 
-        // Orientación de calibración (capturada al activar)
-        this._baseAlpha = null;
+        // Orientación de calibración (capturada en la primera lectura)
         this._baseBeta  = null;
         this._baseGamma = null;
 
@@ -95,7 +91,6 @@ class DronGiroscopio {
         }
 
         // Resetear calibración
-        this._baseAlpha = null;
         this._baseBeta  = null;
         this._baseGamma = null;
         this._pitchSuav = 0;
@@ -106,7 +101,6 @@ class DronGiroscopio {
 
         window.addEventListener('deviceorientation', this._handler, true);
         this.activo = true;
-        console.info('[Giroscopio] Activado correctamente.');
         return { ok: true };
     }
 
@@ -124,45 +118,14 @@ class DronGiroscopio {
         if (typeof this.onChange === 'function') {
             this.onChange({ pitch: 0, roll: 0 });
         }
-        console.info('[Giroscopio] Desactivado.');
     }
 
     /**
      * Recalibra: guarda la orientación actual como base.
      */
     calibrar() {
-        this._baseAlpha = null;
         this._baseBeta  = null;
         this._baseGamma = null;
-        console.info('[Giroscopio] Calibración restablecida — se tomará la próxima lectura como base.');
-    }
-
-    // ----------------------------------------------------------------
-    // Configuración en tiempo real
-    // ----------------------------------------------------------------
-
-    /**
-     * Ajusta la sensibilidad. Clampea en [0.1, 2.0].
-     * @param {number} valor
-     */
-    setSensibilidad(valor) {
-        this.sensibilidad = Math.max(0.1, Math.min(2.0, parseFloat(valor) || 1.0));
-    }
-
-    /**
-     * Ajusta la zona muerta en grados.
-     * @param {number} grados
-     */
-    setZonaMuerta(grados) {
-        this.zonaMuerta = Math.max(0, parseFloat(grados) || 3);
-    }
-
-    /**
-     * Ajusta el suavizado EMA [0, 1].
-     * @param {number} factor
-     */
-    setSuavizado(factor) {
-        this.suavizado = Math.max(0, Math.min(1, parseFloat(factor) || 0.3));
     }
 
     // ----------------------------------------------------------------
@@ -174,13 +137,11 @@ class DronGiroscopio {
         // gamma ≈ inclinación izquierda/derecha → Roll
         const beta  = evento.beta  ?? 0;
         const gamma = evento.gamma ?? 0;
-        const alpha = evento.alpha ?? 0;
 
         // Primera lectura → guardar como calibración base
         if (this._baseBeta === null) {
             this._baseBeta  = beta;
             this._baseGamma = gamma;
-            this._baseAlpha = alpha;
             return; // La primera lectura sólo calibra
         }
 
@@ -216,54 +177,5 @@ class DronGiroscopio {
 
     _clamp(valor, min, max) {
         return Math.max(min, Math.min(max, valor));
-    }
-
-    // ----------------------------------------------------------------
-    // API pública
-    // ----------------------------------------------------------------
-
-    /**
-     * @returns {{ pitch: number, roll: number }}
-     */
-    obtenerValores() {
-        return { pitch: this.pitch, roll: this.roll };
-    }
-
-    /**
-     * @returns {boolean} true si el giroscopio está disponible en este dispositivo.
-     */
-    static estaDisponible() {
-        return typeof DeviceOrientationEvent !== 'undefined';
-    }
-
-    /**
-     * Persiste la configuración actual en localStorage.
-     * Se usa para mantener los ajustes al volver sin internet.
-     */
-    guardarConfiguracion() {
-        try {
-            localStorage.setItem('grupo5dron_giro_config', JSON.stringify({
-                zonaMuerta:   this.zonaMuerta,
-                limiteAngulo: this.limiteAngulo,
-                sensibilidad: this.sensibilidad,
-                suavizado:    this.suavizado,
-            }));
-        } catch (_) { /* storage lleno */ }
-    }
-
-    /**
-     * Restaura la configuración guardada en localStorage.
-     * Si no hay nada guardado, mantiene los valores por defecto.
-     */
-    restaurarConfiguracion() {
-        try {
-            const raw = localStorage.getItem('grupo5dron_giro_config');
-            if (!raw) return;
-            const cfg = JSON.parse(raw);
-            if (cfg.zonaMuerta   !== undefined) this.zonaMuerta   = cfg.zonaMuerta;
-            if (cfg.limiteAngulo !== undefined) this.limiteAngulo = cfg.limiteAngulo;
-            if (cfg.sensibilidad !== undefined) this.sensibilidad = cfg.sensibilidad;
-            if (cfg.suavizado    !== undefined) this.suavizado    = cfg.suavizado;
-        } catch (_) { /* JSON inválido */ }
     }
 }

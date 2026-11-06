@@ -44,12 +44,16 @@ const App = (() => {
             info: 'ℹ️',
         };
 
+        // Texto plano (textContent): un mensaje que venga del servidor no puede inyectar HTML
         const toast = document.createElement('div');
         toast.className = `toast toast--${tipo}`;
-        toast.innerHTML = `
-            <span style="font-size: 1.1rem; flex-shrink: 0;">${iconos[tipo] || '⚡'}</span>
-            <span style="flex-grow: 1;">${mensaje}</span>
-        `;
+        const icono = document.createElement('span');
+        icono.className = 'toast__icono';
+        icono.textContent = iconos[tipo] || '⚡';
+        const texto = document.createElement('span');
+        texto.className = 'toast__texto';
+        texto.textContent = mensaje;
+        toast.append(icono, texto);
 
         contenedor.appendChild(toast);
 
@@ -116,7 +120,8 @@ const App = (() => {
         }
 
         try {
-            const respuesta = await fetch(`/pages/${nombre}.html?v=${Date.now()}`);
+            // Sin parámetros en la URL (no llena la caché) y revalidando con el servidor: siempre la versión actual
+            const respuesta = await fetch(`/pages/${nombre}.html`, { cache: 'no-cache' });
             if (!respuesta.ok) {
                 throw new Error(`No se pudo cargar la vista "${nombre}" (HTTP ${respuesta.status})`);
             }

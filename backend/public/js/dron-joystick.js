@@ -13,13 +13,10 @@
 
 // eslint-disable-next-line no-unused-vars
 class DronJoystick {
-    'use strict';
-
     /**
      * @param {Object} config
      * @param {HTMLElement} config.contenedor   - Elemento que recibirá el canvas del joystick.
-     * @param {string}  [config.etiqueta]       - Texto que se dibuja en el joystick (ej. 'THR/YAW').
-     * @param {boolean} [config.throttleFijo]   - Si es true, el eje Y no vuelve al centro (modo throttle acumulativo).
+     * @param {string}  [config.etiqueta]       - Texto que se dibuja en el joystick (ej. 'ALTURA / GIRO').
      * @param {number}  [config.tamano]         - Tamaño del canvas en px (por defecto 160).
      * @param {string}  [config.colorBase]      - Color del anillo exterior.
      * @param {string}  [config.colorPalo]      - Color de la palanca móvil.
@@ -27,7 +24,6 @@ class DronJoystick {
     constructor({
         contenedor,
         etiqueta = '',
-        throttleFijo = false,
         tamano = 160,
         colorBase = 'rgba(0, 102, 204, 0.25)',
         colorPalo = 'rgba(0, 153, 255, 0.9)',
@@ -36,7 +32,6 @@ class DronJoystick {
 
         this.contenedor = contenedor;
         this.etiqueta = etiqueta;
-        this.throttleFijo = throttleFijo;
         this.tamano = tamano;
         this.colorBase = colorBase;
         this.colorPalo = colorPalo;
@@ -140,16 +135,10 @@ class DronJoystick {
         this._touchId = null;
         this._mousePulsado = false;
 
-        if (this.throttleFijo) {
-            // En modo throttle fijo, sólo centra el eje X
-            this._paloX = 0;
-            this.x = 0;
-        } else {
-            this._paloX = 0;
-            this._paloY = 0;
-            this.x = 0;
-            this.y = 0;
-        }
+        this._paloX = 0;
+        this._paloY = 0;
+        this.x = 0;
+        this.y = 0;
 
         this._dibujar();
         if (typeof this.onChange === 'function') {
@@ -267,7 +256,7 @@ class DronJoystick {
 
         // Etiqueta
         if (this.etiqueta) {
-            ctx.font = `bold 10px Inter, sans-serif`;
+            ctx.font = 'bold 10px system-ui, sans-serif';
             ctx.fillStyle = 'rgba(180, 210, 255, 0.7)';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
@@ -278,14 +267,6 @@ class DronJoystick {
     // ----------------------------------------------------------------
     // API pública
     // ----------------------------------------------------------------
-
-    /**
-     * Devuelve los valores actuales normalizados.
-     * @returns {{ x: number, y: number }}
-     */
-    obtenerValores() {
-        return { x: this.x, y: this.y };
-    }
 
     /**
      * Centra el joystick sin disparar eventos.

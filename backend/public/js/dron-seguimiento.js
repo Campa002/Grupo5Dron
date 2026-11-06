@@ -37,7 +37,6 @@ const DronSeguimiento = (() => {
             this.cargando        = false;
             this.modeloCargado   = false;
             this._modelo         = null;
-            this._claseObj       = 'person';
             this._rafId          = null;
             this._ultFrame       = 0;
             this._framesSinDetectar = 0;
@@ -63,14 +62,12 @@ const DronSeguimiento = (() => {
 
             if (tfDisponible) {
                 try {
-                    console.info('[Seguimiento] Intentando cargar modelo COCO-SSD local...');
                     this._modelo = await cocoSsd.load({
                         modelUrl: './libs/coco-ssd/model.json',
                     });
                     this.modeloCargado = true;
                     this.cargando = false;
                     this.modo = 'persona';
-                    console.info('[Seguimiento] ✅ Modelo COCO-SSD cargado para modo "persona".');
                     return { ok: true, modo: 'persona' };
                 } catch (err) {
                     console.warn('[Seguimiento] No se pudo cargar el modelo COCO-SSD local:', err);
@@ -81,7 +78,6 @@ const DronSeguimiento = (() => {
             this.cargando = false;
             this.modeloCargado = true;
             this.modo = 'color';
-            console.info('[Seguimiento] ℹ️ Activando modo respaldo por color (sin dependencias pesadas).');
             return {
                 ok: true,
                 modo: 'color',
@@ -108,7 +104,6 @@ const DronSeguimiento = (() => {
                 this.onOffset({ dx: 0, dy: 0, deteccion: null, activo: false });
             }
             this._limpiarDebug();
-            console.info('[Seguimiento] Seguimiento desactivado.');
         }
 
         _bucle(ts = 0) {

@@ -111,12 +111,19 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
     <script src="/js/dron.js"></script>
     <script src="/js/app.js"></script>
 
-    <!-- Service Worker -->
+    <!-- Service Worker: solo en el navegador. En el APK los archivos ya son locales. -->
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
-                .then(reg => console.log('Service Worker registrado:', reg.scope))
-                .catch(err => console.warn('Error registrando SW:', err));
+            const enApk = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+            if (enApk) {
+                // Por si quedó registrado uno de una versión anterior
+                navigator.serviceWorker.getRegistrations()
+                    .then(registros => registros.forEach(r => r.unregister()))
+                    .catch(() => {});
+            } else {
+                navigator.serviceWorker.register('/sw.js')
+                    .catch(err => console.warn('No se pudo registrar el service worker:', err));
+            }
         }
     </script>
 </body>

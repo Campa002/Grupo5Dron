@@ -172,6 +172,13 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
   - modal de perfiles con el componente `.modal-overlay` / `.modal`; Prueba Tello con controles de 44 px;
   - Sensores: lectura en vivo del giroscopio (beta, gamma, alpha), con aviso si no llegan datos;
   - Acerca: datos técnicos reales y solo los nombres de los integrantes (los roles los tiene que confirmar Luciano).
+- Fase 4 aplicada el 5/11 (verificada con Playwright, con el service worker activo):
+  - service worker v6: en el navegador, primero la red para páginas, JS y CSS (la caché solo sin conexión o si la red tarda más de 3 s); en el APK no se registra y se desregistra si había uno; las plantillas se piden sin `?v=` y revalidando;
+  - `mostrarToast` con `textContent` (no interpreta HTML);
+  - borrado el CSS de la cabina vieja (`.dron-*`, `.joystick-*`, `.btn--emergencia`, `.sensor-camara`, `.barra-progreso`); quedan a propósito utilidades genéricas sin uso (`texto-exito`, `flex-col`, `oculto`, etc.) para el aula;
+  - sin `'use strict'` dentro de clases, sin métodos ni opciones sin uso (giroscopio, joystick, sensores, seguimiento) y sin `console.log`/`console.info` de depuración.
+- Cuando cambie la lista de archivos de `sw.js` (`RECURSOS_ESTATICOS`), subí `CACHE_NAME`. Para cambios de contenido no hace falta: el service worker pide primero a la red.
+- Pendiente menor en código compartido (no se tocó): `mostrarModalUsuario` (app.js) arma el modal con `innerHTML` usando el nombre y el email que vienen del servidor; conviene escaparlos.
 - Observación para el compañero del aula (no se tocó): en `app.css`, `.dispositivo__botones` tiene padding con `max-height: 0`, así que las tarjetas de dispositivos cerradas muestran una franja de los botones.
 
 ## Próximos pasos (lista única)
@@ -180,11 +187,6 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 2. **Corregir lo que salga de esa prueba.** Lo más probable: red sin internet (`vincularRedWifi`), video en el WebView, si el `rc` interfiere con los pasos y la unidad de `vgx`/`vgy`.
 3. ~~Fase 2, funciones~~: hecha (ver "Estado").
 4. ~~Fase 3, interfaz~~: hecha (ver "Estado").
-5. **Fase 4, limpieza:**
-   - código muerto y CSS sin uso (`.dron-video`, `.joystick-*`, `.sensor-*`);
-   - `console.log` de depuración;
-   - `'use strict'` dentro de clases (joystick y giroscopio);
-   - `mostrarToast` con `innerHTML`;
-   - service worker: no registrarlo en el APK; las plantillas con `?v=Date.now()` llenan la caché; subir `CACHE_NAME` (los cambios de las Fases 2 y 3 en CSS y páginas pueden quedar en caché en un navegador con la PWA instalada).
+5. ~~Fase 4, limpieza~~: hecha (ver "Estado").
 6. **Hosting:** subir el backend, importar `schema.sql` y crear `config.php` (con `https://localhost` en CORS). Cada cuenta del seed pide cambiar `password` en su primer login.
 7. **Al final:** documentación (README, manual de usuario, manual del programador, API, plan de pruebas, limitaciones) y corrección del informe (por ejemplo, el LED IR figura en GPIO35, que es solo de entrada).

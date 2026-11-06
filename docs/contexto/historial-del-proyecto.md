@@ -94,6 +94,11 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - Prueba Tello y formularios con controles de 44 px;
     - giroscopio en vivo en Sensores;
     - Acerca con datos técnicos reales (pines GPIO25/19/4, sin "MVC" ni "drones HTTP") y sin los roles inventados de los integrantes.
+16. **Fase 4 con Claude Code (5/11).** Limpieza:
+    - service worker con "primero la red" (no más estilos viejos estando online), sin service worker en el APK, y plantillas sin `?v=Date.now()`;
+    - avisos (toasts) con texto plano;
+    - borrado el CSS y el JS sin uso de la cabina vieja y de los módulos del dron;
+    - sin logs de depuración.
 
 ## 4. Hardware
 
