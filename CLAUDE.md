@@ -178,7 +178,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
   - borrado el CSS de la cabina vieja (`.dron-*`, `.joystick-*`, `.btn--emergencia`, `.sensor-camara`, `.barra-progreso`); quedan a propósito utilidades genéricas sin uso (`texto-exito`, `flex-col`, `oculto`, etc.) para el aula;
   - sin `'use strict'` dentro de clases, sin métodos ni opciones sin uso (giroscopio, joystick, sensores, seguimiento) y sin `console.log`/`console.info` de depuración.
 - Cuando cambie la lista de archivos de `sw.js` (`RECURSOS_ESTATICOS`), subí `CACHE_NAME`. Para cambios de contenido no hace falta: el service worker pide primero a la red.
-- Pendiente menor en código compartido (no se tocó): `mostrarModalUsuario` (app.js) arma el modal con `innerHTML` usando el nombre y el email que vienen del servidor; conviene escaparlos.
+- `mostrarModalUsuario` (app.js) escapa el nombre, el email y el rol con `escaparHtml` antes de armar el modal.
 - Observación para el compañero del aula (no se tocó): en `app.css`, `.dispositivo__botones` tiene padding con `max-height: 0`, así que las tarjetas de dispositivos cerradas muestran una franja de los botones.
 
 ## Próximos pasos (lista única)

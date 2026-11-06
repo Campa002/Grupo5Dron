@@ -454,6 +454,20 @@ const App = (() => {
     }
 
     /**
+     * Escapa texto para insertarlo en HTML (datos que vienen del servidor o del usuario).
+     * @param {*} valor
+     * @returns {string}
+     */
+    function escaparHtml(valor) {
+        return String(valor ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    /**
      * Muestra un diálogo flotante o modal con los datos de sesión del usuario.
      */
     function mostrarModalUsuario() {
@@ -481,9 +495,9 @@ const App = (() => {
                         <div class="flex items-center gap-md">
                             <div style="font-size: 2.5rem;">🎓</div>
                             <div>
-                                <h4 style="font-weight: 700;">${usuario.nombre}</h4>
-                                <p class="texto-sm texto-secundario">${usuario.email}</p>
-                                <span class="badge badge--info mt-xs">${usuario.rol.toUpperCase()}</span>
+                                <h4 style="font-weight: 700;">${escaparHtml(usuario.nombre)}</h4>
+                                <p class="texto-sm texto-secundario">${escaparHtml(usuario.email)}</p>
+                                <span class="badge badge--info mt-xs">${escaparHtml(String(usuario.rol || '').toUpperCase())}</span>
                             </div>
                         </div>
                     </div>
