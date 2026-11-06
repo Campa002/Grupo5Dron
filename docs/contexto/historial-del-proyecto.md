@@ -112,6 +112,11 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
     - Plan aprobado: S0 a S2 antes de la primera prueba con el Tello; S3 (control real) y S4 ("Mis objetos") después.
     - Criterio de "Mis objetos" tomado de RAC: confirmar con umbral del 75 % y 8 detecciones consecutivas; dar por perdido con una ventana más corta (3 de 5). Los dos valores, editables.
     - S0 aplicado: el seguimiento queda solo en ensayo.
+18. **Seguimiento S1 (6/11).** Tubería nueva, todavía solo en ensayo. Las pruebas encontraron y corrigieron dos errores de diseño:
+    - en un cruce de dos personas del mismo tamaño se pasaba a la otra, porque predecía con la posición suavizada (atrasada); ahora predice con la detección cruda y su velocidad;
+    - con la foto de prueba, el criterio "la más centrada" fijaba a una persona lejana diminuta (3 % del alto), que en control real haría avanzar a fondo; ahora fija la más grande y exige al menos el 12 % del alto.
+    - Medido en la PC: la inferencia tarda lo mismo con cualquier ancho (17 a 19 ms con WebGL), y 320 px pierde personas lejanas chicas. Se eligió 480 px por defecto (en el celular hay que medirlo).
+    - "Despegar" ahora se muestra deshabilitado ("Esperando telemetría…") hasta el primer paquete, en vez de rechazar el toque.
 
 ## 4. Hardware
 

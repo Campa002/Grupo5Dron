@@ -107,6 +107,7 @@ docs/contexto/    informe, historial, reportes
   - MySQL: base `grupo5dron_db` importada desde `backend/sql/schema.sql`; `backend/config/config.php` local con root sin contraseña.
 - Usuarios del seed: la contraseña de todos es `password` y tienen `debe_cambiar_password = 1`: la app obliga a cambiarla en el primer login (`auth.php?action=cambiar_mi_password`). Para volver al estado inicial de la base local, reimportá `schema.sql`.
 - CORS: `config.php` tiene que incluir `https://localhost` en `cors_origenes` (ya está en `config.example.php`) para que el APK pueda usar la API.
+- Pruebas automáticas: `node --test tests/seguimiento.test.js` (selector y controlador del seguimiento con recorridos sintéticos).
 - Pruebas en navegador: Playwright con Microsoft Edge del sistema (`chromium.launch({ channel: 'msedge' })`). Para el TelloAdapter sin dron, se puede inyectar un mock de `window.Capacitor.Plugins.DronNative` que respete el contrato de arriba.
 - APK: se compila en GitHub Actions en cada push a `main`. Artefacto: `Grupo5Dron-app-debug`.
 - NO agregues `android-actions/setup-android` al workflow: el SDK ya viene en el runner y esa acción rompió el build.
@@ -180,6 +181,14 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
   - sin `'use strict'` dentro de clases, sin métodos ni opciones sin uso (giroscopio, joystick, sensores, seguimiento) y sin `console.log`/`console.info` de depuración.
 - Cuando cambie la lista de archivos de `sw.js` (`RECURSOS_ESTATICOS`), subí `CACHE_NAME`. Para cambios de contenido no hace falta: el service worker pide primero a la red.
 - `mostrarModalUsuario` (app.js) escapa el nombre, el email y el rol con `escaparHtml` antes de armar el modal.
+- Seguimiento, etapa S1 (6/11): `dron-seguimiento.js` es una sola tubería.
+  - Visión: COCO-SSD sobre una imagen de 480 px, de 5 a 10 FPS sin superponer, con aviso si TensorFlow no usa WebGL.
+  - Selector: fija la persona más grande, con premio por estar centrada; ignora las de menos del 12 % del alto; asocia con la última detección cruda y su velocidad; tolera pérdidas de 1,5 s; después solo retoma cerca de donde estaba durante 5 s.
+  - Controlador puro: yaw centra, throttle altura (no actúa si el recuadro está cortado), pitch distancia por la altura del recuadro, nunca roll; zona muerta, límites, aceleración gradual y vencimiento con decaimiento.
+  - Bucle a 15 Hz y condiciones para el control real (función pura, se aplica en S3).
+  - Pruebas: `tests/seguimiento.test.js` (`node --test`, 25 pruebas, también en CI).
+  - "Despegar" queda deshabilitado con "⏳ Esperando telemetría…" hasta el primer paquete.
+  - La cancelación por toque de joystick se implementa en S3 con el control real: en ensayo los joysticks siguen funcionando.
 - Seguimiento, etapa S0 (6/11): en la cabina "🎯 Ensayo" calcula el comando y lo muestra sobre el video, pero nunca escribe los ejes del rc. Se puede usar en tierra y no interfiere con los joysticks ni con el giroscopio. Auditoría y plan completos del seguimiento: historial, §3, punto 17.
 - Observación para el compañero del aula (no se tocó): en `app.css`, `.dispositivo__botones` tiene padding con `max-height: 0`, así que las tarjetas de dispositivos cerradas muestran una franja de los botones.
 
@@ -191,10 +200,10 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 4. ~~Fase 3, interfaz~~: hecha (ver "Estado").
 5. ~~Fase 4, limpieza~~: hecha (ver "Estado").
 6. **Seguimiento v2** (una sola tubería: candidatos → selector de objetivo → suavizado → controlador; ensayo y control real comparten todo):
-   - S1: tubería; selector por clase con objetivo fijo; controlador puro (yaw centra, throttle altura, pitch distancia por la altura del recuadro, sin roll), con zona muerta, límite, aceleración gradual y vencimiento; tolerar pérdidas cortas y avisar; cancelar con cualquier toque de joystick o paso; condiciones de activación (en vuelo, altura y batería en rango, telemetría, WebGL, FPS mínimo); aviso si TensorFlow cae a CPU; imagen reducida; FPS adaptativo; el modo color no manda comandos; pruebas en Node (`node --test`) en el job "verificar".
+   - ~~S1~~: hecha (ver "Estado"). Pasan a S3: cancelar el seguimiento real con cualquier toque de joystick y aplicar las condiciones de activación.
    - S2: modo ensayo con panel (FPS, demora, backend, estado, comando); ajustes editables guardados en el teléfono (ganancias, zona muerta, velocidad máxima, distancia objetivo, umbral; confirmación tipo RAC: 75 % y 8 detecciones; pérdida: 3 de 5); "Copiar registro" por cuadro (sin método nativo nuevo); demo con la cámara del celular en Sensores (app.js, aprobado).
    - Firma fija del APK debug (etapa aparte, al final de S2): keystore como secreto de GitHub en base64, nunca en el repo, con la clave por defecto si falta el secreto.
-   - S3 (después de la primera prueba con el Tello): habilitar el control real y ajustar ganancias con el dron.
+   - S3 (después de la primera prueba con el Tello): habilitar el control real (con cancelación por toque de joystick y las condiciones de activación) y ajustar ganancias con el dron.
    - S4 (después de la primera prueba): "Mis objetos" (MobileNet local para embeddings, IndexedDB, selector por objeto guardado y por toque con rastreador).
 7. **Hosting:** subir el backend, importar `schema.sql` y crear `config.php` (con `https://localhost` en CORS). Cada cuenta del seed pide cambiar `password` en su primer login.
 8. **Al final:** documentación (README, manual de usuario, manual del programador, API, plan de pruebas, limitaciones) y corrección del informe (por ejemplo, el LED IR figura en GPIO35, que es solo de entrada).

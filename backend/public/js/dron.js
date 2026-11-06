@@ -76,6 +76,7 @@ const Dron = (() => {
     let _cancelarMisionFlag = false;
     let _pasoEnEjecucion = false;
     let _accionVuelo = false;      // despegue o aterrizaje en curso
+    let _estadoUI = 'desconectado';
 
     let _watchdogId = null;
     let _failsafeActivado = false;
@@ -257,6 +258,7 @@ const Dron = (() => {
         const hay = _hayTelemetria();
         const marca = _q('#estado-telemetria');
         if (marca) marca.hidden = hay;
+        _actualizarBotonDespegar();
 
         if (!hay && a.enVuelo && !_failsafeActivado) {
             _ejecutarFailsafe(Date.now() - a.ultimaTelemetriaTs);
@@ -728,25 +730,31 @@ const Dron = (() => {
         if (!_seguimiento.modeloCargado) {
             App.mostrarToast('Cargando el modelo de seguimiento...', 'info');
             const res = await _seguimiento.inicializar();
-            if (!res.ok) { App.mostrarToast('No se pudo cargar el modelo de seguimiento.', 'advertencia'); return; }
-            if (res.aviso) App.mostrarToast(res.aviso, 'advertencia', 6000);
+            if (!res.ok) { App.mostrarToast(`No se pudo cargar el modelo de seguimiento: ${res.error}`, 'advertencia', 7000); return; }
+            if (res.aviso) App.mostrarToast(res.aviso, 'advertencia', 8000);
         }
         _modoSeguimiento = true;
-        _seguimiento.onOffset = _onSeguimientoOffset;
-        _seguimiento.onPerdida = () => { if (_modoSeguimiento) _mostrarEnsayo('ENSAYO · objetivo perdido · comando: quieto'); };
-        _seguimiento.activar('person');
+        _seguimiento.onComando = _onSeguimientoComando;
+        _seguimiento.onEstado = (nuevo) => {
+            if (_modoSeguimiento && nuevo === 'perdido') App.mostrarToast('Seguimiento: se perdió a la persona. Comando: quieto.', 'advertencia', 5000);
+        };
+        _seguimiento.activar();
         _mostrarEnsayo('ENSAYO · buscando una persona...');
         App.mostrarToast('Ensayo de seguimiento: calcula y muestra los comandos, NO los envía al dron.', 'info', 6000);
         _actualizarBotonSeguimiento();
     }
 
-    /** Muestra (sin enviar) el comando que calcularía el seguimiento. */
-    function _onSeguimientoOffset({ dx, dy, deteccion }) {
+    /** Muestra (sin enviar) el comando que calcula el seguimiento, 15 veces por segundo. */
+    function _onSeguimientoComando(cmd, info) {
         if (!_modoSeguimiento) return;
-        if (!deteccion) return; // al perder el objetivo lo informa onPerdida
-        const sensibilidad = 0.5;
-        const fmt = v => (v >= 0 ? '+' : '') + Math.round(v * sensibilidad * 100);
-        _mostrarEnsayo(`ENSAYO (no se envía) · lateral ${fmt(dx)} · altura ${fmt(-dy)}`);
+        const fmt = v => (v >= 0 ? '+' : '') + Math.round(v * 100);
+        const textos = {
+            buscando: 'ENSAYO · buscando una persona...',
+            siguiendo: `ENSAYO (no se envía) · giro ${fmt(cmd.yaw)} · altura ${fmt(cmd.ud)} · avance ${fmt(cmd.fb)}`,
+            perdiendo: `ENSAYO · perdiéndola: el comando baja a 0 · giro ${fmt(cmd.yaw)} · altura ${fmt(cmd.ud)} · avance ${fmt(cmd.fb)}`,
+            perdido: 'ENSAYO · persona perdida: comando quieto',
+        };
+        _mostrarEnsayo(textos[info.estado] || '');
     }
 
     function _mostrarEnsayo(texto) {
@@ -811,6 +819,7 @@ const Dron = (() => {
     // ----------------------------------------------------------------
 
     function _actualizarPanelTelemetria(tel) {
+        _actualizarBotonDespegar(); // el primer paquete habilita "Despegar" sin esperar al watchdog
         const fmt = (v, sufijo) => (v === null || v === undefined || Number.isNaN(Number(v))) ? `--${sufijo}` : `${Math.round(v)}${sufijo}`;
         const set = (sel, txt) => { const e = _q(sel); if (e) e.textContent = txt; };
         set('#tel-bateria-valor', fmt(tel.bateria, '%'));
@@ -849,19 +858,33 @@ const Dron = (() => {
             failsafe: '🟠 Failsafe: sin enviar comandos',
             desconectado: '🔴 Desconectado',
         };
+        _estadoUI = estado;
         const span = _q('#estado-conexion');
         if (span) span.textContent = textos[estado] || estado;
 
-        const btnDespegar = _q('#btn-despegar');
         const btnAterrizar = _q('#btn-aterrizar');
         const btnEmergencia = _q('#btn-emergencia');
         const btnReconectar = _q('#btn-reconectar');
-        if (btnDespegar) btnDespegar.disabled = estado !== 'conectado';
+        _actualizarBotonDespegar();
         if (btnAterrizar) btnAterrizar.disabled = estado !== 'en_vuelo' && estado !== 'failsafe';
         // La emergencia queda habilitada siempre que exista un adaptador (aunque la conexión falle)
         if (btnEmergencia) btnEmergencia.disabled = !_adaptador;
         if (btnReconectar) btnReconectar.hidden = estado !== 'desconectado';
         if (estado === 'desconectado') { const m = _q('#estado-telemetria'); if (m) m.hidden = true; }
+    }
+
+    /**
+     * "Despegar" solo se habilita conectado, en tierra y con telemetría.
+     * Mientras no llega la telemetría muestra "Esperando telemetría…" (la protección de
+     * _confirmarDespegue sigue igual: esto solo cambia cómo se muestra).
+     */
+    function _actualizarBotonDespegar() {
+        const btn = _q('#btn-despegar');
+        if (!btn) return;
+        const esperando = _estadoUI === 'conectado' && !_hayTelemetria();
+        btn.disabled = _estadoUI !== 'conectado' || esperando;
+        const texto = esperando ? '⏳ Esperando telemetría…' : '🛫 Despegar';
+        if (btn.textContent !== texto) btn.textContent = texto;
     }
 
     function _mostrarAvisoFijo(texto) {

@@ -40,6 +40,9 @@ jobs:
           python3 scripts/check_js.py
           python3 scripts/check_refs.py
 
+      - name: Pruebas automáticas del seguimiento (node --test)
+        run: node --test tests/seguimiento.test.js
+
   build-apk:
     name: Compilar APK Debug
     runs-on: ubuntu-latest
