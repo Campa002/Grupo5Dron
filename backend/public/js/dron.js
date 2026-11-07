@@ -4,7 +4,8 @@
  *
  * Cabina de vuelo táctil. Integra:
  *  - DronAdaptadores  (dron-adaptadores.js)
- *  - DronJoystick     (dron-joystick.js)
+ *  - DronBotonesMovimiento y DronJoystick (dron-joystick.js): botones de mantener apretado
+ *    (mando por defecto) y joysticks (solo en el modo técnico)
  *  - DronGiroscopio   (dron-giroscopio.js)
  *  - DronSeguimiento  (dron-seguimiento.js)  [EXPERIMENTAL]
  *  - DronVideoDecoder (dron-video.js)
@@ -18,6 +19,8 @@
  *  - Failsafe: sin telemetría en vuelo por más del tiempo configurado → freno (rc 0 0 0 0) y aterrizaje.
  *    Si el aterrizaje no se confirma, se reintenta una vez y se avisa (no se cortan motores solos).
  *  - Durante un paso o una misión se pausa el rc continuo para no interrumpirlos.
+ *  - Botones de mantener apretado: al soltar, salir del botón, perder el toque o pasar a segundo plano,
+ *    su eje vuelve a 0 (frena). Arrancan en velocidad Lenta y solo se pueden apretar en vuelo.
  *  - Salir de la cabina en vuelo aterriza el dron (app.js pide confirmación antes).
  */
 
@@ -64,6 +67,8 @@ const Dron = (() => {
     // Estado interno
     // ----------------------------------------------------------------
     let _adaptador = null;
+    let _mando = null;             // botones de mantener apretado (DronBotonesMovimiento)
+    let _usarJoysticks = false;    // modo técnico: joysticks en lugar de los botones
     let _joystickIzq = null;
     let _joystickDer = null;
     let _giroscopio = null;
@@ -89,6 +94,7 @@ const Dron = (() => {
     let _onResize = null;
     let _timerResize = null;
     let _tamanoJoystick = 0;
+    let _avisoManiobraTs = 0;      // para no repetir el aviso de "esperá a que termine el movimiento"
     let _objetosGuardados = [];    // "Mis objetos" (para "¿Qué seguir?")
 
     // ----------------------------------------------------------------
@@ -151,11 +157,11 @@ const Dron = (() => {
         // Avisos de diagnóstico (por ejemplo, despegue confirmado por la telemetría): solo en el modo técnico
         _adaptador.onAvisoTecnico = (texto) => { if (App.modoTecnico()) App.mostrarToast(texto, 'advertencia', 8000); };
 
-        _inicializarJoysticks();
+        _inicializarMando();
         _onResize = () => {
             clearTimeout(_timerResize);
             _timerResize = setTimeout(() => {
-                if (Math.abs(_calcularTamanoJoystick() - _tamanoJoystick) > 8) _inicializarJoysticks();
+                if (_usarJoysticks && Math.abs(_calcularTamanoJoystick() - _tamanoJoystick) > 8) _inicializarJoysticks();
             }, 250);
         };
         window.addEventListener('resize', _onResize);
@@ -308,8 +314,7 @@ const Dron = (() => {
         a.frenar();
         if (_misionEnEjecucion) _cancelarMision(false);
         _apagarModosAutomaticos();
-        _joystickIzq?.centrar();
-        _joystickDer?.centrar();
+        _soltarMandos();
         // 2. Desde acá no sale ningún comando automático (ni rc continuo ni keep-alive).
         //    Si el enlace está caído a medias, así el Tello activa su aterrizaje automático (~15 s sin comandos).
         a.suspenderEnviosAutomaticos();
@@ -378,6 +383,7 @@ const Dron = (() => {
         on('#btn-toggle-seguimiento', _toggleSeguimiento);
         on('#btn-copiar-registro-seg', _copiarRegistroSeguimiento);
         on('#btn-copiar-registro-udp', _copiarRegistroComandos);
+        on('#btn-cambiar-mando', _cambiarMando);
         on('#btn-probar-cpu', _probarCuadroEnCpu);
         _q('#sel-que-seguir')?.addEventListener('change', _elegirQueSeguir);
         on('#btn-reconectar', _conectar);
@@ -475,8 +481,7 @@ const Dron = (() => {
         if (!a) return;
         if (_misionEnEjecucion) _cancelarMision(false);
         _apagarModosAutomaticos();
-        _joystickIzq?.centrar();
-        _joystickDer?.centrar();
+        _soltarMandos();
         a.detenerEmergencia()
             .catch(err => console.error('[Dron] Error enviando emergencia:', err))
             .finally(() => {
@@ -494,8 +499,7 @@ const Dron = (() => {
         if (!a || !a.enVuelo) { App.mostrarToast('El dron no está en vuelo.', 'info'); return; }
         if (_misionEnEjecucion) _cancelarMision(false);
         _apagarModosAutomaticos();
-        _joystickIzq?.centrar();
-        _joystickDer?.centrar();
+        _soltarMandos();
         a.frenar();
         const txt = _q('#estado-paso-texto');
         if (txt) txt.textContent = 'Freno enviado: el dron se queda quieto.';
@@ -537,6 +541,7 @@ const Dron = (() => {
         if (_maniobraEnCurso()) { App.mostrarToast('El dron todavía está haciendo otro movimiento. Esperá o tocá el botón rojo para frenarlo.', 'advertencia'); return; }
 
         _apagarModosAutomaticos();
+        _mando?.soltarTodo();
         _pasoEnEjecucion = true;
         const txt = _q('#estado-paso-texto');
         const nombre = accion === 'girar' ? `girar ${valor > 0 ? 'derecha' : 'izquierda'} ${Math.abs(valor)}°` : `${accion} ${valor} cm`;
@@ -586,6 +591,7 @@ const Dron = (() => {
         if (!confirm(`¿Iniciar la misión "${mision.nombre}"?\n\nVerificá que haya espacio libre suficiente.`)) return;
 
         _apagarModosAutomaticos();
+        _mando?.soltarTodo();
         _misionEnEjecucion = true;
         _cancelarMisionFlag = false;
         const btnEjecutar = _q('#btn-ejecutar-mision');
@@ -675,6 +681,7 @@ const Dron = (() => {
         _giroscopio?.desactivar();
         _adaptador?.actualizarEjes({ lr: 0, fb: 0 });
         _joystickDer?.centrar();
+        _mando?.setBloqueados([]);
         _actualizarBotonGiro();
     }
 
@@ -709,6 +716,8 @@ const Dron = (() => {
             _modoGiro = true;
             _adaptador?.actualizarEjes({ lr: 0, fb: 0 });
             _joystickDer?.centrar();
+            // Avance y costados los maneja la inclinación: esos botones quedan bloqueados (los de altura y giro siguen)
+            _mando?.setBloqueados(['adelante', 'atras', 'izquierda', 'derecha']);
             App.mostrarToast('Inclinación activada: inclinate el celular para avanzar y moverte de costado.', 'exito');
         } else {
             let msg = 'No se pudo activar el control por inclinación.';
@@ -735,10 +744,10 @@ const Dron = (() => {
         if (!_modoGiro) return;
         if (fuente === 'acelerometro') {
             App.mostrarToast('Este celular no tiene giroscopio: la inclinación se mide con el acelerómetro. ' +
-                'El giro no se puede medir: para girar, usá el joystick izquierdo.', 'advertencia', 8000);
+                'El giro no se puede medir: para girar, usá los botones de girar.', 'advertencia', 8000);
         } else if (fuente === 'ninguno') {
             _apagarGiro(); // sus ejes vuelven a cero
-            App.mostrarToast('No llegan datos de inclinación: este dispositivo no los da. Usá los joysticks.', 'advertencia', 7000);
+            App.mostrarToast('No llegan datos de inclinación: este dispositivo no los da. Usá los botones.', 'advertencia', 7000);
         }
     }
 
@@ -763,7 +772,7 @@ const Dron = (() => {
     // Seguimiento (EXPERIMENTAL) — SOLO ENSAYO
     // Calcula los comandos que mandaría y los muestra sobre el video, pero NUNCA
     // escribe los ejes del rc. Por eso se puede usar en tierra y no interfiere con
-    // los joysticks ni con el giroscopio. El control real llega en la etapa S3.
+    // los mandos ni con el giroscopio. El control real llega en la etapa S3.
     // ----------------------------------------------------------------
 
     async function _toggleSeguimiento() {
@@ -876,7 +885,78 @@ const Dron = (() => {
     }
 
     // ----------------------------------------------------------------
-    // Joysticks
+    // Mandos: botones de mantener apretado (por defecto) o joysticks (modo técnico)
+    // ----------------------------------------------------------------
+
+    function _inicializarMando() {
+        const zona = _q('.cab-principal');
+        if (!zona) return;
+        _mando?.destruir();
+        _mando = new DronBotonesMovimiento({ contenedor: zona, velocidad: 'lenta' });
+        _mando.onCambio = _onMandoBotones;
+        _mando.habilitar(_estadoUI === 'en_vuelo');
+        if (_modoGiro) _mando.setBloqueados(['adelante', 'atras', 'izquierda', 'derecha']);
+        _q('#cab-velocidad')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-velocidad]');
+            if (btn) _elegirVelocidad(btn.dataset.velocidad);
+        });
+        _elegirVelocidad('lenta');
+    }
+
+    /** Los botones cambiaron: cada eje vale la velocidad elegida mientras su botón está apretado, o 0. */
+    function _onMandoBotones(ejes, acciones) {
+        const a = _adaptador;
+        if (!a) return;
+        if (acciones.length && _maniobraEnCurso()) {
+            _mando.soltarTodo(); // vuelve a llamar con los ejes en 0
+            if (Date.now() - _avisoManiobraTs > 3000) {
+                _avisoManiobraTs = Date.now();
+                App.mostrarToast('El dron todavía está haciendo otro movimiento. Esperá o tocá el botón rojo para frenarlo.', 'advertencia');
+            }
+            return;
+        }
+        // Con la inclinación activa, el avance y los costados los maneja ella
+        a.actualizarEjes(_modoGiro ? { ud: ejes.ud, yaw: ejes.yaw } : ejes);
+        a.enviarEjesYa(); // al soltar, el freno sale en el acto (no espera al próximo ciclo del rc)
+    }
+
+    function _elegirVelocidad(nombre) {
+        if (!DronBotonesMovimiento.VELOCIDADES[nombre]) return;
+        _mando?.setVelocidad(nombre);
+        _contenedor?.querySelectorAll('[data-velocidad]').forEach(b => {
+            b.setAttribute('aria-pressed', String(b.dataset.velocidad === nombre));
+        });
+    }
+
+    /** Suelta los botones y centra los joysticks: los ejes del mando vuelven a 0. */
+    function _soltarMandos() {
+        _mando?.soltarTodo();
+        _joystickIzq?.centrar();
+        _joystickDer?.centrar();
+    }
+
+    /** Modo técnico: alterna entre los botones y los joysticks. Al cambiar, todos los ejes vuelven a 0. */
+    function _cambiarMando() {
+        _soltarMandos();
+        _usarJoysticks = !_usarJoysticks;
+        _adaptador?.actualizarEjes({ ud: 0, yaw: 0, ...(_modoGiro ? {} : { lr: 0, fb: 0 }) });
+        _contenedor?.querySelectorAll('.cab-mando, #cab-velocidad').forEach(el => { el.hidden = _usarJoysticks; });
+        _contenedor?.querySelectorAll('.cab-joystick').forEach(el => { el.hidden = !_usarJoysticks; });
+        if (_usarJoysticks) {
+            _inicializarJoysticks();
+        } else {
+            _joystickIzq?.destruir();
+            _joystickDer?.destruir();
+            _joystickIzq = null;
+            _joystickDer = null;
+        }
+        const btn = _q('#btn-cambiar-mando');
+        if (btn) btn.textContent = _usarJoysticks ? 'Volver a los botones' : 'Usar joysticks';
+        App.mostrarToast(_usarJoysticks ? 'Joysticks activados (más sensibles que los botones).' : 'Botones activados.', 'info');
+    }
+
+    // ----------------------------------------------------------------
+    // Joysticks (solo en el modo técnico)
     // ----------------------------------------------------------------
 
     function _calcularTamanoJoystick() {
@@ -975,6 +1055,8 @@ const Dron = (() => {
         // La emergencia queda habilitada siempre que exista un adaptador (aunque la conexión falle)
         if (btnEmergencia) btnEmergencia.disabled = !_adaptador;
         if (btnReconectar) btnReconectar.hidden = estado !== 'desconectado';
+        // Los botones de movimiento solo se pueden apretar en vuelo (al deshabilitarlos, frenan)
+        _mando?.habilitar(estado === 'en_vuelo');
         if (estado === 'desconectado') { const m = _q('#estado-telemetria'); if (m) m.hidden = true; }
     }
 
@@ -1068,14 +1150,22 @@ const Dron = (() => {
                 <button id="btn-cerrar-aviso-fijo" class="btn btn--secundario">Entendido</button>
             </div>
 
-            <!-- Zona principal: joystick izquierdo | video | joystick derecho -->
+            <!-- Zona principal: mando izquierdo | video | mando derecho (botones de mantener apretado o joysticks) -->
             <div class="cab-principal">
                 <div class="cab-lado cab-lado--izq">
                     <div class="cab-botones">
                         <button id="btn-despegar" class="btn btn--primario" disabled>${App.icono('despegar')} Despegar</button>
                         <button id="btn-aterrizar" class="btn btn--secundario" disabled>${App.icono('aterrizar')} Aterrizar</button>
                     </div>
-                    <div class="cab-joystick">
+                    <div class="cab-mando">
+                        <span class="cab-joy-etq">Subir y bajar · Girar</span>
+                        <div class="cab-cruz cab-cruz--mantener">
+                            <span></span><button class="btn btn--secundario cab-mantener" data-mover="subir" aria-label="Subir" title="Subir" disabled>${App.icono('chevron-arriba')}</button><span></span>
+                            <button class="btn btn--secundario cab-mantener" data-mover="girar-izq" aria-label="Girar a la izquierda" title="Girar a la izquierda" disabled>${App.icono('girar-izq')}</button><span></span><button class="btn btn--secundario cab-mantener" data-mover="girar-der" aria-label="Girar a la derecha" title="Girar a la derecha" disabled>${App.icono('girar-der')}</button>
+                            <span></span><button class="btn btn--secundario cab-mantener" data-mover="bajar" aria-label="Bajar" title="Bajar" disabled>${App.icono('chevron-abajo')}</button><span></span>
+                        </div>
+                    </div>
+                    <div class="cab-joystick" hidden>
                         <span class="cab-joy-etq">${App.icono('flechas-v')} Subir y bajar · ${App.icono('flechas-h')} Girar</span>
                         <div id="joystick-izquierdo"></div>
                     </div>
@@ -1100,12 +1190,31 @@ const Dron = (() => {
                     <div id="cab-ensayo" class="cartel-ensayo" hidden></div>
                 </div>
 
+                <!-- Velocidad de los botones (arranca siempre en Lenta) -->
+                <div id="cab-velocidad" class="cab-velocidad">
+                    <div class="cab-velocidad__selector" role="group" aria-label="Velocidad">
+                        <span class="cab-velocidad__etq">Velocidad</span>
+                        <button class="btn btn--secundario cab-vel" data-velocidad="lenta" aria-pressed="true">Lenta</button>
+                        <button class="btn btn--secundario cab-vel" data-velocidad="normal" aria-pressed="false">Normal</button>
+                        <button class="btn btn--secundario cab-vel" data-velocidad="rapida" aria-pressed="false">Rápida</button>
+                    </div>
+                    <p class="cab-ayuda-mando">Mantené apretado para mover el dron; soltá para frenar.</p>
+                </div>
+
                 <div class="cab-lado cab-lado--der">
                     <div class="cab-botones">
                         <button id="btn-toggle-giro" class="btn btn--secundario">🧭 Inclinación: OFF</button>
                         <button id="btn-toggle-seguimiento" class="btn btn--secundario">${App.icono('objetivo')} Ensayo: OFF</button>
                     </div>
-                    <div class="cab-joystick">
+                    <div class="cab-mando">
+                        <span class="cab-joy-etq">Avanzar · De costado</span>
+                        <div class="cab-cruz cab-cruz--mantener">
+                            <span></span><button class="btn btn--secundario cab-mantener" data-mover="adelante" aria-label="Adelante" title="Adelante" disabled>${App.icono('tri-arriba')}</button><span></span>
+                            <button class="btn btn--secundario cab-mantener" data-mover="izquierda" aria-label="Izquierda" title="Izquierda" disabled>${App.icono('tri-izq')}</button><span></span><button class="btn btn--secundario cab-mantener" data-mover="derecha" aria-label="Derecha" title="Derecha" disabled>${App.icono('tri-der')}</button>
+                            <span></span><button class="btn btn--secundario cab-mantener" data-mover="atras" aria-label="Atrás" title="Atrás" disabled>${App.icono('tri-abajo')}</button><span></span>
+                        </div>
+                    </div>
+                    <div class="cab-joystick" hidden>
                         <span class="cab-joy-etq">${App.icono('flechas-v')} Avanzar · ${App.icono('flechas-h')} De costado</span>
                         <div id="joystick-derecho"></div>
                     </div>
@@ -1132,6 +1241,17 @@ const Dron = (() => {
                     <button id="btn-copiar-registro-seg" class="btn btn--secundario" hidden>${App.icono('copiar')} Copiar registro</button>
                 </div>
                 <pre id="cab-resultado-cpu" class="panel-seguimiento mt-sm" hidden></pre>
+            </section>
+
+            <!-- Modo técnico: joysticks en lugar de los botones -->
+            <section class="cab-panel solo-tecnico">
+                <p class="etiqueta">Modo técnico · Mandos</p>
+                <ul class="ayuda-tecnica">
+                    <li><b>Usar joysticks:</b> cambia los botones por las palancas de antes (mueven según cuánto las corrés: son más sensibles). Al salir de la cabina vuelven los botones.</li>
+                </ul>
+                <div class="par-botones mt-sm">
+                    <button id="btn-cambiar-mando" class="btn btn--secundario">Usar joysticks</button>
+                </div>
             </section>
 
             <!-- Modo técnico: comandos y respuestas del dron -->
@@ -1243,6 +1363,8 @@ const Dron = (() => {
         if (_giroscopio) { _giroscopio.desactivar(); _giroscopio = null; }
         if (_seguimiento) { _seguimiento.desactivar(); _seguimiento = null; }
         _panelSeguimiento = null;
+        if (_mando) { _mando.destruir(); _mando = null; }
+        _usarJoysticks = false;
         if (_joystickIzq) { _joystickIzq.destruir(); _joystickIzq = null; }
         if (_joystickDer) { _joystickDer.destruir(); _joystickDer = null; }
         if (_video) { _video.destruir(); _video = null; }
