@@ -2,13 +2,12 @@
  * Firmware Principal ESP32 — Grupo 5: Control de Sistemas y Dron
  * EEST N° 1 de Vicente López "Eduardo Ader" — 7° 2°
  * 
- * Hardware:
- *   - Microcontrolador: ESP32 DevKit v1
- *   - LED Emisor IR:    GPIO 4
- *   - Receptor IR:      GPIO 15
- *   - Relé Canal 1:     GPIO 26 (Iluminación / 220V)
- *   - Relé Canal 2:     GPIO 27 (Auxiliar)
- *   - LED Indicador:    GPIO 2 (Onboard)
+ * Hardware (circuito soldado; detalle en config.h.example y README.md):
+ *   - Microcontrolador: ESP32 NodeMCU de 30 pines
+ *   - Emisor IR:        GPIO 18 (base de un BC337 que maneja 2 LEDs IR en serie a 5 V)
+ *   - Receptor IR:      GPIO 15 (KY-022 a 3V3)
+ *   - Relé luces:       GPIO 26 (220 V, corta solo la fase)
+ *   - LED indicador:    GPIO 2 (en la placa)
  */
 
 #include <Arduino.h>
@@ -32,10 +31,9 @@ void imprimirBannerInicio() {
     Serial.printf("  Firmware ESP32 v%s | Compilación: %s %s\n", FIRMWARE_VERSION, __DATE__, __TIME__);
     Serial.println("============================================================");
     Serial.println("Configuración de hardware:");
-    Serial.printf("  • Emisor IR:   GPIO %d\n", PIN_IR_LED);
+    Serial.printf("  • Emisor IR:   GPIO %d\n", PIN_IR_SEND);
     Serial.printf("  • Receptor IR: GPIO %d\n", PIN_IR_RECV);
-    Serial.printf("  • Relé 1:      GPIO %d (220V)\n", PIN_RELAY_1);
-    Serial.printf("  • Relé 2:      GPIO %d (Auxiliar)\n", PIN_RELAY_2);
+    Serial.printf("  • Relé luces:  GPIO %d (220V)\n", PIN_RELE_LUCES);
     Serial.println("============================================================\n");
 }
 
@@ -51,7 +49,7 @@ void setup() {
     digitalWrite(PIN_LED_ESTADO, LOW);
 
     // 3. Inicializar módulos de hardware
-    // IMPORTANTE: Los relés inician inmediatamente apagados
+    // IMPORTANTE: el relé inicia inmediatamente apagado
     relayManager.iniciar();
     irManager.iniciar();
 

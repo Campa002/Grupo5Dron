@@ -137,11 +137,6 @@ const Dron = (() => {
 
         const perfil = await ConfigDron.cargarPerfil(ConfigDron.perfilActivoId());
         if (gen !== _generacion) return;
-        if (!perfil) {
-            _mostrarSinPerfil(contenedor);
-            return;
-        }
-
         try {
             _adaptador = DronAdaptadores.crearAdaptador(perfil);
         } catch (err) {
@@ -1090,21 +1085,8 @@ const Dron = (() => {
     }
 
     // ----------------------------------------------------------------
-    // Pantallas sin perfil / error
+    // Pantalla de error
     // ----------------------------------------------------------------
-
-    function _mostrarSinPerfil(contenedor) {
-        contenedor.innerHTML = `
-        <div class="dron-pagina">
-            <h2 class="seccion-titulo mb-md">Control del Dron</h2>
-            <div class="tarjeta tarjeta--acento texto-centro">
-                <div style="margin-bottom: var(--espacio-md);">${App.icono('engranaje', 'ico--grande')}</div>
-                <h3 class="tarjeta__titulo">No hay perfil de dron seleccionado</h3>
-                <p class="texto-sm texto-secundario mb-lg">Antes de volar, elegí un perfil en Configuración del dron.</p>
-                <a href="#/config-dron" class="btn btn--primario">${App.icono('llave-ajuste')} Ir a Configuración del dron</a>
-            </div>
-        </div>`;
-    }
 
     function _mostrarError(contenedor, mensaje) {
         contenedor.innerHTML = `

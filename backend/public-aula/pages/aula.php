@@ -30,7 +30,7 @@
         </div>
     </div>
 
-    <!-- Control directo de Relé (Canal 1 - GPIO26 / Canal 2 - GPIO27) -->
+    <!-- Control directo del relé de las luces (canal 1, GPIO 26). El circuito tiene un solo relé. -->
     <div class="tarjeta mb-md">
         <div class="flex justify-between items-center mb-sm">
             <div class="tarjeta__titulo" style="margin-bottom: 0;">Relé de Potencia 220V</div>
@@ -45,12 +45,6 @@
             </button>
             <button class="btn btn--peligro" onclick="Aula.enviarComandoRele('apagar', 1)">
                 <span class="ico ico--encender" aria-hidden="true"></span> Apagar Canal 1
-            </button>
-            <button class="btn btn--secundario solo-docente" onclick="Aula.enviarComandoRele('encender', 2)">
-                <span class="ico ico--encender" aria-hidden="true"></span> Encender Canal 2
-            </button>
-            <button class="btn btn--secundario solo-docente" onclick="Aula.enviarComandoRele('apagar', 2)">
-                <span class="ico ico--encender" aria-hidden="true"></span> Apagar Canal 2
             </button>
         </div>
     </div>

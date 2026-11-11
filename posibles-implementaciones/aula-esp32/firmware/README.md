@@ -1,82 +1,82 @@
-# Firmware ESP32 — Grupo 5: Control de Sistemas y Dron
+# Firmware ESP32 del aula — Grupo 5: Control de Sistemas y Dron
 **EEST N° 1 de Vicente López "Eduardo Ader" — 7° año 2° división**
 
-Este directorio contiene el código fuente en C++ para el microcontrolador ESP32 DevKit v1, encargado de ejecutar comandos infrarrojos (IR) y conmutar relés de potencia de 220V en el aula, reportando su estado y consultando la cola de comandos a la API REST vía HTTPS.
+Código C++ para el ESP32 (NodeMCU de 30 pines) que emite códigos infrarrojos (IR), aprende códigos de controles existentes y prende o apaga las luces del aula con un relé. Consulta al servidor (API REST por HTTPS) los comandos que se mandan desde la app del aula.
+
+> **220 V:** el armado y las pruebas con 220 V se hacen solo con supervisión del profesor. Para probar sin 220 V, alimentá el ESP32 por USB.
 
 ---
 
-## 1. Esquema de Conexiones y Asignación de Pines (GPIO)
+## 1. Circuito (el que está soldado)
 
-| Componente | Pin ESP32 | Modo | Descripción / Circuito |
-| :--- | :---: | :---: | :--- |
-| **LED Emisor IR (KY-005)** | **GPIO 19** | OUTPUT | Señal en GPIO 19 con resistencia de 100-220 Ω en serie. *(Mejora opcional: transistor NPN 2N2222/BC337 con R=1 kΩ en base hacia 5V para máxima potencia).* |
-| **Receptor IR (KY-022)** | **GPIO 19** | INPUT | Módulo KY-022 receptor a 38 kHz. Señal a GPIO 19, VCC a 3.3V y GND a tierra común. |
-| **Relé Canal 1** | **GPIO 25** | OUTPUT | Módulo relé 1 canal con optoacoplador y jumper de nivel, alimentado a VIN/5V. Señal en GPIO 25. Corte de 220V del aula. |
-| **Relé Canal 2** | *Sin asignar* | — | Deshabilitado por diseño de hardware en protoboard actual. |
-| **LED Estado** | **GPIO 2** | OUTPUT | LED azul onboard del ESP32 (indicador de estado WiFi / API). Nunca conectar el relé aquí. |
+| Pin ESP32 | Conectado a | Función | En `config.h` |
+| :--- | :--- | :--- | :--- |
+| **GPIO 18** | Resistencia de 330 Ω a la base de un BC337 | Emisor IR | `PIN_IR_SEND` |
+| **GPIO 26** | IN del módulo relé | Luces del aula | `PIN_RELE_LUCES` |
+| **GPIO 15** | OUT del receptor KY-022 | Receptor IR | `PIN_IR_RECV` |
+| **3V3 / GND** | VCC / GND del KY-022 | Alimentación del receptor | — |
+| **VIN / GND** | +Vo / -Vo de la fuente HLK-5M05 | 5 V para el ESP32, el relé y los LEDs | — |
+| **GPIO 2** | LED de la placa | Indicador de estado | `PIN_LED_ESTADO` |
 
-> [!WARNING]
-> **Corrección de Pines Crítica:** El relé **NUNCA** debe conectarse a **GPIO 2** ni a **GPIO 0**, ya que son pines de *strapping* (arranque) del microcontrolador. Un módulo de relé conectado a GPIO 2 puede forzar el pin a un estado indebido durante el encendido e impedir el arranque del ESP32. Por este motivo, se utilizan **GPIO 25** y **GPIO 27**.
+**Emisor IR.** Son 2 LEDs IR en serie manejados por un transistor BC337:
 
-### Lógica de Control de Relé: Activo-Bajo vs Activo-Alto
-La mayoría de los módulos de relé comerciales para Arduino/ESP32 con optoacoplador funcionan con **lógica activo-bajo** (`LOW` activa el relé, `HIGH` lo apaga).
-En [config.h](file:///c:/Users/Alumnos/Desktop/Grupo5Dron/firmware/src/config.h.example) esto se encuentra parametrizado:
-```cpp
-#define RELAY_ACTIVE_LEVEL   LOW
-#define RELAY_INACTIVE_LEVEL HIGH
 ```
-El firmware garantiza que al encender la placa, ambos relés se inicializan inmediatamente en `RELAY_INACTIVE_LEVEL`, permaneciendo **estrictamente apagados** hasta recibir una orden expresa y autorizada desde la API.
+5 V ── (33 Ω en paralelo con 100 Ω) ── LED IR 1 ── LED IR 2 ── colector BC337
+GPIO 18 ── 330 Ω ── base BC337          emisor BC337 ── GND
+```
+
+- Corriente de los LEDs: ~80 mA de pico (dos LEDs de ~1,35 V y ~25 Ω). Como la señal IR va pulsada a 38 kHz, el promedio queda en ~25-30 mA. Está dentro de lo que aguantan los LEDs IR de 5 mm (típico: 100 mA continuos).
+- Resistencias: la de 33 Ω disipa ~0,12 W de pico y ~0,04 W de promedio; alcanza con 1/4 W.
+- Base: (3,3 − 0,75) / 330 ≈ 7,7 mA. Satura bien al BC337 para 80 mA y está dentro de lo que da un pin del ESP32.
+
+**Relé.** Corta solo la fase de la lámpara: COM entra, NO sale y NC queda vacío.
+
+**Receptor KY-022.** Va a 3V3 (su salida queda en 3,3 V, segura para el ESP32). GPIO 15 es un pin de arranque, pero solo decide si se muestran los mensajes de arranque por el puerto serie; el KY-022 en reposo da nivel alto (el normal), así que el ESP32 arranca bien.
+
+**Fuente.** La HLK-5M05 (5 V, 1 A) alcanza para todo. Ojo: no conectes el USB y la fuente a la vez si tu NodeMCU no tiene diodo entre el USB y VIN.
+
+### Nivel del relé: activo en alto o en bajo
+
+Depende del módulo. Se elige con `RELE_ACTIVO_EN_BAJO` en `config.h` (1 = activo en bajo, 0 = activo en alto).
+
+Cómo averiguarlo: con el ESP32 desconectado, alimentá el módulo a 5 V y tocá IN con un cable. Si hace clic al tocar GND, es activo en bajo; si hace clic al tocar 3V3, es activo en alto. Fijate también si tiene un jumper "H/L".
+
+En los dos casos el relé arranca apagado: el firmware escribe el nivel "apagado" antes de configurar el pin, y mientras el ESP32 bootea GPIO 26 queda flotando. Si el módulo es activo en bajo y está alimentado a 5 V, puede que los 3,3 V del ESP32 no alcancen para apagarlo del todo (queda prendido o tiembla); eso se arregla con el jumper o con un transistor, no con el código.
 
 ---
 
-## 2. Configuración Inicial
+## 2. Configuración
 
-1. Copiá el archivo `src/config.h.example` como `src/config.h`:
-   ```bash
-   cp src/config.h.example src/config.h
-   ```
-2. Editá `src/config.h` y configurá:
-   * `WIFI_SSID` y `WIFI_PASSWORD` con los datos de tu red.
-   * `API_URL`: Dirección HTTPS de tu servidor (ej: `https://tu-servidor.com/api/esp32.php`).
-   * `ESP32_TOKEN`: Token de autenticación que debe coincidir con `esp32_token` en `backend/config/config.php`.
-   * `CLIENT_INSECURE_MODE`: Dejá en `true` solo para pruebas sin certificado SSL. En producción con HTTPS comercial (Let's Encrypt), poné `false` y cargá el certificado raíz en `ROOT_CA_CERT`.
+1. Copiá `src/config.h.example` como `src/config.h` (nunca subas `config.h` a git: está en `.gitignore`).
+2. Completá:
+   - `WIFI_SSID` y `WIFI_PASSWORD`;
+   - `API_URL`: dirección de `esp32.php` en el hosting (por ejemplo `https://tu-servidor.com/api/esp32.php`);
+   - `ESP32_TOKEN`: el mismo que `esp32_token` en `backend/config/config.php`;
+   - `RELE_ACTIVO_EN_BAJO`, según tu módulo (ver arriba);
+   - `CLIENT_INSECURE_MODE`: `true` solo para pruebas sin certificado; en el hosting real, `false` con el certificado raíz en `ROOT_CA_CERT`.
 
 ---
 
-## 3. Compilación y Subida
+## 3. Compilar y subir
 
-### Opción A: Con PlatformIO (Recomendada)
-1. Abrí la carpeta `firmware/` en VS Code con la extensión PlatformIO instalada.
-2. Conectá el ESP32 por USB.
-3. Compilá y subí el firmware con:
-   ```bash
-   pio run --target upload
-   ```
-4. Abrí el monitor serial a 115200 baudios:
-   ```bash
-   pio device monitor
-   ```
+Con PlatformIO (VS Code con la extensión PlatformIO, abriendo esta carpeta):
 
-### Opción B: Con Arduino IDE
-1. Abrí el Arduino IDE.
-2. Agregá el paquete de tarjetas ESP32 de Espressif en el Administrador de Tarjetas:
-   `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
-3. Instalá desde el Gestor de Librerías:
-   * **IRremoteESP8266** (de David Conran / Sebastien Warin)
-   * **ArduinoJson** (de Benoit Blanchon, versión 6.x)
-4. Abrí `src/main.cpp` (o creá un sketch que lo incluya), seleccioná la placa **ESP32 Dev Module** y el puerto COM correspondiente, y hacé clic en **Subir**.
+```bash
+pio run --target upload
+pio device monitor
+```
+
+El CI de GitHub (job "Compilar firmware ESP32") compila este firmware y el banco de pruebas en cada push y en cada PR, usando `config.h.example` como `config.h`.
 
 ---
 
-## 4. Banco de Pruebas de Hardware ([tests/test_hardware.ino](file:///c:/Users/Alumnos/Desktop/Grupo5Dron/firmware/tests/test_hardware.ino))
+## 4. Banco de pruebas de hardware (`tests/test_hardware.ino`)
 
-Si querés verificar el funcionamiento eléctrico de los componentes (relés, LED emisor y receptor IR) **sin necesidad de conectar a WiFi ni tener el backend encendido**:
+Prueba el relé, el emisor y el receptor sin WiFi ni servidor. Subilo al ESP32, abrí el monitor serie a 115200 baudios y elegí:
 
-1. Subí el sketch [tests/test_hardware.ino](file:///c:/Users/Alumnos/Desktop/Grupo5Dron/firmware/tests/test_hardware.ino) al ESP32.
-2. Abrí el Monitor Serial a 115200 baudios.
-3. Te aparecerá un menú interactivo:
-   * `1`: Conmuta el Relé 1 por 2 segundos y lo apaga.
-   * `2`: Conmuta el Relé 2 por 2 segundos y lo apaga.
-   * `3`: Emite 5 códigos de prueba infrarrojos NEC en GPIO 19.
-   * `4`: Pone el receptor IR en modo escucha en tiempo real para decodificar cualquier control remoto apuntado al sensor en GPIO 4.
-   * `5`: Realiza una prueba integral secuencial de todos los periféricos.
+- `1`: prende el relé de las luces 2 segundos y lo apaga.
+- `2`: emite 5 códigos NEC de prueba por el emisor (mirá los LEDs con la cámara de un celular: tienen que parpadear).
+- `3`: modo escucha del receptor: apuntá cualquier control remoto y muestra el protocolo y el código.
+- `4`: prueba seguida del relé y del emisor.
+
+Si tu relé es activo en alto, cambiá `RELE_ACTIVO_EN_BAJO` a 0 también en este archivo.

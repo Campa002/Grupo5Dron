@@ -1,6 +1,8 @@
 /**
- * Aplicación Principal (SPA Router & Orquestador)
+ * Aplicación del Dron (router y orquestador)
  * Grupo 5: Control de Sistemas y Dron
+ *
+ * App separada de la del aula (Etapa A): no tiene login ni usa el servidor. Funciona sin internet.
  * EEST N° 1 de Vicente López "Eduardo Ader" — 7° 2°
  */
 
@@ -20,14 +22,11 @@ const App = (() => {
     // Número de navegación: si llega otra mientras esta espera, esta se abandona
     let navegacionActual = 0;
 
-    // Pantallas del módulo del dron: se usan sin cuenta (la app abre en el inicio, sin pasar por el login)
+    // Pantallas del dron
     const RUTAS_DRON = ['dron', 'prueba-tello', 'sensores', 'config-dron', 'objetos'];
 
-    // Rutas que no piden sesión: el inicio (con las dos opciones), las del dron y el login
-    const RUTAS_SIN_CUENTA = ['inicio', 'login', ...RUTAS_DRON];
-
-    // Rutas que existen (cualquier otra, por ejemplo la vieja #/acerca, va al inicio)
-    const RUTAS_VALIDAS = [...RUTAS_SIN_CUENTA, 'aula', 'admin', 'cambiar-password'];
+    // Rutas que existen (cualquier otra, por ejemplo la vieja #/acerca o #/aula, va al inicio)
+    const RUTAS_VALIDAS = ['inicio', ...RUTAS_DRON];
 
     // Modo técnico: muestra lo que sirve para diagnosticar (elementos .solo-tecnico). Arranca apagado.
     const CLAVE_MODO_TECNICO = 'grupo5dron_modo_tecnico';
@@ -175,50 +174,11 @@ const App = (() => {
         const hash = window.location.hash || '#/inicio';
         const ruta = hash.replace(/^#\/?/, '').split('?')[0].trim() || 'inicio';
 
-        // Una ruta que no existe (por ejemplo, la vieja #/acerca) va al inicio sin error
+        // Una ruta que no existe (por ejemplo, la vieja #/acerca o #/aula) va al inicio sin error
         if (!RUTAS_VALIDAS.includes(ruta)) history.replaceState(null, '', '#/inicio');
         const destino = RUTAS_VALIDAS.includes(ruta) ? ruta : 'inicio';
 
-        // 1. Control de autenticación (permite usuario cacheado sin conexión)
-        const estaAutenticado = API.estaAutenticado() || !!Auth.obtenerUsuario();
-        const esOffline = Auth.esModoSinConexion();
-
-        // Sin sesión: el dron se usa igual; el aula y la administración piden iniciar sesión y después vuelven ahí
-        if (!estaAutenticado && !RUTAS_SIN_CUENTA.includes(destino)) {
-            Auth.recordarDestino(destino);
-            if (destino !== 'cambiar-password') mostrarToast('Para entrar al aula o a la administración, iniciá sesión.', 'info');
-            window.location.hash = '#/login';
-            return;
-        }
-        // Si se fue al inicio o al dron en vez de iniciar sesión, se olvida a dónde había que volver
-        if (destino !== 'login' && RUTAS_SIN_CUENTA.includes(destino)) Auth.tomarDestino();
-
-        if (estaAutenticado && destino === 'login') {
-            window.location.hash = '#/inicio';
-            return;
-        }
-
-        // Contraseña temporal: hay que cambiarla antes de seguir (solo con conexión; sin servidor no se puede)
-        if (estaAutenticado && !esOffline && Auth.debeCambiarPassword() && destino !== 'cambiar-password') {
-            window.location.hash = '#/cambiar-password';
-            return;
-        }
-
-        // Sin conexión: aula y admin exigen sesión válida conectada
-        if (esOffline && (destino === 'aula' || destino === 'admin')) {
-            mostrarToast('El aula y administración requieren conexión activa con el servidor.', 'advertencia');
-            window.location.hash = '#/inicio';
-            return;
-        }
-
-        // 2. Control de permisos por rol para /admin
-        if (destino === 'admin' && !Auth.esAdmin()) {
-            mostrarToast('Se requieren permisos de administrador.', 'advertencia');
-            window.location.hash = '#/inicio';
-            return;
-        }
-
-        // 3. Salir de la cabina con el dron en el aire: confirmar y aterrizar
+        // 1. Salir de la cabina con el dron en el aire: confirmar y aterrizar
         if (paginaActual === 'dron' && destino !== 'dron' && typeof Dron !== 'undefined' && Dron.estaEnVuelo && Dron.estaEnVuelo()) {
             if (!confirm('El dron está en vuelo.\n\n¿Aterrizar y salir de la cabina?\n(Cancelar = quedarse en la cabina)')) {
                 history.replaceState(null, '', '#/dron');
@@ -228,10 +188,7 @@ const App = (() => {
 
         const miNavegacion = ++navegacionActual;
 
-        // 4. Limpieza de página anterior si corresponde
-        if (paginaActual === 'aula' && typeof Aula !== 'undefined' && Aula.destruir) {
-            Aula.destruir();
-        }
+        // 2. Limpieza de página anterior si corresponde
         if (paginaActual === 'dron' && typeof Dron !== 'undefined' && Dron.destruir) {
             paginaActual = null;
             await Dron.destruir(); // si estaba en vuelo, aterriza antes de desconectar
@@ -243,10 +200,7 @@ const App = (() => {
         }
         if (miNavegacion !== navegacionActual) return;
 
-        // 5. Adaptación visual del layout (header y menú en pantalla de login)
-        actualizarEncabezado(destino);
-
-        // 6. Cargar plantilla en el contenedor principal
+        // 3. Cargar plantilla en el contenedor principal
         const contenedor = document.getElementById('app-contenido');
         if (!contenedor) return;
 
@@ -257,70 +211,12 @@ const App = (() => {
         contenedor.innerHTML = html;
         paginaActual = destino;
 
-        // 7. Actualizar enlaces activos en menú lateral
+        // 4. Actualizar enlaces activos en menú lateral
         actualizarNavegacionActiva(destino);
         cerrarMenu();
 
-        // 8. Inicializar controlador específico de la página
+        // 5. Inicializar controlador específico de la página
         await inicializarControladorPagina(destino);
-    }
-
-    /**
-     * Ajusta el header y el menú según la pantalla y el tipo de sesión
-     * (login, sesión normal, sin conexión o sin cuenta).
-     * @param {string} destino ruta actual
-     */
-    function actualizarEncabezado(destino) {
-        const sinCuenta = Auth.sinCuenta();
-        const esOffline = Auth.esModoSinConexion();
-        const btnMenu = document.getElementById('btn-menu');
-        const btnUsuario = document.getElementById('btn-usuario');
-        const indicadorEsp = document.getElementById('indicador-esp32');
-        const indicadorOffline = document.getElementById('indicador-offline');
-        const iconoOffline = document.getElementById('indicador-offline-icono');
-        const textoOffline = document.getElementById('indicador-offline-texto');
-
-        // El menú queda visible también en el login: desde ahí se puede volver al dron sin iniciar sesión
-        if (btnMenu) btnMenu.style.visibility = 'visible';
-        if (destino === 'login') {
-            if (btnUsuario) btnUsuario.style.visibility = 'hidden';
-            if (indicadorEsp) indicadorEsp.style.display = 'none';
-            if (indicadorOffline) indicadorOffline.style.display = 'none';
-        } else {
-            if (btnUsuario) btnUsuario.style.visibility = 'visible';
-            // Sin cuenta es el uso normal del dron: no se muestra el ESP32 del aula ni ningún aviso
-            if (indicadorEsp) indicadorEsp.style.display = sinCuenta ? 'none' : 'flex';
-            if (indicadorOffline) {
-                const texto = 'Modo sin conexión';
-                if (iconoOffline) iconoOffline.className = 'ico ico--senal';
-                if (textoOffline) textoOffline.textContent = texto;
-                indicadorOffline.title = texto;
-                indicadorOffline.setAttribute('aria-label', texto);
-                indicadorOffline.style.display = (!sinCuenta && esOffline) ? 'inline-flex' : 'none';
-            }
-        }
-        // Menú: "Iniciar sesión" solo sin sesión; con sesión, "Cerrar sesión"
-        const enlaceSesion = document.getElementById('btn-cerrar-sesion');
-        textoConIcono(enlaceSesion, sinCuenta ? 'llave' : 'salir', sinCuenta ? 'Iniciar sesión' : 'Cerrar sesión');
-    }
-
-    /**
-     * El servidor rechazó el token (401): la sesión venció.
-     * En el inicio y en las pantallas del dron se sigue sin cuenta (no se interrumpe un vuelo);
-     * en el aula y la administración se pide iniciar sesión y después se vuelve ahí.
-     */
-    function manejarSesionVencida() {
-        if (!API.estaAutenticado()) return;
-        Auth.cerrarSesionLocal();
-        const ruta = window.location.hash.replace(/^#\/?/, '').split('?')[0].trim() || 'inicio';
-        if (RUTAS_SIN_CUENTA.includes(ruta)) {
-            actualizarEncabezado(ruta);
-            mostrarToast('Tu sesión venció. Seguís usando el dron sin cuenta; para el aula, iniciá sesión de nuevo.', 'advertencia', 7000);
-        } else {
-            Auth.recordarDestino(ruta);
-            mostrarToast('Tu sesión venció. Iniciá sesión de nuevo.', 'advertencia', 6000);
-            window.location.hash = '#/login';
-        }
     }
 
     /**
@@ -337,35 +233,7 @@ const App = (() => {
      * Inicializa la lógica JS de cada vista luego de inyectar el HTML.
      */
     async function inicializarControladorPagina(pagina) {
-        const usuario = Auth.obtenerUsuario();
-
-        // Asegurar clases de rol en el body
-        if (usuario && usuario.rol) {
-            document.body.classList.remove('rol-admin', 'rol-docente', 'rol-usuario');
-            document.body.classList.add(`rol-${usuario.rol}`);
-        }
-
         switch (pagina) {
-            case 'login':
-                Auth.inicializarPaginaLogin();
-                break;
-
-            case 'inicio':
-                inicializarPaginaInicio(usuario);
-                break;
-
-            case 'aula':
-                if (typeof Aula !== 'undefined' && Aula.inicializar) {
-                    await Aula.inicializar();
-                }
-                break;
-
-            case 'admin':
-                if (typeof Admin !== 'undefined' && Admin.inicializar) {
-                    Admin.inicializar();
-                }
-                break;
-
             case 'dron':
                 if (typeof Dron !== 'undefined' && Dron.inicializar) {
                     const contenedorDron = document.getElementById('app-contenido');
@@ -389,10 +257,6 @@ const App = (() => {
                 break;
             }
 
-            case 'cambiar-password':
-                Auth.inicializarPaginaCambiarPassword();
-                break;
-
             case 'objetos': {
                 const contenedorObj = document.getElementById('app-contenido');
                 if (typeof DronObjetos !== 'undefined' && contenedorObj) {
@@ -412,72 +276,7 @@ const App = (() => {
     }
 
     /**
-     * Configura y puebla los datos dinámicos de la página de inicio.
-     */
-    async function inicializarPaginaInicio(usuario) {
-        const elemNombre = document.getElementById('inicio-nombre-usuario');
-        const elemRol = document.getElementById('inicio-rol-usuario');
-
-        // Sin cuenta: las dos opciones del informe; el dron entra directo y el aula pide iniciar sesión al entrar
-        if (!usuario) {
-            const saludo = document.getElementById('inicio-saludo');
-            if (saludo) saludo.textContent = 'Elegí qué querés controlar. El dron se usa sin cuenta.';
-            const desc = document.querySelector('#inicio-acceso-aula .acceso__desc');
-            if (desc) desc.textContent = 'Pide iniciar sesión al entrar.';
-            const tarjetaEsp = document.getElementById('inicio-tarjeta-esp32');
-            if (tarjetaEsp) tarjetaEsp.hidden = true;
-            return;
-        }
-
-        if (elemNombre && usuario) {
-            elemNombre.textContent = usuario.nombre || 'Usuario';
-        }
-
-        if (elemRol && usuario) {
-            const etiquetasRol = {
-                admin: 'Administrador',
-                docente: 'Docente',
-                usuario: 'Estudiante',
-            };
-            elemRol.textContent = etiquetasRol[usuario.rol] || usuario.rol;
-            elemRol.className = `badge badge--${usuario.rol === 'admin' ? 'advertencia' : (usuario.rol === 'docente' ? 'info' : 'exito')}`;
-        }
-
-        // Consultar estado rápido del ESP32 para el resumen (omitir si está offline)
-        const elemEsp32 = document.getElementById('inicio-esp32-resumen');
-        if (elemEsp32) {
-            if (Auth.esModoSinConexion()) {
-                elemEsp32.innerHTML = '<span class="texto-xs texto-secundario">Modo sin conexión. Estado del ESP32 no disponible.</span>';
-                return;
-            }
-            try {
-                const resp = await API.esp32.estado();
-                const estado = resp.estado;
-                if (estado && estado.en_linea) {
-                    elemEsp32.innerHTML = `
-                        <div class="flex items-center gap-sm mt-xs">
-                            <span class="badge badge--exito"><span class="punto punto--exito" aria-hidden="true"></span>En línea</span>
-                            <span>IP: <code>${estado.ip_local || 'N/A'}</code></span>
-                            <span>Señal: <strong>${estado.rssi || 'N/A'} dBm</strong></span>
-                            <span>FW: v${estado.version_fw || '1.0'}</span>
-                        </div>
-                    `;
-                } else {
-                    elemEsp32.innerHTML = `
-                        <div class="flex items-center gap-sm mt-xs">
-                            <span class="badge badge--error"><span class="punto punto--error" aria-hidden="true"></span>Desconectado</span>
-                            <span>Último latido registrado: ${estado && estado.ultimo_heartbeat ? estado.ultimo_heartbeat : 'Sin registros'}</span>
-                        </div>
-                    `;
-                }
-            } catch (e) {
-                elemEsp32.innerHTML = '<span class="texto-xs texto-secundario">No se pudo verificar el estado del ESP32 en este momento.</span>';
-            }
-        }
-    }
-
-    /**
-     * Escapa texto para insertarlo en HTML (datos que vienen del servidor o del usuario).
+     * Escapa texto para insertarlo en HTML.
      * @param {*} valor
      * @returns {string}
      */
@@ -523,77 +322,6 @@ const App = (() => {
         punto.className = `punto${color ? ' punto--' + color : ''}`;
         punto.setAttribute('aria-hidden', 'true');
         el.replaceChildren(punto, texto);
-    }
-
-    /**
-     * Muestra un diálogo flotante o modal con los datos de sesión del usuario.
-     */
-    function mostrarModalUsuario() {
-        const usuario = Auth.obtenerUsuario();
-        if (!usuario) {
-            window.location.hash = '#/login';
-            return;
-        }
-
-        // Remover modal previo si hubiera
-        const previo = document.getElementById('modal-usuario');
-        if (previo) previo.remove();
-
-        const modalOverlay = document.createElement('div');
-        modalOverlay.id = 'modal-usuario';
-        modalOverlay.className = 'modal-overlay';
-        modalOverlay.innerHTML = `
-            <div class="modal">
-                <div class="modal__header">
-                    <h3 class="modal__titulo">Perfil de usuario</h3>
-                    <button class="modal__cerrar" id="btn-cerrar-modal-user">&times;</button>
-                </div>
-                <div class="modal__body">
-                    <div class="tarjeta mb-md" style="background: var(--color-fondo-claro);">
-                        <div class="flex items-center gap-md">
-                            <div>${icono('usuario', 'ico--grande')}</div>
-                            <div>
-                                <h4 style="font-weight: 700;">${escaparHtml(usuario.nombre)}</h4>
-                                <p class="texto-sm texto-secundario">${escaparHtml(usuario.email)}</p>
-                                <span class="badge badge--info mt-xs">${escaparHtml(String(usuario.rol || '').toUpperCase())}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <button class="btn btn--secundario btn--bloque mb-md" id="btn-modal-cambiar-pass">${icono('llave')} Cambiar contraseña</button>
-                    <p class="texto-xs texto-secundario">
-                        Conectado al servidor de Grupo 5 — EEST N° 1 "Eduardo Ader".
-                    </p>
-                </div>
-                <div class="modal__footer">
-                    <button class="btn btn--secundario" id="btn-modal-cancelar">Cerrar</button>
-                    <button class="btn btn--peligro" id="btn-modal-logout">${icono('salir')} Cerrar sesión</button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(modalOverlay);
-
-        const cerrar = () => modalOverlay.remove();
-        document.getElementById('btn-cerrar-modal-user').onclick = cerrar;
-        document.getElementById('btn-modal-cancelar').onclick = cerrar;
-        document.getElementById('btn-modal-cambiar-pass').onclick = () => {
-            cerrar();
-            window.location.hash = '#/cambiar-password';
-        };
-        modalOverlay.onclick = (e) => { if (e.target === modalOverlay) cerrar(); };
-
-        document.getElementById('btn-modal-logout').onclick = async () => {
-            cerrar();
-            await cerrarSesionEIrAlInicio();
-        };
-    }
-
-    /** Cierra la sesión y vuelve al inicio (la app sigue usable sin cuenta). Si ya estaba ahí, lo recarga. */
-    async function cerrarSesionEIrAlInicio() {
-        await Auth.logout();
-        mostrarToast('Sesión finalizada. Podés seguir usando el dron sin cuenta.', 'info');
-        if (window.location.hash === '#/inicio') cargarRutaActual();
-        else window.location.hash = '#/inicio';
     }
 
     /**
@@ -1020,8 +748,6 @@ const App = (() => {
         const diagLatencia = q('#diag-latencia-cmd');
         const diagTelemetria = q('#diag-telemetria-pps');
         const diagVideoBytes = q('#diag-video-bytes');
-        const diagApiUrl = q('#diag-api-url');
-        const diagConexion = q('#diag-conexion-estado');
         const diagUserAgent = q('#diag-user-agent');
         const diagErroresBox = q('#diag-errores-salida');
         const diagModelo = q('#diag-modelo');
@@ -1044,8 +770,6 @@ const App = (() => {
             ultimaTelemetria: 'Ninguna',
             totalBytesVideo: 0,
             totalPaquetesVideo: 0,
-            apiUrl: API.getBaseUrl() || '(no configurada)',
-            modoSesion: '',
             userAgent: navigator.userAgent,
             modelo: 'Sin verificar',
             modeloDetalle: [],
@@ -1059,11 +783,6 @@ const App = (() => {
 
         function textoRed(red) {
             return { wifi: 'WiFi del Tello', datos: 'datos móviles', ninguna: 'ninguna' }[red] || (red ? 'otra red' : 'sin dato');
-        }
-
-        function textoModoSesion() {
-            if (Auth.sinCuenta()) return 'Dron sin cuenta';
-            return Auth.esModoSinConexion() ? 'Sin conexión con el servidor (sesión cacheada)' : 'Conectado al servidor';
         }
 
         function registrarError(err) {
@@ -1089,8 +808,6 @@ const App = (() => {
             if (diagLatencia) diagLatencia.textContent = `cmd: ${estadoDiag.latencias.command} | bat: ${estadoDiag.latencias.battery}`;
             if (diagTelemetria) diagTelemetria.textContent = `${estadoDiag.telemetriaPPS} pps | escuchas: ${estadoDiag.escuchas} | ${estadoDiag.ultimaTelemetria.slice(0, 35)}`;
             if (diagVideoBytes) diagVideoBytes.textContent = `${estadoDiag.totalBytesVideo.toLocaleString()} bytes (${estadoDiag.totalPaquetesVideo} paquetes UDP)`;
-            if (diagApiUrl) diagApiUrl.textContent = estadoDiag.apiUrl;
-            if (diagConexion) diagConexion.textContent = estadoDiag.modoSesion;
             if (diagUserAgent) diagUserAgent.textContent = estadoDiag.userAgent;
         }
 
@@ -1386,8 +1103,6 @@ const App = (() => {
                 estadoDiag.webCodecs = 'WebCodecs NO disponible en este WebView';
             }
 
-            estadoDiag.apiUrl = API.getBaseUrl() || '(no configurada)';
-            estadoDiag.modoSesion = textoModoSesion();
             estadoDiag.userAgent = navigator.userAgent;
             // En el APK los archivos son locales (rápido): se verifica el modelo siempre.
             // En el navegador serían 9 MB por la red: solo con el botón "Verificar modelo".
@@ -1433,8 +1148,6 @@ const App = (() => {
                 `• Telemetría (8890):     ${estadoDiag.telemetriaPPS} pps, ${estadoDiag.telemetriaTotal} paquetes en total`,
                 `• Última telemetría:     ${estadoDiag.ultimaTelemetria}`,
                 `• Video (11111):         ${estadoDiag.totalBytesVideo} bytes en ${estadoDiag.totalPaquetesVideo} paquetes`,
-                `• URL de la API:         ${estadoDiag.apiUrl}`,
-                `• Sesión:                ${estadoDiag.modoSesion}`,
                 `• WebView / UserAgent:   ${estadoDiag.userAgent}`,
                 `• Modelo de seguimiento: ${estadoDiag.modelo}`,
                 `• Modo técnico:          ${modoTecnico() ? 'activado' : 'apagado'}`,
@@ -1459,7 +1172,6 @@ const App = (() => {
             mostrarToast(copiado ? 'Informe copiado al portapapeles.' : 'No se pudo copiar automáticamente. Revisá los permisos.', copiado ? 'exito' : 'advertencia');
         });
 
-        estadoDiag.modoSesion = textoModoSesion();
         abrirEscuchas().then(ejecutarDiagnosticoCompleto);
 
         // Limpieza al salir de la página
@@ -1488,43 +1200,12 @@ const App = (() => {
             overlay.addEventListener('click', cerrarMenu);
         }
 
-        const btnUsuario = document.getElementById('btn-usuario');
-        if (btnUsuario) {
-            btnUsuario.addEventListener('click', mostrarModalUsuario);
-        }
-
-        const btnCerrarSesion = document.getElementById('btn-cerrar-sesion');
-        if (btnCerrarSesion) {
-            btnCerrarSesion.addEventListener('click', async (e) => {
-                e.preventDefault();
-                cerrarMenu();
-                // Sin sesión el enlace dice "Iniciar sesión"; con sesión, "Cerrar sesión"
-                if (Auth.sinCuenta()) window.location.hash = '#/login';
-                else await cerrarSesionEIrAlInicio();
-            });
-        }
-
         // Cerrar menú al hacer clic en enlaces del menú lateral
         document.querySelectorAll('.menu-lateral__enlace').forEach((enlace) => {
             enlace.addEventListener('click', () => {
                 cerrarMenu();
             });
         });
-
-        // Sesión vencida avisada por api.js (401 con sesión iniciada)
-        window.addEventListener(API.EVENTO_SESION_VENCIDA, manejarSesionVencida);
-
-        // Verificar sesión activa antes de la primera carga con timeout estricto de 3s
-        if (API.estaAutenticado() || Auth.obtenerUsuario()) {
-            try {
-                await Promise.race([
-                    Auth.verificarSesion(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
-                ]);
-            } catch (e) {
-                Auth.setModoSinConexion(true);
-            }
-        }
 
         // Escuchar cambios de hash
         window.addEventListener('hashchange', cargarRutaActual);
@@ -1548,7 +1229,6 @@ const App = (() => {
         abrirMenu,
         cerrarMenu,
         cargarRutaActual,
-        mostrarModalUsuario,
         icono,
         textoConIcono,
         textoConPunto,
