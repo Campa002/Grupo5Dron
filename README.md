@@ -27,12 +27,14 @@ Grupo5Dron/
 │   ├── api/                       # Endpoints REST (auth, dispositivos, esp32, etc.)
 │   ├── config/                    # Configuración de base de datos y credenciales
 │   ├── includes/                  # Middleware JWT, seguridad HTTP y helpers
-│   ├── public/                    # DocumentRoot público (index.php, CSS, JS, libs, pages)
+│   ├── public/                    # Web y APK del DRON (index.php, CSS, JS, libs, pages)
+│   ├── public-aula/               # Web y APK del AULA (index.php, CSS, JS, pages); en el hosting, en /aula/
 │   └── sql/                       # Esquema relacional MySQL / MariaDB (schema.sql)
 ├── capacitor/                     # Configuración y plugin nativo para APK Android
 │   ├── android_plugin/            # Plugin Java nativo DronNativePlugin.java
 │   ├── capacitor.config.json      # Configuración de Capacitor 5
 │   └── network_security_config.xml# Reglas de tráfico cleartext (192.168.10.1)
+├── capacitor-aula/                # Configuración de Capacitor del APK del aula ("Grupo 5 Aula")
 ├── posibles-implementaciones/     # Módulos desacoplados y herramientas archivadas
 │   ├── aula-esp32/firmware/       # Firmware PlatformIO en C++ para ESP32
 │   ├── herramientas/              # Scripts auxiliares de desarrollo local
@@ -66,8 +68,8 @@ El script generará el hash Bcrypt correspondiente y la instrucción SQL lista p
 
 ## 4. Hardware y Conexiones del ESP32
 
-* **Emisor Infrarrojo:** GPIO 4 (Vía transistor NPN).
-* **Receptor Infrarrojo:** GPIO 15 (Módulo VS1838B a 38 kHz).
-* **Relé Canal 1 (220V):** GPIO 26 (Corte general / Iluminación).
-* **Relé Canal 2 (Aux):** GPIO 27.
+* **Emisor Infrarrojo:** GPIO 18 (BC337 con 2 LEDs IR en serie a 5 V).
+* **Receptor Infrarrojo:** GPIO 15 (KY-022 a 38 kHz, alimentado a 3V3).
+* **Relé de las luces (220V):** GPIO 26 (corta solo la fase). Un solo relé.
+* Detalle del circuito: `posibles-implementaciones/aula-esp32/firmware/README.md`.
 * **Protocolo de comunicación:** Polling no bloqueante cada 2 segundos hacia la API REST HTTPS (`WiFiClientSecure`) y autenticación mediante cabecera `X-ESP32-Token`.

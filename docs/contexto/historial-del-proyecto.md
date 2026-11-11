@@ -164,7 +164,8 @@ Resumen de cómo se llegó al estado actual y por qué se tomó cada decisión. 
 - Se prueba con un celular Android (iPhone no sirve para este camino).
 
 ### Aula (en pausa, referencia para no romperla)
-- ESP32 DevKit en protoboard. Cableado real: relé GPIO25, emisor IR KY-005 GPIO19, receptor IR KY-022 GPIO4 (a 3V3), LED integrado GPIO2 como indicador. Un solo relé.
+- Hasta el 11/11: ESP32 DevKit en protoboard con relé GPIO25, emisor IR KY-005 GPIO19 y receptor KY-022 GPIO4.
+- Circuito soldado (11/11, ESP32 NodeMCU de 30 pines): emisor IR GPIO18 (330 Ω a la base de un BC337 que maneja 2 LEDs IR en serie a 5 V con 33 Ω ∥ 100 Ω), relé de las luces GPIO26 (corta solo la fase), receptor KY-022 GPIO15 (a 3V3), fuente HLK-5M05 a VIN, LED integrado GPIO2 como indicador. Un solo relé. Detalle en el README del firmware.
 - El informe original ponía el LED IR en GPIO35: error, ese pin es solo de entrada.
 - Para más alcance IR: transistor 2N2222/BC337 y LEDs de 940 nm de haz angosto (por ejemplo TSAL6100). El alcance real depende mucho del receptor del equipo; conviene acercar el emisor.
 - Fuente Hi-Link HLK-5M05 (220 V a 5 V 1 A): no va en protoboard; necesita fusible, caja aislante y supervisión docente. Para pruebas, USB.

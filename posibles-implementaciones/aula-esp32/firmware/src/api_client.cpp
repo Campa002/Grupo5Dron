@@ -134,7 +134,7 @@ void ApiClient::procesarComando(JsonObject cmd) {
         }
 
     } else if (tipo == "rele") {
-        // Parametros: {"accion": "encender"|"apagar", "canal": 1|2}
+        // Parámetros: {"accion": "encender"|"apagar", "canal": 1} (hay un solo relé: el canal 1, luces)
         JsonObject params = cmd["parametros"];
         String accion = params["accion"] | "apagar";
         int canal = params["canal"] | 1;

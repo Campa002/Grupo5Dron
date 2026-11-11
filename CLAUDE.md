@@ -19,39 +19,38 @@ La ÚNICA lista de pendientes es la sección "Próximos pasos" de este archivo.
 
 ## Objetivo del proyecto (según el informe)
 
-App móvil con una pantalla principal que permite elegir entre "Control del Aula" y "Control del Dron":
+App móvil con una pantalla principal que permite elegir entre "Control del Aula" y "Control del Dron" (desde la Etapa A, 11/11, son dos apps separadas: ver "Arquitectura" y "Próximos pasos", corrección del informe):
 - Aula: enviar órdenes a un ESP32 que las ejecuta por infrarrojo (luces, ventiladores, aire, proyectores). Relé de 220 V solo con supervisión docente.
 - Dron: control local desde el teléfono, video de la cámara, control con el giroscopio del celular y seguimiento automático de objetos/personas ("función muy importante del sistema").
 - Requisito central: uso REAL de sensores físicos del celular (giroscopio y cámara).
 - Regla del informe: lo que no está probado NO se presenta como terminado. Cada módulo se verifica antes de darlo por finalizado.
 
-## Alcance actual: SOLO EL DRON
+## Alcance actual: dron, y el aula separada (Etapa A)
 
-- El módulo del AULA está en pausa y lo continúa un compañero. Su estado completo quedó en la rama `aula-completo` y el tag `respaldo-pre-limpieza`.
-- NO modifiques la lógica del aula: `backend/public/js/aula.js`, `backend/public/js/admin.js`, `backend/public/pages/aula.php`, `backend/public/pages/admin.php`, `backend/api/comandos.php`, `dispositivos.php`, `botones.php`, `esp32.php`, ni `posibles-implementaciones/aula-esp32/`.
-- El código compartido (`app.js`, `api.js`, `auth.js`, `index.php`, `sw.js`, `app.css`, `login.php`, backend de auth/usuarios/config/perfiles) se puede tocar, pero sin romper el aula. Avisale a Luciano ANTES de cambiar algo compartido.
+- Hay DOS apps (Etapa A, 11/11): la del dron (`backend/public/`, APK `capacitor/`) y la del aula (`backend/public-aula/`, APK `capacitor-aula/`). Comparten la API PHP (`backend/api/`) y la base MySQL.
+- El código del aula lo había dejado un compañero (rama `aula-completo` y tag `respaldo-pre-limpieza`; `main` ya lo contiene). En la Etapa A Luciano pidió separarlo y alinear el firmware al circuito soldado.
+- Lógica del aula: `backend/public-aula/js/aula.js`, `admin.js`, `pages/aula.php`, `admin.php`, `backend/api/comandos.php`, `dispositivos.php`, `botones.php`, `esp32.php` y `posibles-implementaciones/aula-esp32/`. No la cambies sin que Luciano lo pida.
+- La tabla `perfiles_dron` y `backend/api/dron-perfiles.php` quedan en el backend, sin uso (decisión de Luciano del 11/11: no tocarlos).
 
 ## Arquitectura
 
 ```
-Celular (APK Capacitor 5, frontend local en https://localhost)
- ├─ con internet ──HTTPS + JWT──> Hosting PHP 8 + MySQL (login, perfiles, config)
+App del DRON (APK "Grupo 5 — Dron", frontend local en https://localhost, sin login ni API)
  └─ WiFi del Tello (sin internet) ──UDP──> DJI Ryze Tello 192.168.10.1
+App del AULA (APK "Grupo 5 Aula", appId ar.edu.eest1vl.grupo5aula, con login)
+ └─ con internet ──HTTPS + JWT──> Hosting PHP 8 + MySQL ──(polling)── ESP32 del aula
 ```
 
-- Frontend: PWA en HTML/CSS/JS vanilla, en `backend/public/`, router por hash (`#/inicio`, `#/dron`, `#/prueba-tello`, `#/sensores`, `#/config-dron`, `#/aula`, `#/admin`, `#/login`, `#/cambiar-password`). Una ruta que no existe (por ejemplo la vieja `#/acerca`) va al inicio.
-- El APK empaqueta ese frontend: `scripts/build-apk.js` genera `capacitor/www/` (generado, ignorado por git) con un `index.html` estático a partir de `index.php` y copia las páginas (`pages/*.php`) con el mismo nombre, quitándoles cualquier bloque `<?php ... ?>`.
+- Frontends: PWA en HTML/CSS/JS vanilla, router por hash.
+  - Dron, `backend/public/`: `#/inicio`, `#/dron`, `#/prueba-tello`, `#/sensores`, `#/config-dron`, `#/objetos`. Cualquier otra ruta (por ejemplo la vieja `#/acerca` o `#/aula`) va al inicio. Rutas absolutas (`/js/...`): va en la raíz del hosting.
+  - Aula, `backend/public-aula/`: `#/login`, `#/aula` (la principal), `#/admin`, `#/cambiar-password`. Cualquier otra ruta va a `#/aula`. Rutas relativas (`js/...`, `pages/...`): en el hosting va en una subcarpeta (por ejemplo `/aula/`) y usa la misma `/api/`.
+- Cada app tiene su propio `app.css` con solo sus estilos (se separaron sin cambiar ningún estilo calculado: comparado contra `main` con Playwright).
+- Los APK empaquetan esos frontends: `node scripts/build-apk.js dron` genera `capacitor/www/` y `node scripts/build-apk.js aula` genera `capacitor-aula/www/` (los dos generados e ignorados por git), con un `index.html` estático a partir de `index.php` y las páginas (`pages/*.php`) con el mismo nombre, sin ningún bloque `<?php ... ?>`.
 - Plugin nativo propio `DronNative` en Java (`capacitor/android_plugin/DronNativePlugin.java`) para UDP y para forzar el uso del WiFi del Tello aunque no tenga internet. El navegador solo no puede mandar UDP: por eso existe el APK.
 - NO hay ESP32 en el dron. El celular habla directo con el Tello.
-- El módulo del dron funciona SIN internet y SIN cuenta (decisión de Luciano del 6/11: el login de entrada sobra para el dron):
-  - La app abre directo en el inicio, con las dos opciones. Inicio, dron, Prueba Tello, Sensores y Config. Dron se usan sin sesión (`RUTAS_SIN_CUENTA` en app.js; `Auth.sinCuenta()` = no hay token ni usuario guardado).
-  - Aula, administración y cambio de contraseña piden iniciar sesión recién al entrar; después del login (y del cambio de contraseña obligatorio, si corresponde) se vuelve a la pantalla pedida (`Auth.recordarDestino` / `Auth.tomarDestino`, en sessionStorage). Si en vez de loguearse se va al inicio o al dron, el destino se olvida.
-  - Menú: "Iniciar sesión" solo sin sesión; con sesión, "Cerrar sesión" (y el menú de usuario con "Cambiar contraseña"). Cerrar sesión vuelve al inicio.
-  - Login: solo email, contraseña e "Ingresar" (más la URL del servidor en el APK si falta). Desde el login se vuelve con el menú.
-  - Ya no existe el flag `grupo5dron_modo_invitado` (auth.js lo borra si quedó de una versión anterior).
-  - Una sesión cacheada vencida (sin conexión) también permite entrar al dron. Aula y admin siempre exigen sesión válida.
-  - Iniciar o cerrar sesión borra el flag.
-- El APK no puede loguearse contra un servidor HTTP local: `network_security_config.xml` solo permite HTTP hacia 192.168.10.1 y la página es `https://localhost`. Para loguearse desde el APK hace falta un servidor HTTPS.
+- La app del dron funciona SIN internet y SIN cuenta (decisiones de Luciano del 6/11 y del 11/11): no tiene login, ni `api.js`/`auth.js`, ni llama al servidor. Los perfiles son dos, fijos: DJI Tello y Simulador (`ConfigDron`); un id guardado que no sea uno de esos (por ejemplo, de un perfil viejo del servidor) usa el Tello. El service worker (solo en el navegador) atiende únicamente los archivos del dron: `/api/` y la web del aula van directo a la red.
+- La app del aula pide iniciar sesión para todo (docente o admin). Después del login (y del cambio de contraseña obligatorio, si corresponde) vuelve a la pantalla pedida (`Auth.recordarDestino` / `Auth.tomarDestino`). Con la sesión guardada pero sin servidor muestra "Sin conexión con el servidor". Administración, solo admin.
+- El APK del aula no puede loguearse contra un servidor HTTP local: la página es `https://localhost` y Android bloquea el HTTP. Para loguearse desde el APK hace falta un servidor HTTPS. El APK del dron solo permite HTTP hacia 192.168.10.1 (`network_security_config.xml`).
 
 ## Protocolo del Tello (SDK 1.3, el del Tello común)
 
@@ -81,9 +80,10 @@ Fuente de verdad: `DronNativePlugin.java`. Del lado JS, el contrato está centra
 ## Estructura del repo
 
 ```
-.github/workflows/android.yml   jobs "verificar" (node --check, php -l, check_js, check_refs) y "build-apk"
+.github/workflows/android.yml   jobs "verificar" (node --check, php -l, check_js, check_refs, node --test), "build-apk" (dron),
+                                "build-apk-aula" y "firmware" (PlatformIO)
 backend/
-  api/            auth, usuarios, config, dron-perfiles (+ endpoints del aula: no tocar)
+  api/            auth, usuarios, config, comandos, dispositivos, botones, esp32 (+ dron-perfiles, sin uso)
   config/         config.example.php (config.php real: ignorado por git)
   includes/       auth_middleware, helpers, security (CORS: solo los orígenes de cors_origenes en config.php)
   sql/schema.sql  tablas y seed (perfiles_dron acepta solo tello|simulador)
@@ -93,16 +93,18 @@ backend/
     js/dron-adaptadores.js  DronNativo (contrato del plugin), TelloAdapter, SimulatorDroneAdapter
     js/dron-joystick.js     botones de mantener apretado (DronBotonesMovimiento, mando por defecto) y joysticks (modo técnico)
     js/dron-giroscopio.js, dron-seguimiento.js, dron-video.js
-    js/config-dron.js       perfiles (cache offline), timeout del failsafe
+    js/config-dron.js       los dos perfiles fijos, modo técnico, failsafe, sentido del avance y ajustes del seguimiento
     js/sensores.js          diagnóstico de sensores del celular
-    js/app.js, api.js, auth.js   compartidos (router, uso sin cuenta, Prueba Tello, sesión offline)
+    js/app.js               router, Prueba Tello, Sensores y Mis objetos
     pages/*.php             vistas parciales (fragmentos HTML; no dependen de PHP)
     libs/tfjs, libs/coco-ssd  modelo de visión LOCAL (pesos en float16, ~10 MB, sí va al repo)
     libs/mobilenet            MobileNet v1 0.25 cortado en la "huella" (256 números) para Mis objetos, float16, 437 KB
     js/dron-objetos.js        Mis objetos: huellas, IndexedDB y alta con 3 a 15 fotos
-capacitor/        capacitor.config.json, package.json, network_security_config.xml, android_plugin/
-scripts/          build-apk.js, check_js.py, check_refs.py, generar_hash.php
-posibles-implementaciones/  firmware del aula, adaptadores genéricos (HTTP, UDP/TCP), herramientas viejas
+  public-aula/      app del AULA: index.php, js/ (app, api, auth, aula, admin), pages/ (login, aula, admin, cambiar-password), css/, img/
+capacitor/        APK del dron: capacitor.config.json, package.json, network_security_config.xml, android_plugin/
+capacitor-aula/   APK del aula: capacitor.config.json, package.json (sin plugin propio)
+scripts/          build-apk.js (dron | aula), check_js.py, check_refs.py (las dos apps), ci_firma_debug.sh (firma de los dos APK), generar_hash.php
+posibles-implementaciones/  firmware del aula (pines del circuito soldado), adaptadores genéricos (HTTP, UDP/TCP), herramientas viejas
 docs/contexto/    informe, historial, reportes
 ```
 
@@ -110,16 +112,17 @@ docs/contexto/    informe, historial, reportes
 
 - Sintaxis: `node --check archivo.js` y `C:\xampp\php\php.exe -l archivo.php`. Balance de llaves: `python scripts/check_js.py`. Referencias a archivos: `python scripts/check_refs.py`. Los dos devuelven código distinto de 0 si fallan.
 - Prueba web local:
-  - `php -S 127.0.0.1:8088 -t backend/public` sirve el frontend pero NO `/api` (la API vive en `backend/api/`).
-  - Para la API hace falta la junction local (ignorada por git): `cmd /c mklink /J backend\public\api backend\api`, o un router de `php -S` que mapee `/api/*.php` a `backend/api/`.
+  - `php -S 127.0.0.1:8088 -t backend/public` sirve la app del dron (no necesita la API).
+  - El aula necesita la API: armá una carpeta con la app del dron en la raíz, `api` apuntando a `backend/api` y `aula` apuntando a `backend/public-aula` (junctions en Windows: `cmd /c mklink /J`), y serví esa carpeta con `php -S`. Así queda como en el hosting: `/`, `/api/` y `/aula/`.
   - MySQL: base `grupo5dron_db` importada desde `backend/sql/schema.sql`; `backend/config/config.php` local con root sin contraseña.
 - Usuarios del seed: la contraseña de todos es `password` y tienen `debe_cambiar_password = 1`: la app obliga a cambiarla en el primer login (`auth.php?action=cambiar_mi_password`). Para volver al estado inicial de la base local, reimportá `schema.sql`.
 - CORS: `config.php` tiene que incluir `https://localhost` en `cors_origenes` (ya está en `config.example.php`) para que el APK pueda usar la API.
 - Pruebas automáticas: `node --test tests/seguimiento.test.js tests/inclinacion.test.js tests/objetos.test.js tests/botones.test.js` (selector de Mis objetos, seguimiento con recorridos sintéticos, marco con bordes de la imagen analizada, inclinación por acelerómetro con eventos simulados, botones de mantener apretado con eventos de puntero simulados).
 - Pruebas en navegador: Playwright con Microsoft Edge del sistema (`chromium.launch({ channel: 'msedge' })`). Para el TelloAdapter sin dron, se puede inyectar un mock de `window.Capacitor.Plugins.DronNative` que respete el contrato de arriba.
-- APK: se compila en GitHub Actions en cada push a `main`. Artefacto: `Grupo5Dron-app-debug`.
-- Firma del APK debug:
-  - Si existe el secreto `DEBUG_KEYSTORE_BASE64`, el paso 10b lo instala como `~/.android/debug.keystore` (alias `androiddebugkey`, contraseña `android`) y el paso 11b verifica con `apksigner` que el APK quedó firmado con esa clave.
+- APK: se compilan en GitHub Actions en cada push a `main` y en cada PR. Artefactos: `Grupo5Dron-app-debug` (dron) y `Grupo5Aula-app-debug` (aula).
+- Firmware del aula: el job "firmware" lo compila con PlatformIO (usa `config.h.example` como `config.h`) y compila también `tests/test_hardware.ino`. Desde este entorno de Claude no se puede: la red bloquea el registro de PlatformIO.
+- Firma de los APK debug (los dos con la misma clave, `scripts/ci_firma_debug.sh`):
+  - Si existe el secreto `DEBUG_KEYSTORE_BASE64`, `ci_firma_debug.sh instalar` lo instala como `~/.android/debug.keystore` (alias `androiddebugkey`, contraseña `android`) y `ci_firma_debug.sh verificar` comprueba con `apksigner` que el APK quedó firmado con esa clave.
   - Sin el secreto, o si no es válido, se usa la clave por defecto (cambia en cada build) y el build no falla.
   - El keystore nunca va al repo (`.gitignore`: `*.keystore`, `*.jks`, `*.keystore.b64`).
 - NO agregues `android-actions/setup-android` al workflow: el SDK ya viene en el runner y esa acción rompió el build.
@@ -160,6 +163,15 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 - Consistente: mismos colores (variables de app.css), mismos componentes y textos en español claro en todas las pantallas.
 - Robusto: errores de red con mensajes entendibles, nada que quede colgado esperando para siempre, estados de carga visibles.
 - Limpio: sin código muerto, sin funciones duplicadas, sin `console.log` de depuración sueltos, sin archivos referenciados que no existen.
+
+## Estado al 11/11/2026
+
+- Etapa A: aula separada del dron (11/11). Ver "Arquitectura".
+  - App del dron sin aula, administración, login, API ni ESP32; inicio con "Cabina" y "Prueba Tello"; perfiles fijos; Prueba Tello sin URL de la API ni sesión; `sw.js` v12.
+  - App del aula nueva en `backend/public-aula/` (login, aula, administración, cambio de contraseña) y APK "Grupo 5 Aula". Se sacaron los botones del canal 2 del relé (el circuito tiene un solo relé).
+  - Firmware alineado al circuito soldado: emisor GPIO18 (BC337 con 2 LEDs IR en serie), relé de las luces GPIO26, receptor KY-022 GPIO15. `PIN_IR_SEND`, `PIN_RELE_LUCES`, `PIN_IR_RECV` y `RELE_ACTIVO_EN_BAJO` (1 por defecto) en `config.h.example`. Un solo relé. README del firmware y banco de pruebas actualizados.
+  - Verificado: con PHP + MariaDB locales (dron en `/`, API en `/api/`, aula en `/aula/`) y Playwright: las dos apps sin errores de consola, la del dron sin ningún pedido a `/api`, login del aula con cambio de contraseña y vuelta al destino, docente sin administración, 360/412/740 sin scroll; estilos idénticos a `main` en todas las pantallas; `ci_firma_debug.sh` con secreto válido, inválido y sin secreto. El APK del aula y el firmware los compila el CI.
+  - Sin probar: los dos APK en el celular, el aula contra el hosting real (HTTPS) y el firmware en el ESP32.
 
 ## Estado al 6/11/2026
 
@@ -265,4 +277,9 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
    - S3 (después de la primera prueba con el Tello): habilitar el control real (con cancelación por toque de joystick y las condiciones de activación) y ajustar ganancias con el dron.
    - ~~S4~~: "Mis objetos" simple, hecho el 6/11 (ver "Estado"). La selección por toque con rastreador no se hizo (no se pidió).
 7. **Hosting:** subir el backend, importar `schema.sql` y crear `config.php` (con `https://localhost` en CORS). Cada cuenta del seed pide cambiar `password` en su primer login.
-8. **Al final:** documentación (README, manual de usuario, manual del programador, API, plan de pruebas, limitaciones) y corrección del informe (por ejemplo, el LED IR figura en GPIO35, que es solo de entrada).
+8. **Al final:** documentación (README, manual de usuario, manual del programador, API, plan de pruebas, limitaciones) y corrección del informe:
+   - el LED IR figura en GPIO35, que es solo de entrada (el circuito real usa GPIO18 con un BC337 y 2 LEDs IR);
+   - el informe pide "una pantalla principal que permita elegir entre el aula y el dron", pero desde la Etapa A son dos apps separadas. Luciano lo habla con el profe (11/11).
+9. **Etapa A, pendientes de Luciano:** probar con el método del README del firmware si el relé es activo en alto o en bajo y avisar (hoy `RELE_ACTIVO_EN_BAJO 1`); instalar los dos APK; subir la web del aula al hosting en `/aula/`.
+10. **Etapa B:** seguimiento "como RAC" (pregunta del profe sobre la IA del Tello, diagnóstico en el A06, YOLO o COCO-SSD, recuadro de la cara con BlazeFace, pantalla con el layout de RAC, prueba con la cámara del celular; sigue en ensayo).
+11. **Etapa C:** carcasa triangular imprimible en OpenSCAD para el equipo del aula, con LEDs IR movibles.

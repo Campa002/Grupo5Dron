@@ -1,5 +1,5 @@
 /**
- * Gestor de Relés de Potencia 220V — Grupo 5: Control de Sistemas y Dron
+ * Gestor del Relé de las luces del aula (220 V) — Grupo 5: Control de Sistemas y Dron
  * EEST N° 1 de Vicente López "Eduardo Ader" — 7° 2°
  */
 
@@ -18,8 +18,7 @@ public:
     bool estaActivo(int canal);
 
 private:
-    bool estadoCanal1;
-    bool estadoCanal2;
+    bool estadoLuces;
     int obtenerPin(int canal);
 };
 

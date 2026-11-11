@@ -11,7 +11,7 @@
 IrManager irManager;
 
 IrManager::IrManager() 
-    : emisor(PIN_IR_LED), 
+    : emisor(PIN_IR_SEND), 
       receptor(PIN_IR_RECV), 
       modoAprendizajeActivo(false), 
       botonIdObjetivo(0), 
@@ -22,7 +22,7 @@ void IrManager::iniciar() {
 
     // Inicializar emisor
     emisor.begin();
-    Serial.printf("[IR] Emisor IR configurado en GPIO %d\n", PIN_IR_LED);
+    Serial.printf("[IR] Emisor IR configurado en GPIO %d\n", PIN_IR_SEND);
 
     // Configurar receptor (inicia apagado hasta que se active el modo aprendizaje)
     receptor.setUnknownThreshold(12); // Umbral mínimo de pulsos para tramas crudas

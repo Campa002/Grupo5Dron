@@ -1,7 +1,7 @@
 {
-    "name": "Grupo 5 — Control de Sistemas y Dron",
+    "name": "Grupo 5 — Dron",
     "short_name": "Grupo5Dron",
-    "description": "Control de dispositivos del aula y dron WiFi — EEST N° 1 de Vicente López",
+    "description": "Control del dron Tello desde el celular — EEST N° 1 de Vicente López",
     "start_url": "/",
     "display": "standalone",
     "orientation": "portrait",
