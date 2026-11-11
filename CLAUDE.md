@@ -102,7 +102,7 @@ backend/
     js/dron-objetos.js        Mis objetos: huellas, IndexedDB y alta con 3 a 15 fotos
 capacitor/        capacitor.config.json, package.json, network_security_config.xml, android_plugin/
 scripts/          build-apk.js, check_js.py, check_refs.py, generar_hash.php
-posibles-implementaciones/  firmware del aula, adaptadores genéricos (HTTP, UDP/TCP), herramientas viejas
+posibles-implementaciones/  firmware del aula, carcasa del equipo del aula (aula-esp32/carcasa: OpenSCAD, STL y vistas), adaptadores genéricos (HTTP, UDP/TCP), herramientas viejas
 docs/contexto/    informe, historial, reportes
 ```
 
@@ -160,6 +160,14 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 - Consistente: mismos colores (variables de app.css), mismos componentes y textos en español claro en todas las pantallas.
 - Robusto: errores de red con mensajes entendibles, nada que quede colgado esperando para siempre, estados de carga visibles.
 - Limpio: sin código muerto, sin funciones duplicadas, sin `console.log` de depuración sueltos, sin archivos referenciados que no existen.
+
+## Etapa C: carcasa del equipo del aula (11/11)
+
+- `posibles-implementaciones/aula-esp32/carcasa/`: `carcasa_aula.scad` (paramétrico, todas las medidas arriba), `stl/` (cuerpo, tapa, cápsula y soporte, binarios, ya orientados para imprimir), `vistas/` (PNG renderizados con OpenSCAD) y `README.md` (medidas a confirmar con calibre, cómo cambiarlas, impresión, armado y cableado de los LEDs).
+- Prisma de triángulo rectángulo isósceles: el frente (hipotenusa) tiene todas las conexiones y los lados cortos (90°) entran en una esquina. Exterior 246 × 126 × 46 mm; impreso con los lados cortos sobre los ejes ocupa 176 × 176, así que entra en una cama de 220 × 220.
+- Pared interna entre 220 V y baja tensión (con muesca solo para los cables de baja tensión), prensacables PG7, portafusible de chasis en el frente, ventilación de 2 mm solo del lado de 220 V, ventanas del USB y del KY-022, y los conectores JST-XH J1/J2 de las cápsulas en el frente.
+- LEDs en cápsulas con rótula a presión en la tapa, o en un soporte aparte con cable de extensión JST-XH. J1 y J2 quedan "en el medio" de la serie, así que si falta una cápsula no prende ninguna (a propósito: con un solo LED la corriente pasaría a ~135 mA).
+- Verificado: OpenSCAD 2021.01 genera las cuatro piezas como sólidos cerrados (sin aviso de "2-manifold") y las vistas se revisaron a ojo. Sin imprimir: hay que confirmar las medidas con calibre y probar el encastre de la rótula.
 
 ## Estado al 6/11/2026
 
