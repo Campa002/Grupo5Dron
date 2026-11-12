@@ -1,0 +1,41 @@
+CARCASA DEL EQUIPO DEL AULA - Grupo 5 (EEST N° 1 Vicente López)
+Piezas para imprimir
+
+Todas las piezas entran en una cama redonda de 170 mm (en un círculo de 160 mm).
+Ya vienen centradas y apoyadas como se imprimen: no hace falta girarlas.
+Ninguna pieza necesita soportes.
+
+PIEZA          ARCHIVO        CANTIDAD   MEDIDAS (mm)          RELLENO
+Cuerpo         cuerpo.stl     1          158 x 82 x 70 alto    25 %
+Bandeja        bandeja.stl    1          134 x 71 x 36 alto    25 %
+Tapa           tapa.stl       1          154 x 78 x 24 alto    25 %
+Cápsula LED    capsula.stl    2          20 x 20 x 15          100 %
+Tapón          tapon.stl      2          20 x 20 x 15          100 %
+Soporte        soporte.stl    2 (*)      48 x 26 x 24          100 %
+
+(*) El soporte es opcional: solo si alguna cápsula se va a poner lejos de la caja.
+
+LA PIEZA MÁS ALTA ES EL CUERPO: 70 mm. La impresora tiene que llegar a esa altura.
+
+MATERIAL: PETG (o ASA). No usar PLA: se ablanda cerca de los 55 °C y adentro hay
+una fuente y un relé de 220 V. Si hay filamento ignífugo (V-0), mejor.
+
+CONFIGURACIÓN
+- Altura de capa: 0,2 mm.
+- Perímetros: 4 (así las paredes de 3 mm salen macizas).
+- Capas arriba y abajo: 5.
+- Relleno: 25 % giroide en cuerpo, bandeja y tapa; 100 % en cápsulas, tapones y soportes.
+- Soportes: NO (ninguna pieza los necesita).
+- Adhesión: si el cuerpo se despega de las puntas, usar borde (brim) de 5 mm.
+
+CÓMO VAN EN LA CAMA
+- Cuerpo: apoyado en el piso, abierto para arriba. El frente (el lado largo) va sobre
+  un diámetro de la cama.
+- Bandeja: plana, con las columnas para arriba.
+- Tapa: plana, con las dos rótulas (los cilindros) para arriba.
+- Cápsula y tapón: sobre la cara plana más grande (el agujero del LED queda arriba).
+- Soporte: plano, con la rótula para arriba.
+
+Después de imprimir: probá que la bola (cápsula) entre a presión en una rótula y que
+gire y quede apuntando. Si queda muy dura o muy floja, avisá: se ajusta en el diseño
+(variable rotula_apriete de carcasa_aula.scad).

@@ -102,7 +102,7 @@ backend/
     js/dron-objetos.js        Mis objetos: huellas, IndexedDB y alta con 3 a 15 fotos
 capacitor/        capacitor.config.json, package.json, network_security_config.xml, android_plugin/
 scripts/          build-apk.js, check_js.py, check_refs.py, generar_hash.php
-posibles-implementaciones/  firmware del aula, carcasa del equipo del aula (aula-esp32/carcasa: OpenSCAD, STL y vistas), adaptadores genéricos (HTTP, UDP/TCP), herramientas viejas
+posibles-implementaciones/  firmware del aula, carcasa del equipo del aula (aula-esp32/carcasa: OpenSCAD, para-imprimir/ y vistas), adaptadores genéricos (HTTP, UDP/TCP), herramientas viejas
 docs/contexto/    informe, historial, reportes
 ```
 
@@ -133,7 +133,7 @@ docs/contexto/    informe, historial, reportes
 - Nada de recursos externos (CDN, Google Fonts): el APK tiene que andar sin internet.
 - Todo archivo que use la app tiene que tener extensión. En el APK, Capacitor responde index.html a cualquier ruta sin "." (html5mode). Por eso los shards del modelo son `group1-shardNofM.bin`. Si se cambia el modelo, renombrar los shards y sus `paths` en `model.json`, pasarlo a float16 con `python scripts/modelo_float16.py` y actualizar la lista de `sw.js` (y subir `CACHE_NAME`).
 - Las páginas son .php pero no pueden depender de PHP para funcionar en el APK. No hay archivos `.html` en el proyecto (`check_refs.py` falla si aparece uno en `pages/` y avisa si una página trae código PHP). `build-apk.js` quita todo bloque `<?php ... ?>` / `<?= ... ?>` al generar `www/` y falla si queda alguno. Capacitor sirve `/pages/x.php` como archivo porque tiene extensión; `cargarPlantilla` (app.js) no depende del content-type y avisa si en lugar de la vista llega una página completa.
-- `.gitattributes` marca como binarios `backend/public/libs/**`, imágenes, `.bin` y keystores (la PC tiene `core.autocrlf=true`).
+- `.gitattributes` marca como binarios `backend/public/libs/**`, imágenes, `.bin`, `.stl` y keystores (la PC tiene `core.autocrlf=true`).
 - Sin credenciales reales en el repo. `config.php` y `config.h` están en `.gitignore`.
 - Seguridad de vuelo. No debilites:
   - el botón de emergencia fijo y siempre visible;
@@ -161,13 +161,18 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 - Robusto: errores de red con mensajes entendibles, nada que quede colgado esperando para siempre, estados de carga visibles.
 - Limpio: sin código muerto, sin funciones duplicadas, sin `console.log` de depuración sueltos, sin archivos referenciados que no existen.
 
-## Etapa C: carcasa del equipo del aula (11/11)
+## Etapa C: carcasa del equipo del aula (11/11, rehecha el 12/11)
 
-- `posibles-implementaciones/aula-esp32/carcasa/`: `carcasa_aula.scad` (paramétrico, todas las medidas arriba), `stl/` (cuerpo, tapa, cápsula y soporte, binarios, ya orientados para imprimir), `vistas/` (PNG renderizados con OpenSCAD) y `README.md` (medidas a confirmar con calibre, cómo cambiarlas, impresión, armado y cableado de los LEDs).
-- Prisma de triángulo rectángulo isósceles: el frente (hipotenusa) tiene todas las conexiones y los lados cortos (90°) entran en una esquina. Exterior 246 × 126 × 46 mm; impreso con los lados cortos sobre los ejes ocupa 176 × 176, así que entra en una cama de 220 × 220.
-- Pared interna entre 220 V y baja tensión (con muesca solo para los cables de baja tensión), prensacables PG7, portafusible de chasis en el frente, ventilación de 2 mm solo del lado de 220 V, ventanas del USB y del KY-022, y los conectores JST-XH J1/J2 de las cápsulas en el frente.
-- LEDs en cápsulas con rótula a presión en la tapa, o en un soporte aparte con cable de extensión JST-XH. J1 y J2 quedan "en el medio" de la serie, así que si falta una cápsula no prende ninguna (a propósito: con un solo LED la corriente pasaría a ~135 mA).
-- Verificado: OpenSCAD 2021.01 genera las cuatro piezas como sólidos cerrados (sin aviso de "2-manifold") y las vistas se revisaron a ojo. Sin imprimir: hay que confirmar las medidas con calibre y probar el encastre de la rótula.
+- `posibles-implementaciones/aula-esp32/carcasa/`: `carcasa_aula.scad` (paramétrico), `para-imprimir/` (solo los STL finales y `LEEME.txt` para quien imprime), `vistas/` (PNG de OpenSCAD) y `README.md` (medidas, conexiones de 220 V, lista de compras y armado).
+- Impresora de Luciano: cama REDONDA de 170 mm. Toda pieza entra en un círculo de 160 mm (el cuerpo, Ø158, con el frente sobre un diámetro). Pieza más alta: el cuerpo, 70 mm.
+- Prisma de triángulo rectángulo isósceles (entra en una esquina), de DOS PISOS:
+  - abajo, 220 V (HLK-5M05 parada, relé, portafusible de chasis, 2 PG7);
+  - una bandeja que se saca (separa los pisos, con un solo paso de 7 mm para 5 V, GND y la señal del relé; la traban 3 columnas contra la tapa);
+  - arriba, baja tensión (ESP32 sobre tacos a 25 mm para las fichas hembra, plaquita del BC337, KY-022).
+- Fusible: SOLO para la HLK-5M05, 5×20 T1A 250 V lento (hoja de datos de la serie HLK-5M: 1 A slow-blow; entrada máx. 0,2 A, pico de arranque 10 A). La fase se divide en el terminal de entrada del portafusible: un camino al fusible y la HLK, el otro directo al COM del relé (la lámpara la protege la térmica del aula). Neutro con empalme soldado.
+- Materiales: solo lo ya soldado más fusible, portafusible y 2 PG7. Sin JST-XH: el cable de cada LED va soldado y entra por un agujero de 6 mm de la tapa, justo debajo de su rótula, con un precinto como alivio de tensión.
+- Rótula con embudo: el cable sale derecho de la bola y se curva suave; la bola gira 50° para cualquier lado (comprobado en OpenSCAD) y queda apuntando por un apriete de 0,1 mm (`rotula_apriete`). Tapones para rótulas sin usar y soporte para alejar una cápsula.
+- Verificado en OpenSCAD 2021.01: cada pieza es un solo sólido cerrado; la vista `"choques"` sale vacía (portafusible, tuercas de los PG7, relé, HLK, cuerpo y bandeja); los círculos de cada pieza medidos sobre los STL. Sin imprimir: confirmar medidas con calibre y probar el apriete de la rótula.
 
 ## Estado al 6/11/2026
 
