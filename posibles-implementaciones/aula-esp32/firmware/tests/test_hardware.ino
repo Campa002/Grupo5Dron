@@ -32,7 +32,8 @@
 #endif
 
 IRsend irSend(PIN_IR_SEND);
-IRrecv irRecv(PIN_IR_RECV);
+// Buffer de 1024 pulsos y 50 ms de fin de trama: así entran los códigos largos de los aires (como el firmware)
+IRrecv irRecv(PIN_IR_RECV, 1024, 50, true);
 decode_results results;
 
 bool modoMonitoreoReceptor = false;
@@ -135,8 +136,9 @@ void loop() {
             digitalWrite(PIN_LED_ESTADO, HIGH);
             Serial.println("------------------------------------------------------------");
             Serial.printf("✓ SEÑAL DETECTADA -> Protocolo: %s\n", typeToString(results.decode_type).c_str());
-            Serial.printf("  Código Hex: 0x%s\n", resultToHexidecimal(&results).c_str());
+            Serial.printf("  Código Hex: %s\n", resultToHexidecimal(&results).c_str());
             Serial.printf("  Bits:       %u\n", results.bits);
+            Serial.printf("  Pulsos:     %u%s\n", results.rawlen - 1, results.overflow ? " (CORTADA: más larga que el buffer)" : "");
             Serial.println("------------------------------------------------------------");
             irRecv.resume();
             delay(100);
