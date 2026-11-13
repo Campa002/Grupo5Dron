@@ -25,9 +25,11 @@ public:
 
 private:
     WiFiClientSecure secureClient;
+    WiFiClient clientePlano;   // para API_URL con http:// (por ejemplo, XAMPP en la red del aula)
     HTTPClient http;
 
     void configurarSeguridad();
+    bool abrir(const String& url);
     void procesarComando(JsonObject cmd);
 };
 

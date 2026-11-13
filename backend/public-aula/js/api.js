@@ -222,18 +222,11 @@ const API = (() => {
     const dispositivos = {
         listar: () => get('dispositivos.php?action=listar'),
         obtener: (id) => get(`dispositivos.php?action=obtener&id=${id}`),
-        crear: (datos) => post('dispositivos.php?action=crear', datos),
-        actualizar: (id, datos) => put(`dispositivos.php?action=actualizar&id=${id}`, datos),
-        eliminar: (id) => eliminar(`dispositivos.php?action=eliminar&id=${id}`),
     };
 
     // --- Botones ---
     const botones = {
         listar: (dispositivoId) => get(`botones.php?action=listar&dispositivo_id=${dispositivoId}`),
-        crear: (datos) => post('botones.php?action=crear', datos),
-        actualizar: (id, datos) => put(`botones.php?action=actualizar&id=${id}`, datos),
-        eliminar: (id) => eliminar(`botones.php?action=eliminar&id=${id}`),
-        guardarCodigoIr: (datos) => post('botones.php?action=guardar_codigo_ir', datos),
         eliminarCodigoIr: (id) => eliminar(`botones.php?action=eliminar_codigo_ir&id=${id}`),
     };
 

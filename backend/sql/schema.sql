@@ -28,36 +28,39 @@ CREATE TABLE `usuarios` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
--- 2. DISPOSITIVOS DEL AULA
+-- 2. APARATOS DEL AULA QUE SE MANEJAN POR INFRARROJO
+--    Solo dos: el proyector y el aire acondicionado. Las luces van por el relé
+--    (comandos de tipo 'rele'), no son un aparato de esta tabla.
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `dispositivos`;
 CREATE TABLE `dispositivos` (
     `id`          INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     `nombre`      VARCHAR(100)    NOT NULL,
-    `tipo`        VARCHAR(50)     NOT NULL COMMENT 'luz, ventilador, aire, proyector, otro',
+    `tipo`        VARCHAR(50)     NOT NULL COMMENT 'proyector o aire',
     `icono`       VARCHAR(50)     NULL DEFAULT 'dispositivo',
     `orden`       INT UNSIGNED    NOT NULL DEFAULT 0,
     `activo`      TINYINT(1)      NOT NULL DEFAULT 1,
     `creado_en`   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    INDEX `idx_tipo` (`tipo`),
+    UNIQUE KEY `uk_tipo` (`tipo`),
     INDEX `idx_orden` (`orden`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
--- 3. BOTONES / ACCIONES POR DISPOSITIVO
+-- 3. ACCIONES DE CADA APARATO (cada una con su código IR aprendido)
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `botones`;
 CREATE TABLE `botones` (
     `id`              INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     `dispositivo_id`  INT UNSIGNED    NOT NULL,
-    `nombre`          VARCHAR(100)    NOT NULL COMMENT 'Ej: Encender, Apagar, Subir temp.',
+    `accion`          VARCHAR(30)     NOT NULL COMMENT 'encender, apagar, subir_temp, bajar_temp',
+    `nombre`          VARCHAR(100)    NOT NULL COMMENT 'Ej: Encender, Apagar, Subir temperatura',
     `icono`           VARCHAR(50)     NULL DEFAULT 'boton',
     `orden`           INT UNSIGNED    NOT NULL DEFAULT 0,
     `activo`          TINYINT(1)      NOT NULL DEFAULT 1,
     `creado_en`       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    INDEX `idx_dispositivo` (`dispositivo_id`),
+    UNIQUE KEY `uk_dispositivo_accion` (`dispositivo_id`, `accion`),
     CONSTRAINT `fk_botones_dispositivo`
         FOREIGN KEY (`dispositivo_id`) REFERENCES `dispositivos` (`id`)
         ON DELETE CASCADE ON UPDATE CASCADE
@@ -70,13 +73,14 @@ DROP TABLE IF EXISTS `codigos_ir`;
 CREATE TABLE `codigos_ir` (
     `id`            INT UNSIGNED    NOT NULL AUTO_INCREMENT,
     `boton_id`      INT UNSIGNED    NOT NULL,
-    `protocolo`     VARCHAR(30)     NOT NULL DEFAULT 'DESCONOCIDO' COMMENT 'NEC, SONY, RC5, RAW, etc.',
-    `codigo`        VARCHAR(20)     NULL COMMENT 'Código hexadecimal decodificado',
+    `protocolo`     VARCHAR(30)     NOT NULL DEFAULT 'DESCONOCIDO' COMMENT 'NEC, SONY, SAMSUNG, DAIKIN, COOLIX, UNKNOWN, etc. (nombres de IRremoteESP8266)',
+    `codigo`        VARCHAR(255)    NULL COMMENT 'Hexadecimal; en los aires, el estado completo (hasta 53 bytes)',
     `bits`          INT UNSIGNED    NULL COMMENT 'Cantidad de bits del código',
-    `raw_data`      TEXT            NULL COMMENT 'Array raw (JSON) para protocolos desconocidos',
+    `raw_data`      MEDIUMTEXT      NULL COMMENT 'Trama cruda completa (JSON, microsegundos): respaldo si el protocolo no se conoce',
     `frecuencia`    INT UNSIGNED    NOT NULL DEFAULT 38000 COMMENT 'Frecuencia portadora en Hz',
     `descripcion`   VARCHAR(200)    NULL,
     `creado_en`     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `actualizado_en` DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Último aprendizaje',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_boton` (`boton_id`),
     CONSTRAINT `fk_codigos_boton`
@@ -199,52 +203,23 @@ INSERT INTO `usuarios` (`nombre`, `email`, `password_hash`, `rol`, `debe_cambiar
 ('Demian Barreto', 'demian@grupo5dron.local', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'usuario', 1),
 ('Luciano Campanelli', 'luciano@grupo5dron.local', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'usuario', 1);
 
--- Dispositivos del aula de ejemplo
-INSERT INTO `dispositivos` (`nombre`, `tipo`, `icono`, `orden`) VALUES
-('Luz principal', 'luz', 'lightbulb', 1),
-('Ventilador de techo', 'ventilador', 'fan', 2),
-('Aire acondicionado', 'aire', 'snowflake', 3),
-('Proyector Epson', 'proyector', 'projector', 4),
-('Equipo de audio', 'otro', 'speaker', 5);
+-- Los dos aparatos del aula que se manejan por infrarrojo (las luces van por el relé)
+INSERT INTO `dispositivos` (`id`, `nombre`, `tipo`, `icono`, `orden`) VALUES
+(1, 'Proyector', 'proyector', 'proyector', 1),
+(2, 'Aire acondicionado', 'aire', 'copo', 2);
 
--- Botones para cada dispositivo
-INSERT INTO `botones` (`dispositivo_id`, `nombre`, `icono`, `orden`) VALUES
--- Luz principal
-(1, 'Encender', 'power-on', 1),
-(1, 'Apagar', 'power-off', 2),
--- Ventilador
-(2, 'Encender', 'power-on', 1),
-(2, 'Apagar', 'power-off', 2),
-(2, 'Velocidad +', 'speed-up', 3),
-(2, 'Velocidad -', 'speed-down', 4),
--- Aire acondicionado
-(3, 'Encender', 'power-on', 1),
-(3, 'Apagar', 'power-off', 2),
-(3, 'Subir temperatura', 'temp-up', 3),
-(3, 'Bajar temperatura', 'temp-down', 4),
-(3, 'Modo frío', 'cold', 5),
-(3, 'Modo calor', 'hot', 6),
-(3, 'Modo ventilador', 'fan', 7),
--- Proyector
-(4, 'Encender', 'power-on', 1),
-(4, 'Apagar', 'power-off', 2),
-(4, 'Fuente HDMI', 'hdmi', 3),
-(4, 'Fuente VGA', 'vga', 4),
--- Equipo de audio
-(5, 'Encender', 'power-on', 1),
-(5, 'Apagar', 'power-off', 2),
-(5, 'Volumen +', 'volume-up', 3),
-(5, 'Volumen -', 'volume-down', 4),
-(5, 'Mute', 'mute', 5);
-
--- Códigos IR de ejemplo (valores ficticios, se capturan con modo aprendizaje)
-INSERT INTO `codigos_ir` (`boton_id`, `protocolo`, `codigo`, `bits`, `frecuencia`, `descripcion`) VALUES
-(1, 'NEC', '0x00FF00FF', 32, 38000, 'Luz principal - Encender (ejemplo)'),
-(2, 'NEC', '0x00FF807F', 32, 38000, 'Luz principal - Apagar (ejemplo)');
+-- Sus acciones. Los códigos se aprenden con el control remoto de cada aula ("Aprender código").
+INSERT INTO `botones` (`dispositivo_id`, `accion`, `nombre`, `icono`, `orden`) VALUES
+(1, 'encender', 'Encender', 'power-on', 1),
+(1, 'apagar', 'Apagar', 'power-off', 2),
+(2, 'encender', 'Encender', 'power-on', 1),
+(2, 'apagar', 'Apagar', 'power-off', 2),
+(2, 'subir_temp', 'Subir temperatura', 'temp-up', 3),
+(2, 'bajar_temp', 'Bajar temperatura', 'temp-down', 4);
 
 -- Estado ESP32 inicial
 INSERT INTO `estado_esp32` (`dispositivo_id`, `en_linea`, `version_fw`) VALUES
-('esp32-principal', 0, '1.0.0');
+('esp32-principal', 0, '1.1.0');
 
 -- Perfiles de dron (Exclusivo: tello | simulador)
 INSERT INTO `perfiles_dron` (`nombre`, `tipo_adaptador`, `ip`, `puerto_comando`, `puerto_video`, `protocolo`, `url_video`, `formato_video`, `plantilla_comandos`) VALUES
@@ -255,10 +230,5 @@ INSERT INTO `perfiles_dron` (`nombre`, `tipo_adaptador`, `ip`, `puerto_comando`,
 -- Configuración general
 INSERT INTO `configuracion` (`clave`, `valor`, `descripcion`) VALUES
 ('rele_habilitado', '0', 'Control de relé 220V habilitado (0=no, 1=sí). REQUIERE SUPERVISIÓN DOCENTE.'),
-('polling_intervalo_ms', '1000', 'Intervalo de polling del ESP32 en milisegundos'),
-('heartbeat_timeout_seg', '30', 'Segundos sin heartbeat para marcar ESP32 como desconectado'),
-('giroscopio_zona_muerta', '5', 'Zona muerta del giroscopio en grados'),
-('giroscopio_sensibilidad', '50', 'Sensibilidad del giroscopio (1-100)'),
-('seguimiento_velocidad_max', '30', 'Velocidad máxima del seguimiento automático (1-100)'),
 ('nombre_proyecto', 'Grupo 5: Control de Sistemas y Dron', 'Nombre del proyecto'),
 ('escuela', 'EEST N° 1 de Vicente López "Eduardo Ader"', 'Nombre de la escuela');

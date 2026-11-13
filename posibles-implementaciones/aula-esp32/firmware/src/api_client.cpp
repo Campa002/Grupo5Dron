@@ -34,6 +34,15 @@ void ApiClient::configurarSeguridad() {
     }
 }
 
+/**
+ * Abre la conexión. El cliente (seguro o plano) es un miembro de la clase: antes el plano era una variable
+ * local que se destruía antes de usarse, y con una API por http:// (XAMPP) fallaba.
+ */
+bool ApiClient::abrir(const String& url) {
+    if (url.startsWith("https://")) return http.begin(secureClient, url);
+    return http.begin(clientePlano, url);
+}
+
 void ApiClient::pollComandos() {
     if (!wifiManager.estaConectado()) {
         return;
@@ -41,13 +50,7 @@ void ApiClient::pollComandos() {
 
     String url = String(API_URL) + "?action=poll";
 
-    bool iniciada = false;
-    if (url.startsWith("https://")) {
-        iniciada = http.begin(secureClient, url);
-    } else {
-        WiFiClient plainClient;
-        iniciada = http.begin(plainClient, url);
-    }
+    bool iniciada = abrir(url);
 
     if (!iniciada) {
         Serial.println("[API] ⚠️ Error al inicializar conexión HTTP para polling.");
@@ -62,8 +65,10 @@ void ApiClient::pollComandos() {
     if (httpCode == HTTP_CODE_OK) {
         String payload = http.getString();
 
-        // Reservar memoria para documento JSON
-        DynamicJsonDocument doc(4096);
+        // Memoria para el JSON según lo que llegó: los códigos de aire traen tramas crudas de cientos de
+        // números (cada número ocupa ~16 bytes en ArduinoJson y ~4 en el texto)
+        const size_t capacidad = min((size_t)98304, (size_t)(payload.length() * 5 + 1024));
+        DynamicJsonDocument doc(capacidad);
         DeserializationError err = deserializeJson(doc, payload);
 
         if (err) {
@@ -170,13 +175,7 @@ bool ApiClient::enviarHeartbeat() {
 
     String url = String(API_URL) + "?action=heartbeat";
 
-    bool iniciada = false;
-    if (url.startsWith("https://")) {
-        iniciada = http.begin(secureClient, url);
-    } else {
-        WiFiClient plainClient;
-        iniciada = http.begin(plainClient, url);
-    }
+    bool iniciada = abrir(url);
 
     if (!iniciada) return false;
 
@@ -215,13 +214,7 @@ bool ApiClient::reportarResultado(int comandoId, const String& estado, const Str
 
     String url = String(API_URL) + "?action=resultado";
 
-    bool iniciada = false;
-    if (url.startsWith("https://")) {
-        iniciada = http.begin(secureClient, url);
-    } else {
-        WiFiClient plainClient;
-        iniciada = http.begin(plainClient, url);
-    }
+    bool iniciada = abrir(url);
 
     if (!iniciada) return false;
 
@@ -258,20 +251,15 @@ bool ApiClient::enviarCodigoIr(int botonId, const String& protocolo, const Strin
 
     String url = String(API_URL) + "?action=codigo_ir";
 
-    bool iniciada = false;
-    if (url.startsWith("https://")) {
-        iniciada = http.begin(secureClient, url);
-    } else {
-        WiFiClient plainClient;
-        iniciada = http.begin(plainClient, url);
-    }
+    bool iniciada = abrir(url);
 
     if (!iniciada) return false;
 
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-ESP32-Token", ESP32_TOKEN);
 
-    DynamicJsonDocument doc(4096);
+    // Memoria según el largo de la trama cruda (un aire puede tener 600 tiempos o más)
+    DynamicJsonDocument doc(JSON_ARRAY_SIZE(rawLen) + JSON_OBJECT_SIZE(8) + 512);
     doc["boton_id"] = botonId;
     doc["protocolo"] = protocolo;
     doc["codigo"] = codigo;

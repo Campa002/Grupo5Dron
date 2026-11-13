@@ -526,97 +526,7 @@ select.campo__input {
 }
 
 /* --- Dispositivos del aula --- */
-.dispositivo {
-    background: var(--color-superficie);
-    border: 1px solid var(--color-borde);
-    border-radius: var(--radio-lg);
-    margin-bottom: var(--espacio-md);
-    overflow: hidden;
-    transition: border-color var(--trans-normal);
-}
-.dispositivo:hover { border-color: var(--color-borde-claro); }
 
-.dispositivo__header {
-    display: flex;
-    align-items: center;
-    gap: var(--espacio-md);
-    padding: var(--espacio-md) var(--espacio-lg);
-    background: var(--color-fondo-claro);
-    border-bottom: 1px solid var(--color-borde);
-    cursor: pointer;
-}
-.dispositivo__icono {
-    font-size: var(--tamano-2xl);
-    flex-shrink: 0;
-}
-.dispositivo__nombre {
-    font-weight: 600;
-    flex: 1;
-}
-.dispositivo__tipo {
-    font-size: var(--tamano-xs);
-    color: var(--color-texto-terciario);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-.dispositivo__flecha {
-    color: var(--color-texto-terciario);
-    transition: transform var(--trans-normal);
-    font-size: var(--tamano-sm);
-}
-.dispositivo.expandido .dispositivo__flecha {
-    transform: rotate(180deg);
-}
-
-.dispositivo__botones {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
-    gap: var(--espacio-sm);
-    padding: var(--espacio-md);
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height var(--trans-lenta), padding var(--trans-lenta);
-}
-.dispositivo.expandido .dispositivo__botones {
-    max-height: 500px;
-    padding: var(--espacio-md);
-}
-
-.dispositivo__btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--espacio-xs);
-    padding: var(--espacio-md);
-    background: var(--color-fondo);
-    border: 1px solid var(--color-borde);
-    border-radius: var(--radio-md);
-    cursor: pointer;
-    transition: all var(--trans-rapida);
-    color: var(--color-texto);
-    font-family: var(--fuente-principal);
-    font-size: var(--tamano-xs);
-    text-align: center;
-    min-height: 4rem;
-}
-.dispositivo__btn:hover {
-    background: var(--color-acento-suave);
-    border-color: var(--color-acento);
-}
-.dispositivo__btn:active {
-    transform: scale(0.95);
-}
-.dispositivo__btn--sin-codigo {
-    border-style: dashed;
-    opacity: 0.6;
-}
-.dispositivo__btn-icono {
-    font-size: var(--tamano-xl);
-}
-.dispositivo__btn-nombre {
-    font-weight: 500;
-    line-height: 1.2;
-}
 
 /* --- Toast / Notificaciones --- */
 .toast-contenedor {
@@ -1118,3 +1028,81 @@ select.campo__input {
 .ico--silencio { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9h4l5-4v14l-5-4H4z'/%3E%3Cpath d='M16.5 9.5l5 5M21.5 9.5l-5 5'/%3E%3C/svg%3E"); }
 .ico--tele { --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='6' width='18' height='13' rx='2'/%3E%3Cpath d='M8 2.5l4 3.5 4-3.5'/%3E%3C/svg%3E"); }
 /* === ÍCONOS PROPIOS (fin) === */
+
+/* === ESTILO RACVISION (como la app del dron) === */
+.encabezado { margin-bottom: var(--espacio-xl); }
+.etiqueta--linea::before {
+    content: '';
+    display: inline-block;
+    width: 1.5rem;
+    height: 2px;
+    margin-right: 0.6rem;
+    vertical-align: 0.25em;
+    background: currentColor;
+}
+.titulo-grande {
+    font-size: clamp(1.625rem, 7.5vw, 2.5rem);
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    overflow-wrap: anywhere;
+}
+.bajada {
+    max-width: 34rem;
+    margin-top: var(--espacio-sm);
+    font-size: var(--tamano-sm);
+    color: var(--color-texto-secundario);
+}
+.bloque {
+    margin-bottom: var(--espacio-xl);
+    padding-left: var(--espacio-md);
+    border-left: 3px solid var(--color-acento);
+}
+.bloque__titulo {
+    margin-bottom: var(--espacio-sm);
+    font-size: var(--tamano-xl);
+    font-weight: 900;
+    line-height: 1.15;
+    text-transform: uppercase;
+}
+.bloque__texto {
+    margin-bottom: var(--espacio-md);
+    font-size: var(--tamano-sm);
+    color: var(--color-texto-secundario);
+}
+.par-botones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--espacio-sm);
+}
+.par-botones .btn { flex: 1 1 9rem; min-height: 2.75rem; }
+
+/* === AULA: luces, proyector, aire y aprender código === */
+.aula-equipo {
+    display: flex;
+    align-items: center;
+    gap: var(--espacio-sm);
+    margin-bottom: var(--espacio-xl);
+    font-size: var(--tamano-sm);
+    color: var(--color-texto-secundario);
+}
+.aula-falta { margin-top: var(--espacio-sm); }
+.aula-aprender {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0 var(--espacio-md);
+}
+.aula-aprender .campo__input { min-height: 2.75rem; }
+.aula-pasos { margin: 0 0 var(--espacio-md); padding-left: 1.25rem; }
+.aula-pasos li { margin-bottom: 0.25rem; }
+.aula-aprender__estado {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--espacio-sm);
+    margin-top: var(--espacio-md);
+    padding: var(--espacio-sm) var(--espacio-md);
+    background: var(--color-acento-suave);
+    border-left: 3px solid var(--color-acento);
+}
+.aula-aprender__estado .punto { margin-top: 0.4em; flex: 0 0 auto; }
