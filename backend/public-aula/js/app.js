@@ -35,16 +35,15 @@ const App = (() => {
         const contenedor = document.getElementById('toast-contenedor');
         if (!contenedor) return;
 
-        const iconos = { exito: 'check', error: 'cruz', advertencia: 'alerta', info: 'info' };
+        const iconos = { exito: 'bi-check-lg', error: 'bi-x-lg', advertencia: 'bi-exclamation-triangle', info: 'bi-info-circle' };
 
         // Texto plano (textContent): un mensaje que venga del servidor no puede inyectar HTML
         const toast = document.createElement('div');
-        toast.className = `toast toast--${tipo}`;
-        const ico = document.createElement('span');
-        ico.className = `toast__icono ico ico--${iconos[tipo] || 'info'}`;
+        toast.className = `toast show toast--${tipo}`;
+        const ico = document.createElement('i');
+        ico.className = `bi ${iconos[tipo] || iconos.info}`;
         ico.setAttribute('aria-hidden', 'true');
         const texto = document.createElement('span');
-        texto.className = 'toast__texto';
         texto.textContent = mensaje;
         toast.append(ico, texto);
         contenedor.appendChild(toast);
@@ -87,11 +86,10 @@ const App = (() => {
             return html;
         } catch (error) {
             return `
-                <div class="tarjeta texto-centro" style="padding: var(--espacio-2xl) var(--espacio-md);">
-                    <div style="margin-bottom: var(--espacio-sm);">${icono('alerta', 'ico--grande')}</div>
-                    <h3 class="mb-sm">Error cargando la página</h3>
-                    <p class="texto-sm texto-secundario mb-lg">${escaparHtml(error.message)}</p>
-                    <button class="btn btn--primario" onclick="App.cargarRutaActual()">Reintentar</button>
+                <div class="alert alert-danger">
+                    <p class="fw-semibold mb-1">Error cargando la página</p>
+                    <p class="small mb-3">${escaparHtml(error.message)}</p>
+                    <button class="btn btn-primary" onclick="App.cargarRutaActual()">Reintentar</button>
                 </div>`;
         }
     }
@@ -99,11 +97,10 @@ const App = (() => {
     /** Pantalla para cuando no hay conexión con el servidor (el aula no funciona sin él). */
     function plantillaSinConexion() {
         return `
-            <div class="tarjeta texto-centro" style="padding: var(--espacio-2xl) var(--espacio-md);">
-                <div style="margin-bottom: var(--espacio-sm);">${icono('senal', 'ico--grande')}</div>
-                <h3 class="mb-sm">Sin conexión con el servidor</h3>
-                <p class="texto-sm texto-secundario mb-lg">El aula necesita internet para mandar las órdenes al ESP32. Revisá la conexión y volvé a intentar.</p>
-                <button class="btn btn--primario" onclick="location.reload()">${icono('recargar')} Reintentar</button>
+            <div class="alert alert-warning">
+                <p class="fw-semibold mb-1">Sin conexión con el servidor</p>
+                <p class="small mb-3">El aula necesita internet para mandar las órdenes al ESP32. Revisá la conexión y volvé a intentar.</p>
+                <button class="btn btn-primary" onclick="location.reload()">Reintentar</button>
             </div>`;
     }
 
@@ -160,7 +157,7 @@ const App = (() => {
             return;
         }
 
-        contenedor.innerHTML = '<div class="cargando"><div class="cargando__spinner"></div><p>Cargando...</p></div>';
+        contenedor.innerHTML = '<div class="text-center py-5 text-body-secondary"><div class="spinner-border mb-3" aria-hidden="true"></div><p>Cargando...</p></div>';
         const html = await cargarPlantilla(destino);
         if (miNavegacion !== navegacionActual) return;
         contenedor.innerHTML = html;
@@ -235,21 +232,24 @@ const App = (() => {
             .replace(/'/g, '&#39;');
     }
 
+    // Los pocos íconos que usa el aula (Bootstrap Icons, locales). Un nombre sin ícono no dibuja nada.
+    const ICONOS = Object.freeze({ usuario: 'bi-person-circle', llave: 'bi-key', salir: 'bi-box-arrow-right' });
+
     /**
-     * HTML de un ícono propio (SVG definido en app.css). Decorativo: siempre junto a un texto visible
+     * HTML de un ícono (Bootstrap Icons). Decorativo: siempre junto a un texto visible
      * o dentro de un botón con aria-label.
      */
     function icono(nombre, clases = '') {
-        return `<span class="ico ico--${nombre}${clases ? ' ' + clases : ''}" aria-hidden="true"></span>`;
+        return ICONOS[nombre] ? `<i class="bi ${ICONOS[nombre]}${clases ? ' ' + clases : ''}" aria-hidden="true"></i>` : '';
     }
 
     /** Pone en `el` un ícono (opcional) y un texto plano. */
     function textoConIcono(el, nombre, texto) {
         if (!el) return;
         el.replaceChildren();
-        if (nombre) {
-            const ico = document.createElement('span');
-            ico.className = `ico ico--${nombre}`;
+        if (ICONOS[nombre]) {
+            const ico = document.createElement('i');
+            ico.className = `bi ${ICONOS[nombre]}`;
             ico.setAttribute('aria-hidden', 'true');
             el.append(ico, ' ');
         }
@@ -267,29 +267,24 @@ const App = (() => {
 
         const modalOverlay = document.createElement('div');
         modalOverlay.id = 'modal-usuario';
-        modalOverlay.className = 'modal-overlay';
+        modalOverlay.className = 'modal-overlay modal';
         modalOverlay.innerHTML = `
-            <div class="modal">
-                <div class="modal__header">
-                    <h3 class="modal__titulo">Perfil de usuario</h3>
-                    <button class="modal__cerrar" id="btn-cerrar-modal-user" aria-label="Cerrar">&times;</button>
-                </div>
-                <div class="modal__body">
-                    <div class="tarjeta mb-md" style="background: var(--color-fondo-claro);">
-                        <div class="flex items-center gap-md">
-                            <div>${icono('usuario', 'ico--grande')}</div>
-                            <div>
-                                <h4 style="font-weight: 700;">${escaparHtml(usuario.nombre)}</h4>
-                                <p class="texto-sm texto-secundario">${escaparHtml(usuario.email)}</p>
-                                <span class="badge badge--info mt-xs">${escaparHtml(String(usuario.rol || '').toUpperCase())}</span>
-                            </div>
-                        </div>
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title fs-5">Perfil de usuario</h2>
+                        <button type="button" class="btn-close" id="btn-cerrar-modal-user" aria-label="Cerrar"></button>
                     </div>
-                    <button class="btn btn--secundario btn--bloque mb-md" id="btn-modal-cambiar-pass">${icono('llave')} Cambiar contraseña</button>
-                </div>
-                <div class="modal__footer">
-                    <button class="btn btn--secundario" id="btn-modal-cancelar">Cerrar</button>
-                    <button class="btn btn--peligro" id="btn-modal-logout">${icono('salir')} Cerrar sesión</button>
+                    <div class="modal-body">
+                        <p class="fw-semibold mb-0">${escaparHtml(usuario.nombre)}</p>
+                        <p class="small text-body-secondary mb-2">${escaparHtml(usuario.email)}</p>
+                        <span class="badge text-bg-secondary">${escaparHtml(String(usuario.rol || '').toUpperCase())}</span>
+                        <button class="btn btn-outline-secondary w-100 mt-4" id="btn-modal-cambiar-pass">${icono('llave')} Cambiar contraseña</button>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-outline-secondary" id="btn-modal-cancelar">Cerrar</button>
+                        <button class="btn btn-danger" id="btn-modal-logout">${icono('salir')} Cerrar sesión</button>
+                    </div>
                 </div>
             </div>`;
         document.body.appendChild(modalOverlay);

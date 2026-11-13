@@ -1,28 +1,22 @@
 <div class="admin-pagina">
-    <div class="flex justify-between items-center mb-md flex-wrap gap-sm">
-        <div>
-            <h2 class="seccion-titulo" style="margin-bottom: var(--espacio-xs);">
-                Panel de Administración
-            </h2>
-            <p class="texto-sm texto-secundario">
-                Historial de órdenes, usuarios y habilitación del relé
-            </p>
-        </div>
-        <span class="badge badge--advertencia">Solo Administradores</span>
-    </div>
+    <header class="mb-4">
+        <p class="etiqueta">Solo administradores</p>
+        <h1 class="h3 fw-bold text-uppercase">Administración</h1>
+        <p class="text-body-secondary mb-0">Historial de órdenes, usuarios y habilitación del relé.</p>
+    </header>
 
-    <!-- Pestañas de administración -->
-    <div class="admin-tabs">
-        <button class="admin-tab activo" data-tab="historial">Historial</button>
-        <button class="admin-tab" data-tab="usuarios">Usuarios</button>
-        <button class="admin-tab" data-tab="config">Configuración</button>
-    </div>
+    <!-- Pestañas de administración (admin.js marca la activa) -->
+    <nav class="nav nav-pills nav-fill gap-2 mb-4" aria-label="Secciones">
+        <button class="nav-link border admin-tab activo" data-tab="historial">Historial</button>
+        <button class="nav-link border admin-tab" data-tab="usuarios">Usuarios</button>
+        <button class="nav-link border admin-tab" data-tab="config">Configuración</button>
+    </nav>
 
     <!-- Contenido dinámico inyectado por admin.js -->
     <div id="admin-contenido">
-        <div class="cargando">
-            <div class="cargando__spinner"></div>
-            <p>Cargando panel de administración...</p>
+        <div class="text-center py-5 text-body-secondary">
+            <div class="spinner-border mb-3" role="status" aria-hidden="true"></div>
+            <p>Cargando...</p>
         </div>
     </div>
 </div>

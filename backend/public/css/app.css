@@ -42,6 +42,7 @@
 
 /* Tamaño táctil mínimo (44 px) */
 .btn, .form-control, .form-select { min-height: 2.75rem; }
+#header-principal .btn { min-width: 2.75rem; }
 .form-check-input { width: 1.25em; height: 1.25em; }
 .form-switch { display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; padding-left: 0; }
 .form-switch .form-check-input { width: 2.5em; margin: 0; float: none; flex-shrink: 0; }
@@ -99,6 +100,7 @@ body:not(.modo-tecnico) .solo-tecnico { display: none !important; }
     width: auto;
     padding: 0.75rem 1rem;
     border-left: 4px solid var(--bs-info);
+    background: var(--bs-secondary-bg);
     transition: opacity 0.3s ease;
 }
 .toast-contenedor .toast--exito { border-left-color: var(--bs-success); }
