@@ -20,6 +20,13 @@
             <span class="opcion__desc">Revisa la conexión, la batería, los datos y el video sin despegar.</span>
             <span class="opcion__ir">Entrar <span class="ico ico--ir" aria-hidden="true"></span></span>
         </a>
+        <a href="#/seguimiento" class="opcion">
+            <span class="etiqueta">03 — Sin volar</span>
+            <span class="opcion__icono"><span class="ico ico--camara" aria-hidden="true"></span></span>
+            <span class="opcion__titulo">Seguimiento</span>
+            <span class="opcion__desc">Probá el seguimiento con la cámara del celular, sin el dron.</span>
+            <span class="opcion__ir">Entrar <span class="ico ico--ir" aria-hidden="true"></span></span>
+        </a>
     </div>
 
     <!-- Modo técnico: accesos a las herramientas -->

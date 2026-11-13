@@ -13,7 +13,11 @@
  *
  * Reglas de seguridad:
  *  - Giroscopio y seguimiento DESACTIVADOS al iniciar; al apagar el giroscopio, sus ejes vuelven a cero.
- *  - El seguimiento funciona por ahora SOLO EN ENSAYO: calcula y muestra los comandos, nunca los envía.
+ *  - El seguimiento arranca en ENSAYO: calcula y muestra el comando, no lo envía.
+ *  - Control real del seguimiento (S3, experimental): apagado por defecto; se activa con un interruptor y una
+ *    confirmación cada vez, solo en vuelo y con las condiciones cumplidas. Límites bajos (DronSeguimiento.
+ *    LIMITES_CONTROL_REAL), nunca roll; sin objetivo, rc 0 0 0 0. Vuelve a ensayo al tocar un botón de
+ *    movimiento, al perder la conexión, si deja de cumplir las condiciones, al pasar a segundo plano o al salir.
  *  - Botón de EMERGENCIA fijo y siempre visible (vertical y horizontal).
  *  - Confirmación explícita antes de despegar; no se despega si no llega telemetría.
  *  - Failsafe: sin telemetría en vuelo por más del tiempo configurado → freno (rc 0 0 0 0) y aterrizaje.
@@ -74,10 +78,13 @@ const Dron = (() => {
     let _giroscopio = null;
     let _seguimiento = null;
     let _panelSeguimiento = null;
+    let _pantallaSeg = null;       // tarjetas estilo RAC (dron-seguimiento-ui.js)
     let _video = null;
 
     let _modoGiro = false;
     let _modoSeguimiento = false;
+    let _controlReal = false;      // S3: el seguimiento manda el comando al dron (apagado por defecto)
+    let _onVisibilidad = null;
     let _misionEnEjecucion = false;
     let _cancelarMisionFlag = false;
     let _pasoEnEjecucion = false;
@@ -178,12 +185,28 @@ const Dron = (() => {
                     telemetriaOk: _hayTelemetria(),
                 }),
             });
+            _pantallaSeg = new DronPantallaSeguimiento.Pantalla({
+                contenedor: _q('#cab-seguimiento'),
+                cajaVideo: _q('.cab-video'),
+                chipFps: _q('#cab-chip-fps'),
+                fuente: 'dron',
+                fuenteTamano: () => { const v = _q('#canvas-video'); return [v?.width || 0, v?.height || 0]; },
+                onIniciar: _activarSeguimiento,
+                onDetener: () => { _apagarSeguimiento(); App.mostrarToast('Seguimiento detenido.', 'info'); },
+                onTocar: (x, y) => _seguimiento?.elegirEnPunto(x, y) || { ok: false },
+                onDiagnosticar: () => _seguimiento.diagnosticar(_q('#cab-foto-prueba')),
+                onControlReal: _cambiarControlReal,
+            });
+            _pantallaSeg.selectQueSeguir.addEventListener('change', _elegirQueSeguir);
         }
+        // Al pasar a segundo plano, el control real vuelve a ensayo
+        _onVisibilidad = () => { if (document.hidden) _volverAEnsayo('La app pasó a segundo plano: el seguimiento volvió a ensayo.'); };
+        document.addEventListener('visibilitychange', _onVisibilidad);
 
         _agregarEventosCabina();
         _actualizarSelectMisiones();
-        if (typeof DronObjetos !== 'undefined') {
-            App.llenarQueSeguir(_q('#sel-que-seguir')).then(lista => { if (gen === _generacion) _objetosGuardados = lista; });
+        if (typeof DronObjetos !== 'undefined' && _pantallaSeg) {
+            App.llenarQueSeguir(_pantallaSeg.selectQueSeguir).then(lista => { if (gen === _generacion) _objetosGuardados = lista; });
         }
         await _conectar();
     }
@@ -380,7 +403,6 @@ const Dron = (() => {
         on('#btn-copiar-registro-udp', _copiarRegistroComandos);
         on('#btn-cambiar-mando', _cambiarMando);
         on('#btn-probar-cpu', _probarCuadroEnCpu);
-        _q('#sel-que-seguir')?.addEventListener('change', _elegirQueSeguir);
         on('#btn-reconectar', _conectar);
         on('#btn-ir-config-dron', () => { window.location.hash = '#/config-dron'; });
         on('#btn-cab-menu', () => App.abrirMenu());
@@ -680,7 +702,14 @@ const Dron = (() => {
         _actualizarBotonGiro();
     }
 
-    function _apagarSeguimiento() {
+    /**
+     * Apaga el seguimiento (y el control real, si estaba).
+     * @param {boolean} [mandarFreno] true: si el control real estaba activo, manda ya "rc 0 0 0 0".
+     *   Los que llaman desde emergencia, freno, failsafe, aterrizaje o pasos pasan false: ellos ya se ocupan
+     *   de lo que se manda (así no cambia nada de lo que sale en esos casos).
+     */
+    function _apagarSeguimiento(mandarFreno = true) {
+        _volverAEnsayo(null, mandarFreno);
         if (!_modoSeguimiento) return;
         _modoSeguimiento = false;
         _seguimiento?.desactivar();
@@ -689,12 +718,13 @@ const Dron = (() => {
         _mostrarEnsayo('');
         const chip = _q('#cab-chip-seguimiento');
         if (chip) chip.hidden = true;
+        _pantallaSeg?.setActivo(false);
         _actualizarBotonSeguimiento();
     }
 
     function _apagarModosAutomaticos() {
         _apagarGiro();
-        _apagarSeguimiento();
+        _apagarSeguimiento(false);
     }
 
     async function _toggleGiroscopio() {
@@ -704,6 +734,8 @@ const Dron = (() => {
             App.mostrarToast('Giroscopio desactivado.', 'info');
             return;
         }
+        // La inclinación y el control real del seguimiento usan los mismos ejes: el control real vuelve a ensayo
+        _volverAEnsayo('Activaste la inclinación: el seguimiento volvió a ensayo.');
         if (_failsafeBloquea()) return;
         if (_maniobraEnCurso()) { App.mostrarToast('Esperá a que termine la maniobra en curso.', 'advertencia'); return; }
         const resultado = await _giroscopio.activar();
@@ -764,46 +796,133 @@ const Dron = (() => {
     }
 
     // ----------------------------------------------------------------
-    // Seguimiento (EXPERIMENTAL) — SOLO ENSAYO
-    // Calcula los comandos que mandaría y los muestra sobre el video, pero NUNCA
-    // escribe los ejes del rc. Por eso se puede usar en tierra y no interfiere con
-    // los mandos ni con el giroscopio. El control real llega en la etapa S3.
+    // Seguimiento estilo RAC: ensayo por defecto y control real (S3, experimental)
+    // En ensayo calcula el comando y lo muestra, pero NUNCA escribe los ejes del rc: se puede usar en tierra
+    // y no interfiere con los mandos ni con la inclinación. Con el control real activo, cada paso de control
+    // (15 Hz) escribe los ejes con los límites de DronSeguimiento.LIMITES_CONTROL_REAL; sin objetivo, en 0.
     // ----------------------------------------------------------------
 
     async function _toggleSeguimiento() {
-        if (!_seguimiento) { App.mostrarToast('El seguimiento no está disponible.', 'advertencia'); return; }
         if (_modoSeguimiento) {
             _apagarSeguimiento();
-            App.mostrarToast('Ensayo apagado.', 'info');
+            App.mostrarToast('Seguimiento detenido.', 'info');
             return;
         }
+        await _activarSeguimiento();
+    }
+
+    async function _activarSeguimiento() {
+        if (!_seguimiento) { App.mostrarToast('El seguimiento no está disponible.', 'advertencia'); return; }
+        if (_modoSeguimiento) return;
         if (_failsafeBloquea()) return;
         if (_maniobraEnCurso()) { App.mostrarToast('Esperá a que termine la maniobra en curso.', 'advertencia'); return; }
         if (!_seguimiento.modeloCargado) {
             App.mostrarToast('Preparando el seguimiento...', 'info');
+            _pantallaSeg?.setCargando(true);
             const res = await _seguimiento.inicializar();
+            _pantallaSeg?.setCargando(false);
+            if (!_seguimiento) return; // salió de la cabina mientras cargaba
             if (!res.ok) { App.mostrarToast(`No se pudo preparar el seguimiento: ${res.error}`, 'advertencia', 7000); return; }
             if (res.aviso) App.mostrarToast(res.aviso, 'advertencia', 8000);
         }
         _modoSeguimiento = true;
+        _seguimiento.controlReal = false;
         _seguimiento.onComando = _onSeguimientoComando;
         _panelSeguimiento?.destruir();
         _panelSeguimiento = new DronSeguimiento.Panel(_q('#cab-panel-seg'));
-        _seguimiento.onEstado = (nuevo) => {
-            if (_modoSeguimiento && nuevo === 'perdido') App.mostrarToast('Se perdió lo que seguías: el dron se quedaría quieto.', 'advertencia', 5000);
+        _seguimiento.onEstado = (nuevo, anterior, info) => {
+            _pantallaSeg?.cambioDeEstado(nuevo, anterior, info);
+            if (_modoSeguimiento && nuevo === 'perdido') {
+                App.mostrarToast(_controlReal ? 'Objetivo perdido: el dron queda quieto.' : 'Objetivo perdido: el dron se quedaría quieto.', 'advertencia', 5000);
+            }
         };
         _seguimiento.activar();
-        _mostrarEnsayo('ENSAYO · buscando una persona...');
+        _pantallaSeg?.setActivo(true);
+        _mostrarEnsayo('ENSAYO · buscando objetivo...');
         const btnRegistro = _q('#btn-copiar-registro-seg');
         if (btnRegistro) btnRegistro.hidden = false;
-        App.mostrarToast('Ensayo: la app muestra lo que haría el dron, pero no lo mueve.', 'info', 6000);
+        App.mostrarToast('Seguimiento en ensayo: la app muestra lo que haría el dron, pero no lo mueve.', 'info', 6000);
         _actualizarBotonSeguimiento();
     }
 
-    /** Muestra (sin enviar) el comando que calcula el seguimiento, 15 veces por segundo. */
+    /**
+     * Interruptor "Control real (experimental)". Activarlo pide confirmación cada vez.
+     * @returns {Promise<boolean>} si quedó activo
+     */
+    async function _cambiarControlReal(activar) {
+        if (!activar) {
+            _volverAEnsayo('Control real apagado: el seguimiento volvió a ensayo.');
+            return false;
+        }
+        if (!_modoSeguimiento) { App.mostrarToast('Primero tocá Iniciar seguimiento.', 'advertencia'); return false; }
+        if (_failsafeBloquea()) return false;
+        if (_maniobraEnCurso()) { App.mostrarToast('Esperá a que termine la maniobra en curso.', 'advertencia'); return false; }
+        if (_modoGiro) { App.mostrarToast('Apagá la inclinación antes de activar el control real.', 'advertencia'); return false; }
+        const cond = _seguimiento.condiciones();
+        if (!cond.ok) {
+            App.mostrarToast(`Todavía no se puede activar el control real: ${cond.motivos.join('; ')}.`, 'advertencia', 9000);
+            return false;
+        }
+        const L = DronSeguimiento.LIMITES_CONTROL_REAL;
+        if (!confirm(
+            '¿Activar el control real del seguimiento (experimental)?\n\n' +
+            `• El dron va a seguir al objetivo de verdad, despacio (giro hasta ${Math.round(L.yaw * 100)}, altura y avance hasta ${Math.round(L.fb * 100)} de 100; nunca de costado).\n` +
+            '• Si pierde el objetivo, queda quieto (no aterriza ni se mueve solo).\n' +
+            '• Cualquier botón de movimiento, Frenar o EMERGENCIA lo apagan.\n' +
+            '• Que alguien tenga el dedo listo en EMERGENCIA.'
+        )) return false;
+        // Puede haber cambiado algo mientras se mostraba la confirmación
+        if (!_modoSeguimiento || !_adaptador?.enVuelo || !_hayTelemetria()) {
+            App.mostrarToast('El dron ya no está listo: el control real no se activó.', 'advertencia');
+            return false;
+        }
+        _soltarMandos();
+        _controlReal = true;
+        _seguimiento.controlReal = true;
+        App.mostrarToast('Control real activado: el dron sigue al objetivo.', 'advertencia', 6000);
+        return true;
+    }
+
+    /**
+     * Vuelve el seguimiento a ensayo: los ejes del seguimiento a 0.
+     * @param {string|null} motivo aviso para mostrar (null: sin aviso)
+     * @param {boolean} [mandarFreno] mandar ya "rc 0 0 0 0" (si no, sale en el próximo ciclo del rc)
+     */
+    function _volverAEnsayo(motivo, mandarFreno = true) {
+        if (!_controlReal) return;
+        _controlReal = false;
+        if (_seguimiento) _seguimiento.controlReal = false;
+        _adaptador?.actualizarEjes({ lr: 0, fb: 0, ud: 0, yaw: 0 });
+        if (mandarFreno) _adaptador?.enviarEjesYa();
+        _pantallaSeg?.setControlReal(false);
+        if (motivo) App.mostrarToast(motivo, 'advertencia', 6000);
+    }
+
+    /** Cada paso de control (15 Hz): en ensayo solo muestra; con el control real, escribe los ejes. */
     function _onSeguimientoComando(cmd, info) {
         if (!_modoSeguimiento) return;
-        _mostrarEnsayo(DronSeguimiento.textoEnsayo(cmd, info));
+        let textoComando;
+        if (_controlReal) {
+            // Salidas de seguridad: conexión, maniobras o condiciones
+            const a = _adaptador;
+            let motivo = null;
+            if (!a || !a.enVuelo || a.enviosSuspendidos || !_hayTelemetria()) motivo = 'Se perdió la conexión con el dron (o ya no está en vuelo): el seguimiento volvió a ensayo.';
+            else if (_maniobraEnCurso()) motivo = 'Empezó otra maniobra: el seguimiento volvió a ensayo.';
+            else if (!info.condiciones.ok) motivo = `El seguimiento volvió a ensayo: ${info.condiciones.motivos[0]}.`;
+            if (motivo) {
+                _volverAEnsayo(motivo);
+            } else {
+                const ejes = DronSeguimiento.comandoControlReal(cmd, info.estado);
+                a.actualizarEjes(ejes);
+                textoComando = `Mandando al dron: ${DronSeguimiento.textoRc(ejes)}`;
+                _mostrarEnsayo(`CONTROL REAL · ${DronSeguimiento.estadoCorto(info).texto} · ${DronSeguimiento.textoRc(ejes)}`);
+            }
+        }
+        if (!_controlReal) {
+            textoComando = `Ensayo: no se manda nada (calcularía ${DronSeguimiento.textoRc({ lr: 0, ...cmd })}).`;
+            _mostrarEnsayo(DronSeguimiento.textoEnsayo(cmd, info));
+        }
+        _pantallaSeg?.actualizar(info, textoComando);
         _panelSeguimiento?.actualizar(info);
         const chip = _q('#cab-chip-seguimiento');
         if (chip) {
@@ -818,7 +937,7 @@ const Dron = (() => {
 
     /** "¿Qué seguir?": una persona o un objeto guardado. Si el ensayo está activo, vuelve a empezar con lo elegido. */
     async function _elegirQueSeguir() {
-        const sel = _q('#sel-que-seguir');
+        const sel = _pantallaSeg?.selectQueSeguir;
         if (!sel || !_seguimiento) return;
         const objeto = _objetosGuardados.find(o => o.id === sel.value) || null;
         const res = await _seguimiento.elegirObjeto(objeto);
@@ -828,6 +947,7 @@ const Dron = (() => {
             await _seguimiento.elegirObjeto(null);
         }
         if (_modoSeguimiento) {
+            _volverAEnsayo('Cambiaste qué seguir: el seguimiento volvió a ensayo.');
             _seguimiento.desactivar();
             _seguimiento.activar();
         }
@@ -875,7 +995,7 @@ const Dron = (() => {
     function _actualizarBotonSeguimiento() {
         const btn = _q('#btn-toggle-seguimiento');
         if (!btn) return;
-        App.textoConIcono(btn, 'objetivo', _modoSeguimiento ? 'Ensayo: ON' : 'Ensayo: OFF');
+        App.textoConIcono(btn, 'objetivo', _modoSeguimiento ? 'Seguimiento: ON' : 'Seguimiento: OFF');
         btn.classList.toggle('cab-activo', _modoSeguimiento);
     }
 
@@ -902,6 +1022,8 @@ const Dron = (() => {
     function _onMandoBotones(ejes, acciones) {
         const a = _adaptador;
         if (!a) return;
+        // Tocar un botón de movimiento apaga el control real del seguimiento (vuelve a ensayo)
+        if (acciones.length) _volverAEnsayo('Tocaste un botón de movimiento: el seguimiento volvió a ensayo.', false);
         if (acciones.length && _maniobraEnCurso()) {
             _mando.soltarTodo(); // vuelve a llamar con los ejes en 0
             if (Date.now() - _avisoManiobraTs > 3000) {
@@ -978,6 +1100,7 @@ const Dron = (() => {
 
         // Cada joystick actualiza SOLO sus dos ejes
         _joystickIzq.onChange = ({ x, y }) => {
+            _volverAEnsayo('Tocaste un joystick: el seguimiento volvió a ensayo.', false);
             _adaptador?.actualizarEjes({ ud: y, yaw: x });
         };
         _joystickIzq.onRelease = () => {
@@ -985,6 +1108,7 @@ const Dron = (() => {
         };
         _joystickDer.onChange = ({ x, y }) => {
             if (_modoGiro) return; // en ese modo lo maneja el giroscopio
+            _volverAEnsayo('Tocaste un joystick: el seguimiento volvió a ensayo.', false);
             _adaptador?.actualizarEjes({ lr: x, fb: y });
         };
         _joystickDer.onRelease = () => {
@@ -1167,6 +1291,7 @@ const Dron = (() => {
                         <div class="sobre-imagen__grupo sobre-imagen__grupo--der">
                             <span class="chip chip--dato" title="Batería"><span id="tel-bateria-icono" class="punto" aria-hidden="true"></span><span class="chip__etq">Bat.</span><span id="tel-bateria-valor">--%</span></span>
                             <span class="chip chip--dato" title="Altura"><span class="chip__etq">Alt.</span><span id="tel-altura-valor">-- cm</span></span>
+                            <span id="cab-chip-fps" class="chip chip--dato" hidden></span>
                         </div>
                     </div>
                     <div id="cab-ensayo" class="cartel-ensayo" hidden></div>
@@ -1186,7 +1311,7 @@ const Dron = (() => {
                 <div class="cab-lado cab-lado--der">
                     <div class="cab-botones">
                         <button id="btn-toggle-giro" class="btn btn--secundario">🧭 Inclinación: OFF</button>
-                        <button id="btn-toggle-seguimiento" class="btn btn--secundario">${App.icono('objetivo')} Ensayo: OFF</button>
+                        <button id="btn-toggle-seguimiento" class="btn btn--secundario">${App.icono('objetivo')} Seguimiento: OFF</button>
                     </div>
                     <div class="cab-mando">
                         <span class="cab-joy-etq">Avanzar · De costado</span>
@@ -1216,7 +1341,7 @@ const Dron = (() => {
                         <canvas id="cab-miniatura" width="160" height="120"></canvas>
                         <figcaption>Lo que ve el modelo</figcaption>
                     </figure>
-                    <div id="cab-panel-seg" class="detalle-seguimiento__panel" data-vacio="Activá el ensayo para ver el detalle."></div>
+                    <div id="cab-panel-seg" class="detalle-seguimiento__panel" data-vacio="Iniciá el seguimiento para ver el detalle."></div>
                 </div>
                 <div class="par-botones mt-sm">
                     <button id="btn-probar-cpu" class="btn btn--secundario">${App.icono('probeta')} Probar este cuadro en CPU</button>
@@ -1252,23 +1377,28 @@ const Dron = (() => {
                 <button id="btn-ir-config-dron" class="btn btn--secundario">${App.icono('llave-ajuste')} Config. dron</button>
             </div>
 
-            <!-- Inclinación y seguimiento -->
+            <!-- Seguimiento estilo RAC (las tarjetas las arma dron-seguimiento-ui.js) -->
             <section class="cab-panel">
-                <p class="etiqueta">01 — Inclinación y seguimiento</p>
-                <h3 class="cab-panel__titulo">Inclinación y seguimiento</h3>
-                <p class="cab-ayuda">Inclinación: movés el dron inclinando el celular. Sostené el celular como lo vas a usar y tocá Calibrar: esa posición será "quieto".</p>
-                <p class="cab-ayuda">Seguimiento (ensayo): la app busca lo que elijas y muestra qué haría el dron, pero no lo mueve.</p>
+                <p class="etiqueta">01 — Seguimiento</p>
+                <h3 class="cab-panel__titulo">Seguimiento</h3>
+                <p class="cab-ayuda">La app busca a una persona (la cara o, si no se ve, el cuerpo) o lo que elijas, y muestra qué haría el dron. Arranca en ensayo: no lo mueve.</p>
+                <div id="cab-seguimiento"></div>
+                <img id="cab-foto-prueba" src="/img/prueba-persona.jpg" alt="" hidden>
+            </section>
+
+            <!-- Inclinación -->
+            <section class="cab-panel">
+                <p class="etiqueta">02 — Inclinación</p>
+                <h3 class="cab-panel__titulo">Inclinación</h3>
+                <p class="cab-ayuda">Movés el dron inclinando el celular. Sostené el celular como lo vas a usar y tocá Calibrar: esa posición será "quieto".</p>
                 <div class="cab-opciones">
                     <button id="btn-calibrar-giro" class="btn btn--secundario">${App.icono('objetivo')} Calibrar</button>
-                    <label>¿Qué seguir?
-                        <select id="sel-que-seguir" class="cab-select"><option value="persona">Una persona</option></select>
-                    </label>
                 </div>
             </section>
 
             <!-- Movimientos por paso -->
             <section class="cab-panel">
-                <p class="etiqueta">02 — Por pasos</p>
+                <p class="etiqueta">03 — Por pasos</p>
                 <h3 class="cab-panel__titulo">Movimientos por paso</h3>
                 <p class="cab-ayuda">Cada botón mueve el dron la distancia elegida y lo deja quieto. El botón rojo lo frena.</p>
                 <div class="cab-opciones">
@@ -1312,7 +1442,7 @@ const Dron = (() => {
 
             <!-- Misiones -->
             <section class="cab-panel">
-                <p class="etiqueta">03 — Automático</p>
+                <p class="etiqueta">04 — Automático</p>
                 <h3 class="cab-panel__titulo">Misiones</h3>
                 <p class="cab-ayuda">Una lista de pasos que el dron hace solo. Elegí una y tocá Iniciar; Cancelar la frena.</p>
                 <div class="cab-mision">
@@ -1325,7 +1455,7 @@ const Dron = (() => {
             </section>
 
             <p class="cab-nota">
-                ${App.icono('escudo')} Vuelo supervisado, con 3×3 m libres de personas. El seguimiento está en ensayo: muestra los comandos, no los envía.
+                ${App.icono('escudo')} Vuelo supervisado, con 3×3 m libres de personas. El seguimiento arranca en ensayo; el control real es experimental y pide confirmación.
             </p>
         </div>`;
     }
@@ -1341,10 +1471,13 @@ const Dron = (() => {
 
         _modoGiro = false;
         _modoSeguimiento = false;
+        _controlReal = false; // al salir de la cabina, el seguimiento vuelve a ensayo (y se apaga)
         _cancelarMisionFlag = true;
+        if (_onVisibilidad) { document.removeEventListener('visibilitychange', _onVisibilidad); _onVisibilidad = null; }
         if (_giroscopio) { _giroscopio.desactivar(); _giroscopio = null; }
         if (_seguimiento) { _seguimiento.desactivar(); _seguimiento = null; }
         _panelSeguimiento = null;
+        if (_pantallaSeg) { _pantallaSeg.destruir(); _pantallaSeg = null; }
         if (_mando) { _mando.destruir(); _mando = null; }
         _usarJoysticks = false;
         if (_joystickIzq) { _joystickIzq.destruir(); _joystickIzq = null; }

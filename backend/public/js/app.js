@@ -23,7 +23,7 @@ const App = (() => {
     let navegacionActual = 0;
 
     // Pantallas del dron
-    const RUTAS_DRON = ['dron', 'prueba-tello', 'sensores', 'config-dron', 'objetos'];
+    const RUTAS_DRON = ['dron', 'seguimiento', 'prueba-tello', 'sensores', 'config-dron', 'objetos'];
 
     // Rutas que existen (cualquier otra, por ejemplo la vieja #/acerca o #/aula, va al inicio)
     const RUTAS_VALIDAS = ['inicio', ...RUTAS_DRON];
@@ -257,6 +257,14 @@ const App = (() => {
                 break;
             }
 
+            case 'seguimiento': {
+                const contenedorSeg = document.getElementById('app-contenido');
+                if (typeof DronSeguimiento !== 'undefined' && typeof DronPantallaSeguimiento !== 'undefined' && contenedorSeg) {
+                    limpiezaPaginaActual = inicializarPaginaSeguimiento(contenedorSeg);
+                }
+                break;
+            }
+
             case 'objetos': {
                 const contenedorObj = document.getElementById('app-contenido');
                 if (typeof DronObjetos !== 'undefined' && contenedorObj) {
@@ -326,10 +334,9 @@ const App = (() => {
 
     /**
      * Inicializa la vista de Sensores (/pages/sensores.php):
-     * inclinación en vivo (giroscopio o, si no hay, acelerómetro), demo de detección con la cámara y,
-     * en el modo técnico, el diagnóstico de los sensores.
+     * inclinación en vivo (giroscopio o, si no hay, acelerómetro) y, en el modo técnico, el diagnóstico de los sensores.
      * @param {HTMLElement} contenedor
-     * @returns {Function} limpieza que deja de escuchar los sensores y apaga la cámara al salir de la página
+     * @returns {Function} limpieza que deja de escuchar los sensores al salir de la página
      */
     function inicializarPaginaSensores(contenedor) {
         const q = sel => contenedor.querySelector(sel);
@@ -409,137 +416,6 @@ const App = (() => {
             iniciarLecturaVivo();
         }
 
-        // ---- Demo de detección con la cámara (misma tubería que la cabina, solo ensayo) ----
-        const btnDemo = q('#btn-demo-seg');
-        const btnCopiarDemo = q('#btn-demo-seg-copiar');
-        const cajaDemo = q('#demo-seg-caja');
-        const videoDemo = q('#demo-seg-video');
-        const estadoDemo = q('#demo-seg-estado');
-        const chipDemo = q('#demo-seg-chip');
-        const selQueSeguir = q('#demo-que-seguir');
-        const btnCpu = q('#btn-demo-cpu');
-        let objetosGuardados = [];
-        let demo = null;
-        let panelDemo = null;
-        let camara = null;
-        let paginaCerrada = false;
-
-        /** La caja toma la proporción real de la cámara (vertical en el celular): sin franjas negras a los costados. */
-        function ajustarProporcion() {
-            const w = videoDemo.videoWidth;
-            const h = videoDemo.videoHeight;
-            if (w > 0 && h > 0) cajaDemo.style.setProperty('--proporcion', String(w / h));
-        }
-
-        function detenerDemo() {
-            demo?.desactivar();
-            panelDemo?.destruir();
-            panelDemo = null;
-            camara?.getTracks().forEach(t => t.stop());
-            camara = null;
-            if (videoDemo) videoDemo.srcObject = null;
-            if (cajaDemo) cajaDemo.hidden = true;
-            if (chipDemo) { chipDemo.hidden = true; delete chipDemo.dataset.texto; }
-            if (btnDemo) { textoConIcono(btnDemo, 'play', 'Probar con la cámara'); btnDemo.disabled = false; }
-            if (btnCpu) btnCpu.hidden = true;
-        }
-
-        /** "¿Qué seguir?": una persona o un objeto guardado; si la cámara está andando, vuelve a empezar. */
-        async function elegirQueSeguir() {
-            if (!demo) return;
-            const objeto = objetosGuardados.find(o => o.id === selQueSeguir.value) || null;
-            const res = await demo.elegirObjeto(objeto);
-            if (!res.ok) {
-                mostrarToast(res.error, 'advertencia', 7000);
-                selQueSeguir.value = 'persona';
-                await demo.elegirObjeto(null);
-            }
-            if (demo.activo) {
-                demo.desactivar();
-                demo.activar();
-            }
-        }
-
-        async function iniciarDemo() {
-            if (typeof DronSeguimiento === 'undefined' || !videoDemo) return;
-            if (!navigator.mediaDevices?.getUserMedia) {
-                textoConIcono(estadoDemo, 'cruz', 'Este navegador no permite usar la cámara.');
-                return;
-            }
-            btnDemo.disabled = true;
-            estadoDemo.textContent = 'Pidiendo permiso para usar la cámara...';
-            try {
-                camara = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 960 }, height: { ideal: 720 } },
-                    audio: false,
-                });
-            } catch (e) {
-                textoConIcono(estadoDemo, 'cruz', e?.name === 'NotAllowedError'
-                    ? 'Permiso de cámara denegado. Habilitalo en los ajustes del teléfono.'
-                    : `No se pudo abrir la cámara: ${e?.message || e}`);
-                btnDemo.disabled = false;
-                return;
-            }
-            if (paginaCerrada) { detenerDemo(); return; }
-            videoDemo.srcObject = camara;
-            cajaDemo.hidden = false;
-            try { await videoDemo.play(); } catch (_) { /* se reproduce igual al tener datos */ }
-            ajustarProporcion();
-
-            if (!demo) {
-                demo = new DronSeguimiento({ videoEl: videoDemo, canvasDebug: q('#demo-seg-canvas'), miniatura: q('#demo-seg-miniatura') });
-            }
-            await elegirQueSeguir();
-            if (!demo.modeloCargado) {
-                estadoDemo.textContent = 'Preparando el seguimiento...';
-                const res = await demo.inicializar();
-                if (paginaCerrada) { detenerDemo(); return; }
-                if (!res.ok) { textoConIcono(estadoDemo, 'cruz', `No se pudo preparar el seguimiento: ${res.error}`); detenerDemo(); return; }
-                estadoDemo.textContent = res.aviso || '';
-            }
-            panelDemo = new DronSeguimiento.Panel(q('#demo-seg-panel'));
-            demo.onComando = (cmd, info) => {
-                q('#demo-seg-cartel').textContent = DronSeguimiento.textoEnsayo(cmd, info);
-                panelDemo?.actualizar(info);
-                const e = DronSeguimiento.estadoCorto(info);
-                if (chipDemo && chipDemo.dataset.texto !== e.texto) {
-                    textoConPunto(chipDemo, e.color, e.texto);
-                    chipDemo.dataset.texto = e.texto;
-                }
-                if (chipDemo) chipDemo.hidden = false;
-            };
-            demo.activar();
-            textoConIcono(btnDemo, 'detener', 'Detener');
-            btnDemo.disabled = false;
-            btnCopiarDemo.hidden = false;
-            if (btnCpu) btnCpu.hidden = false;
-        }
-
-        selQueSeguir?.addEventListener('change', elegirQueSeguir);
-        if (selQueSeguir && typeof DronObjetos !== 'undefined') {
-            llenarQueSeguir(selQueSeguir).then(lista => { objetosGuardados = lista; });
-        }
-        btnCpu?.addEventListener('click', async () => {
-            const salida = q('#demo-resultado-cpu');
-            if (!demo || !salida) return;
-            btnCpu.disabled = true;
-            salida.hidden = false;
-            salida.textContent = 'Probando en el procesador: puede tardar unos segundos...';
-            const r = await demo.probarCuadroEnCpu();
-            if (paginaCerrada) return;
-            salida.textContent = DronSeguimiento.textoPruebaCpu(r, 'person');
-            btnCpu.disabled = false;
-        });
-        videoDemo?.addEventListener('loadedmetadata', ajustarProporcion);
-        videoDemo?.addEventListener('resize', ajustarProporcion); // el celular giró
-        btnDemo?.addEventListener('click', () => (camara ? detenerDemo() : iniciarDemo()));
-        btnCopiarDemo?.addEventListener('click', async () => {
-            const filas = demo?.registro.length || 0;
-            if (!filas) { mostrarToast('Todavía no hay registro.', 'info'); return; }
-            const ok = await DronSeguimiento.copiarTexto(demo.registroCSV());
-            mostrarToast(ok ? `Registro copiado (${filas} cuadros).` : 'No se pudo copiar el registro.', ok ? 'exito' : 'advertencia');
-        });
-
         btnDiagnosticar?.addEventListener('click', ejecutarDiagnostico);
         btnVivo?.addEventListener('click', pedirPermisoYLeer);
         // El diagnóstico abre la cámara un instante: solo en el modo técnico
@@ -548,10 +424,174 @@ const App = (() => {
         pedirPermisoYLeer();
 
         return () => {
-            paginaCerrada = true;
             lector?.detener();
             lector = null;
-            detenerDemo(); // apaga la cámara al salir de la pantalla
+        };
+    }
+
+    /**
+     * Inicializa la pantalla de Seguimiento con la cámara del celular (/pages/seguimiento.php), estilo RAC.
+     * Misma tubería y mismas tarjetas que la cabina, pero con la cámara: nunca se manda nada al dron.
+     * @param {HTMLElement} contenedor
+     * @returns {Function} limpieza que apaga la cámara y el seguimiento al salir de la página
+     */
+    function inicializarPaginaSeguimiento(contenedor) {
+        const q = sel => contenedor.querySelector(sel);
+        const video = q('#seg-video');
+        const caja = q('#seg-caja');
+        const aviso = q('#seg-aviso');
+        const estadoTexto = q('#seg-estado');
+        const chipEstado = q('#seg-chip-estado');
+        const cartel = q('#seg-cartel');
+        let objetosGuardados = [];
+        let camara = null;
+        let paginaCerrada = false;
+        let panelTecnico = null;
+        const seg = new DronSeguimiento({ videoEl: video, canvasDebug: q('#seg-canvas'), miniatura: q('#seg-miniatura') });
+
+        /** La caja toma la proporción real de la cámara (vertical en el celular): sin franjas negras a los costados. */
+        function ajustarProporcion() {
+            if (video.videoWidth > 0 && video.videoHeight > 0) caja.style.setProperty('--proporcion', String(video.videoWidth / video.videoHeight));
+        }
+
+        async function abrirCamara() {
+            if (camara) return true;
+            if (!navigator.mediaDevices?.getUserMedia) {
+                textoConIcono(estadoTexto, 'cruz', 'Este navegador no permite usar la cámara.');
+                return false;
+            }
+            estadoTexto.textContent = 'Pidiendo permiso para usar la cámara...';
+            try {
+                camara = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 960 }, height: { ideal: 720 } },
+                    audio: false,
+                });
+            } catch (e) {
+                textoConIcono(estadoTexto, 'cruz', e?.name === 'NotAllowedError'
+                    ? 'Permiso de cámara denegado. Habilitalo en los ajustes del teléfono.'
+                    : `No se pudo abrir la cámara: ${e?.message || e}`);
+                return false;
+            }
+            if (paginaCerrada) { cerrarCamara(); return false; }
+            video.srcObject = camara;
+            try { await video.play(); } catch (_) { /* se reproduce igual al tener datos */ }
+            ajustarProporcion();
+            aviso.hidden = true;
+            estadoTexto.textContent = '';
+            return true;
+        }
+
+        function cerrarCamara() {
+            camara?.getTracks().forEach(t => t.stop());
+            camara = null;
+            video.srcObject = null;
+            aviso.hidden = false;
+        }
+
+        async function preparar() {
+            if (seg.modeloCargado) return true;
+            estadoTexto.textContent = 'Preparando el detector...';
+            const res = await seg.inicializar();
+            if (paginaCerrada) return false;
+            if (!res.ok) { textoConIcono(estadoTexto, 'cruz', `No se pudo preparar el seguimiento: ${res.error}`); return false; }
+            estadoTexto.textContent = res.aviso || '';
+            return true;
+        }
+
+        async function iniciar() {
+            pantalla.setCargando(true);
+            const ok = (await abrirCamara()) && (await preparar());
+            pantalla.setCargando(false);
+            if (!ok || paginaCerrada) { if (!paginaCerrada) cerrarCamara(); return; }
+            panelTecnico?.destruir();
+            panelTecnico = new DronSeguimiento.Panel(q('#seg-panel'));
+            seg.activar();
+            pantalla.setActivo(true);
+        }
+
+        function detener() {
+            seg.desactivar();
+            panelTecnico?.destruir();
+            panelTecnico = null;
+            cerrarCamara();
+            chipEstado.hidden = true;
+            delete chipEstado.dataset.texto;
+            cartel.textContent = '';
+            pantalla.setActivo(false);
+        }
+
+        const pantalla = new DronPantallaSeguimiento.Pantalla({
+            contenedor: q('#seg-tarjetas'),
+            cajaVideo: caja,
+            chipFps: q('#seg-chip-fps'),
+            fuente: 'camara',
+            fuenteTamano: () => [video.videoWidth, video.videoHeight],
+            onIniciar: iniciar,
+            onDetener: detener,
+            onTocar: (x, y) => seg.elegirEnPunto(x, y),
+            onDiagnosticar: async () => {
+                // Para diagnosticar hace falta imagen: se abre la cámara si estaba apagada
+                if (!(await abrirCamara())) return { items: [{ ok: false, titulo: 'Llega imagen', detalle: 'No se pudo abrir la cámara.' }], conclusion: 'No llega imagen: revisá el permiso de la cámara.' };
+                const r = await seg.diagnosticar(q('#seg-foto-prueba'));
+                if (!seg.activo && !paginaCerrada) cerrarCamara();
+                return r;
+            },
+        });
+
+        seg.onComando = (cmd, info) => {
+            cartel.textContent = DronSeguimiento.textoEnsayo(cmd, info);
+            pantalla.actualizar(info, `Comando que calcularía: ${DronSeguimiento.textoRc({ lr: 0, ...cmd })} (no se manda)`);
+            panelTecnico?.actualizar(info);
+            const e = DronSeguimiento.estadoCorto(info);
+            if (chipEstado.dataset.texto !== e.texto) {
+                textoConPunto(chipEstado, e.color, e.texto);
+                chipEstado.dataset.texto = e.texto;
+            }
+            chipEstado.hidden = info.estado === 'apagado';
+        };
+        seg.onEstado = (nuevo, anterior, info) => pantalla.cambioDeEstado(nuevo, anterior, info);
+
+        /** "¿Qué seguir?": una persona o un objeto guardado; si está andando, vuelve a empezar. */
+        const sel = pantalla.selectQueSeguir;
+        sel.addEventListener('change', async () => {
+            const objeto = objetosGuardados.find(o => o.id === sel.value) || null;
+            const res = await seg.elegirObjeto(objeto);
+            if (!res.ok) {
+                mostrarToast(res.error, 'advertencia', 7000);
+                sel.value = 'persona';
+                await seg.elegirObjeto(null);
+            }
+            if (seg.activo) { seg.desactivar(); seg.activar(); }
+        });
+        if (typeof DronObjetos !== 'undefined') llenarQueSeguir(sel).then(lista => { objetosGuardados = lista; });
+
+        q('#btn-seg-cpu')?.addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const salida = q('#seg-resultado-cpu');
+            btn.disabled = true;
+            salida.hidden = false;
+            salida.textContent = 'Probando en el procesador: puede tardar unos segundos...';
+            const r = await seg.probarCuadroEnCpu();
+            if (paginaCerrada) return;
+            salida.textContent = DronSeguimiento.textoPruebaCpu(r, 'person');
+            btn.disabled = false;
+        });
+        q('#btn-seg-copiar')?.addEventListener('click', async () => {
+            const filas = seg.registro.length;
+            if (!filas) { mostrarToast('Todavía no hay registro: iniciá el seguimiento un rato.', 'info'); return; }
+            const ok = await DronSeguimiento.copiarTexto(seg.registroCSV());
+            mostrarToast(ok ? `Registro copiado (${filas} cuadros).` : 'No se pudo copiar el registro.', ok ? 'exito' : 'advertencia');
+        });
+        video.addEventListener('loadedmetadata', ajustarProporcion);
+        video.addEventListener('resize', ajustarProporcion); // el celular giró
+
+        return () => {
+            paginaCerrada = true;
+            seg.desactivar();
+            seg.onComando = null;
+            panelTecnico?.destruir();
+            pantalla.destruir();
+            cerrarCamara(); // apaga la cámara al salir de la pantalla
         };
     }
 

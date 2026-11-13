@@ -184,9 +184,9 @@ const ConfigDron = (() => {
     const AYUDA_GRUPOS = {
         'Detección': 'Qué tan seguro tiene que estar el detector y cuántas veces por segundo analiza la imagen.',
         'Control': 'Cuánto y qué tan rápido se movería el dron para seguir lo elegido.',
-        'Pérdida': 'Cuánto espera antes de darlo por perdido y dejar de moverse.',
-        'Control real (etapa S3)': 'Condiciones para que el seguimiento mueva el dron de verdad (todavía no se usa).',
-        'Mis objetos': 'Qué tan parecido a tus fotos tiene que ser, y cuántas veces seguidas, para seguirlo o darlo por perdido.',
+        'Reglas (como RAC)': 'Qué confianza tiene que tener una detección para contar, cuántas seguidas confirman el objetivo y cuántas fallas lo dan por perdido (en "Mis objetos", la confianza es el parecido con tus fotos).',
+        'Pérdida': 'Cuánto espera sin detecciones antes de darlo por perdido y dejar de moverse.',
+        'Control real': 'Condiciones para poder activar el control real (el dron sigue de verdad). Los límites de velocidad del control real son fijos, en el código.',
     };
 
     function _renderizarAjustesSeguimiento(contenedor) {
@@ -202,8 +202,8 @@ const ConfigDron = (() => {
             <p class="etiqueta">05 — Seguimiento</p>
             <h3 class="bloque__titulo">Ajustes del seguimiento</h3>
             <p class="bloque__texto">
-                Se guardan en este teléfono y se aplican la próxima vez que actives el ensayo.
-                Por ahora el seguimiento funciona solo en ensayo (no le manda órdenes al dron).
+                Se guardan en este teléfono y se aplican la próxima vez que inicies el seguimiento.
+                El seguimiento arranca en ensayo; el control real se activa en la cabina, con confirmación.
             </p>
             ${Object.entries(grupos).map(([grupo, campos]) => `
                 <fieldset style="border:1px solid var(--color-borde); border-radius: var(--radio-md); padding: var(--espacio-sm) var(--espacio-md); margin-bottom: var(--espacio-md);">
@@ -241,7 +241,7 @@ const ConfigDron = (() => {
             }
             errores.hidden = true;
             DronSeguimiento.guardarAjustes(resultado.ajustes);
-            App.mostrarToast('Ajustes del seguimiento guardados. Se aplican al activar el ensayo.', 'exito');
+            App.mostrarToast('Ajustes del seguimiento guardados. Se aplican al iniciar el seguimiento.', 'exito');
         });
         caja.querySelector('#btn-restaurar-ajustes-seg').addEventListener('click', () => {
             DronSeguimiento.restaurarAjustes();

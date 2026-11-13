@@ -9,7 +9,7 @@
  */
 
 // Subir este número cuando cambie la lista de recursos precacheados
-const CACHE_NAME = 'grupo5dron-v12';
+const CACHE_NAME = 'grupo5dron-v13';
 
 // Si la red tarda más que esto y hay copia en caché, se usa la copia (la red sigue actualizando en segundo plano)
 const ESPERA_RED_MS = 3000;
@@ -30,7 +30,11 @@ const RECURSOS_ESTATICOS = [
     '/libs/coco-ssd/group1-shard1of3.bin',
     '/libs/coco-ssd/group1-shard2of3.bin',
     '/libs/coco-ssd/group1-shard3of3.bin',
+    '/libs/blazeface/model.json',
+    '/libs/blazeface/group1-shard1of1.bin',
+    '/js/dron-caras.js',
     '/js/dron-seguimiento.js',
+    '/js/dron-seguimiento-ui.js',
     '/js/dron-objetos.js',
     '/libs/mobilenet/model.json',
     '/libs/mobilenet/group1-shard1of1.bin',
@@ -40,8 +44,10 @@ const RECURSOS_ESTATICOS = [
     '/js/dron.js',
     '/img/icon-192.png',
     '/img/icon-512.png',
+    '/img/prueba-persona.jpg',
     '/pages/inicio.php',
     '/pages/dron.php',
+    '/pages/seguimiento.php',
     '/pages/sensores.php',
     '/pages/objetos.php',
     '/pages/prueba-tello.php',

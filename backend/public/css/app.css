@@ -1597,6 +1597,135 @@ body:not(.modo-tecnico) .solo-tecnico { display: none !important; }
 }
 .lista-objetos__texto { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow-wrap: anywhere; }
 
+/* === SEGUIMIENTO ESTILO RAC (pantalla con la cámara y cabina) === */
+/* Video arriba y tarjetas abajo en el celular; lado a lado en pantallas anchas */
+.rac-layout { display: grid; gap: var(--espacio-md); }
+@media (min-width: 900px) {
+    .rac-layout { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+}
+.caja-video__aviso {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--espacio-md);
+    text-align: center;
+    color: #cbd5e1;
+    font-size: var(--tamano-sm);
+}
+.caja-video, .cab-video { cursor: crosshair; }
+.rac { display: grid; gap: var(--espacio-sm); }
+.rac-fuente {
+    display: flex;
+    align-items: center;
+    gap: var(--espacio-sm);
+    margin: 0;
+    font-size: var(--tamano-sm);
+    color: var(--color-texto-secundario);
+}
+.rac-que-seguir {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--espacio-sm);
+    font-size: var(--tamano-sm);
+    color: var(--color-texto-secundario);
+}
+.rac-ayuda { margin: 0; font-size: var(--tamano-xs); color: var(--color-texto-terciario); }
+.rac-real {
+    padding: var(--espacio-sm) var(--espacio-md);
+    border: 1px solid var(--color-borde-claro);
+    border-left: 3px solid var(--color-advertencia);
+    background: var(--color-fondo-claro);
+}
+.rac-grilla { display: grid; gap: var(--espacio-sm); }
+.rac-tarjeta {
+    padding: var(--espacio-md);
+    background: var(--color-superficie);
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-md);
+    min-width: 0;
+}
+.rac-tarjeta .etiqueta { margin-bottom: var(--espacio-xs); }
+/* Tarjeta de estado: borde del color del estado (señales: naranja, verde, rojo) */
+.rac-estado { border-left: 4px solid var(--color-borde-claro); }
+.rac-estado[data-color="advertencia"] { border-left-color: var(--color-advertencia); background: linear-gradient(90deg, var(--color-advertencia-fondo), var(--color-superficie) 60%); }
+.rac-estado[data-color="exito"] { border-left-color: var(--color-exito); background: linear-gradient(90deg, var(--color-exito-fondo), var(--color-superficie) 60%); }
+.rac-estado[data-color="error"] { border-left-color: var(--color-error); background: linear-gradient(90deg, var(--color-error-fondo), var(--color-superficie) 60%); }
+.rac-estado__titulo {
+    margin: 0 0 var(--espacio-xs);
+    font-size: 1.125rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    overflow-wrap: anywhere;
+}
+.rac-estado[data-color="advertencia"] .rac-estado__titulo { color: #fbbf24; }
+.rac-estado[data-color="exito"] .rac-estado__titulo { color: #4ade80; }
+.rac-estado[data-color="error"] .rac-estado__titulo { color: #f87171; }
+.rac-estado__texto { margin: 0 0 var(--espacio-sm); font-size: var(--tamano-sm); color: var(--color-texto-secundario); }
+.rac-modo { margin: 0; font-size: var(--tamano-xs); font-weight: 700; color: var(--color-celeste); }
+.rac-modo--real { color: #fbbf24; }
+.rac-comando {
+    margin: var(--espacio-xs) 0 0;
+    font-family: var(--fuente-mono);
+    font-size: var(--tamano-xs);
+    color: var(--color-texto);
+    overflow-wrap: anywhere;
+}
+.rac-vacio { margin: 0; font-size: var(--tamano-xs); color: var(--color-texto-terciario); }
+/* Análisis de confianza */
+.rac-barras { display: grid; gap: var(--espacio-sm); }
+.rac-barra__etq {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--espacio-sm);
+    font-size: var(--tamano-xs);
+    color: var(--color-texto-secundario);
+    font-variant-numeric: tabular-nums;
+}
+.rac-barra--objetivo .rac-barra__etq { color: var(--color-texto); font-weight: 700; }
+.rac-barra__pista { height: 0.5rem; margin-top: 0.2rem; background: var(--color-fondo); border: 1px solid var(--color-borde); }
+.rac-barra__relleno { height: 100%; background: var(--color-acento); }
+.rac-barra__relleno[data-cuenta="si"] { background: var(--color-exito); }
+/* Historial */
+.rac-cabecera { display: flex; align-items: center; justify-content: space-between; gap: var(--espacio-sm); }
+.rac-limpiar { min-height: 2.75rem; padding: 0 var(--espacio-md); }
+.rac-historial {
+    list-style: none;
+    margin: var(--espacio-xs) 0 0;
+    padding: 0;
+    max-height: 14rem;
+    overflow-y: auto;
+}
+.rac-historial li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: var(--espacio-sm);
+    align-items: center;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--color-borde);
+    font-size: var(--tamano-xs);
+}
+.rac-historial li > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rac-historial__pct { font-variant-numeric: tabular-nums; color: var(--color-texto-secundario); }
+.rac-historial time { font-variant-numeric: tabular-nums; color: var(--color-texto-terciario); }
+/* Diagnóstico */
+.rac-diagnostico { padding-top: var(--espacio-sm); border-top: 1px solid var(--color-borde); }
+.rac-diag-lista { list-style: none; margin: var(--espacio-sm) 0 0; padding: 0; display: grid; gap: 0.35rem; }
+.rac-diag-lista li { display: grid; gap: 0.1rem; font-size: var(--tamano-xs); color: var(--color-texto-secundario); }
+.rac-diag-lista b { color: var(--color-texto); }
+.rac-diag-conclusion {
+    margin: var(--espacio-sm) 0 0;
+    padding: var(--espacio-sm) var(--espacio-md);
+    font-size: var(--tamano-sm);
+    font-weight: 600;
+    background: var(--color-acento-suave);
+    border-left: 3px solid var(--color-acento);
+}
+.rac-diag-conclusion[data-ok="no"] { background: var(--color-error-fondo); border-left-color: var(--color-error); }
+
 /* === ÍCONOS PROPIOS (inicio) === */
 /*
  * Íconos SVG propios (24x24, trazo), embebidos como data: URI: sin archivos, sin librerías ni CDN.

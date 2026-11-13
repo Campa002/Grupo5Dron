@@ -57,6 +57,7 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
             <ul class="menu-lateral__lista">
                 <li><a href="#/inicio" class="menu-lateral__enlace" data-pagina="inicio"><span class="ico ico--inicio" aria-hidden="true"></span> Inicio</a></li>
                 <li><a href="#/dron" class="menu-lateral__enlace" data-pagina="dron"><span class="ico ico--dron" aria-hidden="true"></span> Control del Dron</a></li>
+                <li><a href="#/seguimiento" class="menu-lateral__enlace" data-pagina="seguimiento"><span class="ico ico--camara" aria-hidden="true"></span> Seguimiento</a></li>
                 <li><a href="#/sensores" class="menu-lateral__enlace" data-pagina="sensores"><span class="ico ico--sensores" aria-hidden="true"></span> Sensores</a></li>
                 <li><a href="#/prueba-tello" class="menu-lateral__enlace" data-pagina="prueba-tello"><span class="ico ico--senal" aria-hidden="true"></span> Prueba Tello</a></li>
                 <li><a href="#/objetos" class="menu-lateral__enlace" data-pagina="objetos"><span class="ico ico--objetivo" aria-hidden="true"></span> Mis objetos</a></li>
@@ -85,7 +86,9 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
     <!-- ML Local para Seguimiento Visual Autónomo (COCO-SSD) -->
     <script src="/libs/tfjs/tf.min.js"></script>
     <script src="/libs/coco-ssd/coco-ssd.min.js"></script>
+    <script src="/js/dron-caras.js"></script>
     <script src="/js/dron-seguimiento.js"></script>
+    <script src="/js/dron-seguimiento-ui.js"></script>
     <script src="/js/dron-objetos.js"></script>
     <script src="/js/dron-video.js"></script>
     <script src="/js/config-dron.js"></script>

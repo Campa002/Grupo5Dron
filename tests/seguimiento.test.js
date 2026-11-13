@@ -90,7 +90,8 @@ test('persona arriba del centro: sube; recuadro cortado arriba: no sube ni baja'
 
 test('un falso positivo de un solo cuadro no fija un objetivo', () => {
     const reg = simular(2000, t => (t === 0 ? [persona(0.9, 0.5, 0.45)] : []));
-    assert.ok(reg.every(r => r.estado === 'buscando'));
+    assert.ok(reg.every(r => r.estado === 'buscando' || r.estado === 'confirmando'));
+    assert.equal(ultimo(reg).estado, 'buscando');
     assert.ok(reg.every(r => r.comando.yaw === 0));
 });
 
@@ -121,25 +122,28 @@ test('cruce de dos personas del mismo tamaño: sigue a la que venía siguiendo (
     assert.ok(ultimo(reg).objetivo.cx > 0.7, 'termina sobre la persona que iba hacia la derecha');
 });
 
-test('si desaparece: el comando decae a 0 y después pasa a "perdido"', () => {
+test('si desaparece: con 3 fallas de las últimas 5 pasa a "perdido" y el comando queda en 0 en el acto', () => {
     const corte = 2000;
     const reg = simular(5000, t => (t < corte ? [persona(0.9, 0.5, 0.45)] : []));
     assert.ok(en(reg, corte - 70).comando.yaw > 0, 'antes del corte giraba');
-    // Vence a los 400 ms, decae en 300 ms y frena (desaceleración 1,5/s): a los 1,0 s del corte ya está en 0
-    assert.equal(en(reg, corte + 1000).comando.yaw, 0);
-    assert.equal(en(reg, corte + 600).estado, 'perdiendo');
+    assert.equal(en(reg, corte + 200).estado, 'perdiendo', 'con 1 o 2 fallas se está perdiendo');
     const primerPerdido = reg.find(r => r.estado === 'perdido');
     assert.ok(primerPerdido, 'pasa a perdido');
-    assert.ok(primerPerdido.t >= corte - 125 + A.toleranciaPerdidaMs && primerPerdido.t <= corte + A.toleranciaPerdidaMs + 150,
-        `pasa a perdido después de la tolerancia (${Math.round(primerPerdido.t)} ms)`);
+    // 8 detecciones por segundo: la tercera falla llega ~375 ms después del corte
+    assert.ok(primerPerdido.t >= corte + 250 && primerPerdido.t <= corte + 3 * 125 + 70,
+        `pasa a perdido con la tercera falla (${Math.round(primerPerdido.t - corte)} ms después del corte)`);
+    assert.deepEqual(primerPerdido.comando, { yaw: 0, ud: 0, fb: 0 }, 'perdido: rc 0 0 0 0 en el acto');
+    assert.ok(reg.filter(r => r.t > primerPerdido.t).every(r => r.estado === 'perdido'), 'no se mueve solo: sigue perdido');
     assert.deepEqual(ultimo(reg).comando, { yaw: 0, ud: 0, fb: 0 }, 'queda quieto');
 });
 
-test('pérdidas cortas (menores a la tolerancia) no lo dan por perdido', () => {
-    // Visible 1 s, oculto 0,6 s, visible 1 s, oculto 0,6 s...
-    const reg = simular(6000, t => ((t % 1600) < 1000 ? [persona(0.6, 0.5, 0.45)] : []));
-    assert.ok(reg.every(r => r.estado !== 'perdido'));
-    assert.ok(reg.some(r => r.estado === 'perdiendo'));
+test('2 fallas de cada 5 no lo dan por perdido', () => {
+    // Detección n.º i (8 por segundo): fallan la 2.ª y la 4.ª de cada 5
+    // (el primer segundo y medio se ve siempre: para confirmar hacen falta 8 seguidas)
+    const reg = simular(6000, t => (t > 1500 && [1, 3].includes(Math.round(t / 125) % 5) ? [] : [persona(0.6, 0.5, 0.45)]));
+    const despues = reg.filter(r => r.t > 1500);
+    assert.ok(despues.every(r => r.estado === 'siguiendo' || r.estado === 'perdiendo'), 'nunca perdido');
+    assert.ok(despues.some(r => r.estado === 'perdiendo'));
 });
 
 test('perdido: no se engancha a otra persona que aparece lejos', () => {
@@ -214,9 +218,9 @@ test('condiciones del control real', () => {
         [{ alturaCm: null }, 'no se conoce la altura'],
         [{ bateria: 20 }, 'batería menor'],
         [{ bateria: null }, 'batería menor'],
-        [{ telemetriaOk: false }, 'telemetría'],
-        [{ backend: 'cpu' }, 'WebGL'],
-        [{ fps: 2 }, 'FPS'],
+        [{ telemetriaOk: false }, 'datos del dron'],
+        [{ backend: 'cpu' }, 'placa de video'],
+        [{ fps: 2 }, 'detecciones por segundo'],
     ];
     for (const [cambio, texto] of casos) {
         const r = Seguimiento.condicionesControlReal({ ...ok, ...cambio }, A);
@@ -241,10 +245,9 @@ test('recuadro con ruido: no pierde el objetivo y el comando no oscila de signo'
     assert.ok(despues.every(x => x.comando.ud === 0), 'el ruido vertical queda dentro de la zona muerta');
 });
 
-test('detecciones que fallan al azar (30 %): sigue sin pasar a perdido', () => {
-    const r = azar(7);
-    const reg = simular(8000, () => (r() < 0.7 ? [persona(0.7, 0.5, 0.45)] : []));
-    assert.ok(reg.filter(x => x.t > 1000).every(x => x.estado !== 'perdido'));
+test('una falla de cada 3 detecciones: sigue sin pasar a perdido', () => {
+    const reg = simular(8000, t => (t > 1500 && Math.round(t / 125) % 3 === 2 ? [] : [persona(0.7, 0.5, 0.45)]));
+    assert.ok(reg.filter(x => x.t > 1500).every(x => x.estado !== 'perdido'));
     assert.ok(ultimo(reg).comando.yaw > 0);
 });
 
@@ -296,23 +299,28 @@ test('registro por cuadro: CSV con detección, comando y telemetría', () => {
     const seg = new Seguimiento({ videoEl: { width: 960, height: 720 }, obtenerContexto: () => ({ enVuelo: true, alturaCm: 120, bateria: 77 }) });
     seg.seguidor = new Seguimiento.Seguidor(A);
     seg._tActivacion = 0;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 10; i++) {
         const t = i * 125;
-        seg.seguidor.procesarDeteccion([persona(0.8, 0.5, 0.45)], t);
+        const cands = Seguimiento.combinarPersonas([persona(0.8, 0.5, 0.45)], [], A);
+        seg._ultimosCandidatos = cands;
+        seg.seguidor.procesarDeteccion(cands, t);
         seg.seguidor.tickControl(t);
-        seg._registrar(t, { ms: 20, candidatos: [{ ...persona(0.8, 0.5, 0.45) }] });
+        seg._registrar(t, { ms: 20 });
     }
     const filas = seg.registroCSV().split('\n');
-    assert.equal(filas.length, 6);
+    assert.equal(filas.length, 12);
     assert.ok(filas[0].startsWith('# camara'), 'primera línea: con qué imagen se trabajó');
-    assert.ok(filas[1].startsWith('t_ms;estado;personas;inferencia_ms'));
+    assert.ok(filas[1].startsWith('t_ms;estado;cuentan;inferencia_ms'));
     assert.ok(filas[1].endsWith(';brillo'));
-    const ultima = filas[5].split(';');
+    assert.equal(filas[2].split(';')[1], 'confirmando');
+    const ultima = filas[11].split(';');
     assert.equal(ultima[1], 'siguiendo');
     assert.equal(ultima[2], '1');
-    assert.equal(ultima[12], '1');   // en vuelo
-    assert.equal(ultima[13], '120'); // altura
-    assert.equal(ultima[14], '77');  // batería
+    assert.equal(ultima[5], 'cuerpo');  // tipo de recuadro
+    assert.equal(ultima[13], '0');      // control real: no
+    assert.equal(ultima[14], '1');      // en vuelo
+    assert.equal(ultima[15], '120');    // altura
+    assert.equal(ultima[16], '77');     // batería
 });
 
 // ---------------------------------------------------------------
@@ -365,8 +373,8 @@ test('recuadros: del lienzo con bordes a la imagen original, recortados a [0, 1]
     assert.ok(Math.abs(r3.w - 55 / 270) < 1e-9);
 });
 
-test('ajustes de "Mis objetos" con los valores tipo RAC (75 %, 8 detecciones, 3 de 5)', () => {
-    const mis = Object.entries(Seguimiento.RANGOS).filter(([, r]) => r.grupo === 'Mis objetos').map(([k]) => k).sort();
+test('reglas de RAC editables, con los valores acordados (75 %, 8 detecciones, 3 de 5)', () => {
+    const mis = Object.entries(Seguimiento.RANGOS).filter(([, r]) => r.grupo === 'Reglas (como RAC)').map(([k]) => k).sort();
     assert.deepEqual(mis, ['confirmacionUmbral', 'confirmacionVentana', 'perdidaMinimo', 'perdidaVentana']);
     assert.equal(A.maxComparar, 3);
     assert.equal(A.reverificarMs, 1000);
@@ -379,7 +387,9 @@ test('cartel del ensayo en palabras: qué haría el dron', () => {
 });
 
 test('estado corto para la etiqueta sobre la imagen', () => {
-    assert.equal(Seguimiento.estadoCorto({ estado: 'siguiendo' }).texto, 'Persona fijada');
-    assert.equal(Seguimiento.estadoCorto({ estado: 'buscando' }).texto, 'Buscando persona');
+    assert.equal(Seguimiento.estadoCorto({ estado: 'siguiendo' }).texto, 'Siguiendo: Persona');
+    assert.equal(Seguimiento.estadoCorto({ estado: 'buscando' }).texto, 'Buscando objetivo');
+    assert.equal(Seguimiento.estadoCorto({ estado: 'confirmando', confirmaciones: 3, confirmacionVentana: 8 }).texto, 'Confirmando 3/8');
+    assert.equal(Seguimiento.estadoCorto({ estado: 'perdido' }).color, 'error');
     assert.equal(Seguimiento.estadoCorto({ estado: 'siguiendo', imagenNegra: true }).texto, 'Sin imagen de la cámara');
 });
