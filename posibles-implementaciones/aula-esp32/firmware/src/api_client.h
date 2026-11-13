@@ -7,6 +7,7 @@
 #define API_CLIENT_H
 
 #include <Arduino.h>
+#include <WiFi.h>              // WiFiClient (en el núcleo Arduino 3.x no viene con WiFiClientSecure.h)
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
