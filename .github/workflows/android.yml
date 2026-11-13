@@ -1,5 +1,8 @@
 name: Build APK Android (Capacitor)
 
+# Jobs: verificar (sintaxis, referencias y pruebas), build-apk (APK del dron), build-apk-aula (APK del aula)
+# y firmware (compila el firmware del ESP32 del aula con PlatformIO).
+
 on:
   push:
     branches: [ "main", "master" ]
@@ -28,7 +31,7 @@ jobs:
 
       - name: Sintaxis JavaScript (node --check)
         run: |
-          for f in backend/public/js/*.js backend/public/sw.js scripts/*.js; do
+          for f in backend/public/js/*.js backend/public/sw.js backend/public-aula/js/*.js scripts/*.js; do
             node --check "$f" || exit 1
           done
           echo "JS OK"
@@ -43,11 +46,11 @@ jobs:
           python3 scripts/check_js.py
           python3 scripts/check_refs.py
 
-      - name: Pruebas automáticas del seguimiento, la inclinación, Mis objetos y los botones (node --test)
-        run: node --test tests/seguimiento.test.js tests/inclinacion.test.js tests/objetos.test.js tests/botones.test.js
+      - name: Pruebas automáticas del seguimiento, el control real, la inclinación, Mis objetos y los botones (node --test)
+        run: node --test tests/seguimiento.test.js tests/rac.test.js tests/control-real.test.js tests/inclinacion.test.js tests/objetos.test.js tests/botones.test.js
 
   build-apk:
-    name: Compilar APK Debug
+    name: Compilar APK Debug del dron
     runs-on: ubuntu-latest
 
     steps:
@@ -68,7 +71,7 @@ jobs:
 
       - name: 5. Preparar www/ estático
         run: |
-          node scripts/build-apk.js
+          node scripts/build-apk.js dron
 
       - name: 6. Instalar dependencias Capacitor
         working-directory: capacitor
@@ -157,30 +160,7 @@ jobs:
       - name: 10b. Instalar la clave de firma fija (si existe el secreto)
         env:
           DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
-        run: |
-          if [ -z "${DEBUG_KEYSTORE_BASE64}" ]; then
-            echo "::notice::No existe el secreto DEBUG_KEYSTORE_BASE64: se usa la clave debug por defecto (cambia en cada build)."
-            echo "### 🔑 Firma: clave debug por defecto (cambia en cada build)" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          TMP="$RUNNER_TEMP/debug.keystore"
-          if ! printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 -d > "$TMP" 2>/dev/null \
-             || ! keytool -list -keystore "$TMP" -storepass android -alias androiddebugkey > /dev/null 2>&1; then
-            echo "::warning::El secreto DEBUG_KEYSTORE_BASE64 no es un keystore válido (alias androiddebugkey, contraseña android): se usa la clave por defecto."
-            echo "### ⚠️ Firma: el secreto no es válido, se usó la clave por defecto" >> "$GITHUB_STEP_SUMMARY"
-            rm -f "$TMP"
-            exit 0
-          fi
-          # Ubicación por defecto del keystore debug (y las alternativas, si el runner las define)
-          DESTINOS="$HOME/.android"
-          [ -n "${ANDROID_USER_HOME:-}" ] && DESTINOS="$DESTINOS $ANDROID_USER_HOME"
-          [ -n "${ANDROID_SDK_HOME:-}" ] && DESTINOS="$DESTINOS $ANDROID_SDK_HOME/.android"
-          for d in $DESTINOS; do mkdir -p "$d"; cp "$TMP" "$d/debug.keystore"; done
-          HUELLA=$(keytool -list -v -keystore "$TMP" -storepass android -alias androiddebugkey | grep -m1 'SHA256:' | sed 's/.*SHA256: *//')
-          rm -f "$TMP"
-          echo "HUELLA_CLAVE=$HUELLA" >> "$GITHUB_ENV"
-          echo "Clave fija instalada en: $DESTINOS"
-          echo "SHA-256 de la clave: $HUELLA"
+        run: bash scripts/ci_firma_debug.sh instalar
 
       - name: 11. Compilar APK Debug con Gradle
         working-directory: capacitor/android
@@ -189,26 +169,7 @@ jobs:
           ./gradlew assembleDebug --stacktrace
 
       - name: 11b. Verificar con qué clave quedó firmado el APK
-        run: |
-          APK="capacitor/android/app/build/outputs/apk/debug/app-debug.apk"
-          BT=$(ls -d "$ANDROID_HOME"/build-tools/*/ 2>/dev/null | sort -V | tail -1)
-          if [ -z "$BT" ] || [ ! -x "${BT}apksigner" ]; then
-            echo "::notice::No se encontró apksigner: no se verifica la firma."
-            exit 0
-          fi
-          FIRMA=$("${BT}apksigner" verify --print-certs "$APK" | grep -m1 'SHA-256 digest' | sed 's/.*digest: *//')
-          echo "SHA-256 del certificado del APK: $FIRMA"
-          echo "### 🔑 Certificado del APK (SHA-256): \`$FIRMA\`" >> "$GITHUB_STEP_SUMMARY"
-          if [ -n "${HUELLA_CLAVE:-}" ]; then
-            ESPERADA=$(printf '%s' "$HUELLA_CLAVE" | tr -d ':' | tr 'A-F' 'a-f')
-            if [ "$FIRMA" = "$ESPERADA" ]; then
-              echo "✅ El APK quedó firmado con la clave fija."
-              echo "✅ Firmado con la clave fija: se instala encima del anterior sin desinstalar." >> "$GITHUB_STEP_SUMMARY"
-            else
-              echo "::warning::El APK NO quedó firmado con la clave fija (esperada $ESPERADA)."
-              echo "⚠️ El APK no quedó firmado con la clave fija." >> "$GITHUB_STEP_SUMMARY"
-            fi
-          fi
+        run: bash scripts/ci_firma_debug.sh verificar capacitor/android/app/build/outputs/apk/debug/app-debug.apk
 
       # Diagnóstico del modelo de seguimiento: el mismo archivo tiene que tener el mismo tamaño en el repo,
       # en www/, en los assets de Android y dentro del APK
@@ -236,3 +197,92 @@ jobs:
           else
             echo "⚠ APK no encontrado en $APK_PATH"
           fi
+
+  # APK de la app del AULA: otra app (appId ar.edu.eest1vl.grupo5aula, "Grupo 5 Aula"), sin el plugin del dron.
+  # Usa la misma clave de firma fija que el APK del dron.
+  build-apk-aula:
+    name: Compilar APK Debug del aula
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout del código
+        uses: actions/checkout@v7
+
+      - name: 2. Configurar Node.js 20
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          package-manager-cache: false
+
+      - name: 3. Configurar Java JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: 4. Preparar www/ estático del aula
+        run: node scripts/build-apk.js aula
+
+      - name: 5. Instalar dependencias Capacitor
+        working-directory: capacitor-aula
+        run: npm install
+
+      - name: 6. Inicializar plataforma Android (npx cap add android)
+        working-directory: capacitor-aula
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+
+      - name: 7. Sincronizar proyecto Capacitor
+        working-directory: capacitor-aula
+        run: npx cap sync android
+
+      - name: 7b. Instalar la clave de firma fija (si existe el secreto)
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: bash scripts/ci_firma_debug.sh instalar
+
+      - name: 8. Compilar APK Debug con Gradle
+        working-directory: capacitor-aula/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: 8b. Verificar con qué clave quedó firmado el APK
+        run: bash scripts/ci_firma_debug.sh verificar capacitor-aula/android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: 9. Publicar artefacto APK Debug del aula
+        uses: actions/upload-artifact@v7
+        with:
+          name: Grupo5Aula-app-debug
+          path: capacitor-aula/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+  # Firmware del ESP32 del aula: compila con PlatformIO usando config.h.example como config.h
+  # (config.h real no está en el repo). También compila el banco de pruebas de hardware.
+  firmware:
+    name: Compilar firmware ESP32 (PlatformIO)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: posibles-implementaciones/aula-esp32/firmware
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v7
+
+      - name: Instalar PlatformIO
+        run: |
+          pipx install platformio
+          pio --version
+
+      - name: Compilar el firmware
+        run: |
+          cp src/config.h.example src/config.h
+          pio run
+
+      - name: Compilar el banco de pruebas (tests/test_hardware.ino)
+        run: |
+          pio ci tests/test_hardware.ino --board esp32dev \
+            --project-option="lib_deps=crankyoldgit/IRremoteESP8266 @ ^2.8.6"

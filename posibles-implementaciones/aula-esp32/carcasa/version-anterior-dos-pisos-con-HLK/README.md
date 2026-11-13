@@ -1,0 +1,1 @@
+Versión anterior de la carcasa (12/11/2026): dos pisos, con la fuente HLK-5M05 y el fusible adentro; se reemplazó porque ahora el ESP32 se alimenta por USB-C con un cargador de celular y había que imprimir más rápido (el cuerpo tardaba unas 10 horas).

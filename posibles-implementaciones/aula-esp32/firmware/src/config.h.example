@@ -14,35 +14,54 @@
 #include <Arduino.h>
 
 // ============================================================
-// 1. ASIGNACIÓN DE PINES (GPIO)
+// 1. ASIGNACIÓN DE PINES (GPIO) — circuito soldado (ESP32 NodeMCU de 30 pines)
 // ============================================================
+//
+//  GPIO 18 -> resistencia de 330 Ω -> base de un BC337 (emisor IR)
+//             5 V -> (33 Ω en paralelo con 100 Ω) -> LED IR 1 -> LED IR 2 -> colector del BC337
+//             emisor del BC337 -> GND
+//  GPIO 26 -> IN del módulo relé (luces del aula: corta solo la fase; COM entra, NO sale, NC vacío)
+//  GPIO 15 <- OUT del receptor KY-022 (VCC del KY-022 a 3V3 y GND a GND)
+//  VIN / GND <- +Vo / -Vo de la fuente HLK-5M05 (5 V para el ESP32, el relé y los LEDs)
+//
+// Notas:
+//  - GPIO 15 es un pin de arranque: solo decide si el ESP32 muestra los mensajes de arranque por el
+//    puerto serie. El KY-022 en reposo da nivel alto, que es el normal: arranca bien.
+//  - Corriente de los LEDs: ~80 mA de pico (2 LEDs de ~1,35 V y ~25 Ω), ~25-30 mA de promedio con la
+//    portadora de 38 kHz. Base del BC337: ~7,7 mA (lo satura bien).
 
-// LED Emisor Infrarrojo KY-005 (GPIO 19 con resistencia de 100-220 ohm en serie)
-// Mejora de alcance opcional: transistor NPN (2N2222 o BC337) con resistencia de 1 kΩ en la base
-// alimentando el LED IR a 5V/VIN para mayor corriente y alcance.
-#define PIN_IR_LED         19 // Emisor IR KY-005 (GPIO 19)
+// Emisor IR: base del BC337 (a través de 330 Ω). El transistor maneja los 2 LEDs en serie a 5 V.
+#define PIN_IR_SEND        18
 
-// Receptor Infrarrojo (Módulo VS1838B o similar a 38 kHz)
-#define PIN_IR_RECV        4  // Receptor IR KY-022 (GPIO 4, 3V3)
+// Receptor IR KY-022 (38 kHz), alimentado a 3V3
+#define PIN_IR_RECV        15
 
-// Control de Relé 1 (220V - Iluminación o Cargas del Aula)
-#define PIN_RELAY_1        25 // Relé Canal 1 (GPIO 25, 220V Aula)
+// Relé de las luces del aula (220 V)
+#define PIN_RELE_LUCES     26
 
-// Control de Relé 2 (Opcional - Tomas o Circuitos Auxiliares)
-#define PIN_RELAY_2        -1 // Relé 2 deshabilitado (sin pin asignado)
-
-// LED indicador de estado en placa (habitualmente GPIO2 en DevKit v1)
+// LED indicador de estado en placa (GPIO 2 en el NodeMCU)
 #define PIN_LED_ESTADO     2
 
 // ============================================================
-// 2. CONFIGURACIÓN DEL MÓDULO DE RELÉ
+// 2. NIVEL DEL MÓDULO RELÉ
 // ============================================================
-// La mayoría de los módulos de relé de 1/2/4 canales para Arduino/ESP32
-// con optoacoplador son ACTIVO-BAJO (LOW = Relé cerrado/activado,
-// HIGH = Relé abierto/apagado).
-// Si tu módulo es activo-alto, invertí estos valores:
+// Hay módulos que se activan con nivel BAJO (LOW) y otros con nivel ALTO (HIGH); algunos traen un jumper "H/L".
+// Cómo averiguarlo: con el ESP32 desconectado, alimentá el módulo a 5 V (VCC y GND) y tocá IN con un cable:
+//  - si hace clic al tocar GND  -> es activo en BAJO -> RELE_ACTIVO_EN_BAJO 1
+//  - si hace clic al tocar 3V3  -> es activo en ALTO -> RELE_ACTIVO_EN_BAJO 0
+// En los dos casos el relé arranca APAGADO: el firmware escribe el nivel "apagado" antes de configurar el pin,
+// y mientras el ESP32 bootea el pin queda flotando (el módulo lo toma como apagado).
+// Ojo: un módulo activo en BAJO alimentado a 5 V puede no apagarse del todo con los 3,3 V del ESP32
+// (queda prendido o tiembla). Si pasa, se arregla con el jumper o con un transistor, no con el código.
+#define RELE_ACTIVO_EN_BAJO  1
+
+#if RELE_ACTIVO_EN_BAJO
 #define RELAY_ACTIVE_LEVEL   LOW
 #define RELAY_INACTIVE_LEVEL HIGH
+#else
+#define RELAY_ACTIVE_LEVEL   HIGH
+#define RELAY_INACTIVE_LEVEL LOW
+#endif
 
 // ============================================================
 // 3. CONECTIVIDAD WI-FI
@@ -70,7 +89,7 @@
 #define DISPOSITIVO_ID     "esp32-principal"
 
 // Versión del Firmware reportada en el heartbeat
-#define FIRMWARE_VERSION   "1.0.0"
+#define FIRMWARE_VERSION   "1.1.0"
 
 // ============================================================
 // 5. SEGURIDAD HTTPS (WiFiClientSecure) & CERTIFICADOS RAÍZ

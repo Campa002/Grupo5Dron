@@ -5,7 +5,7 @@
                 Panel de Administración
             </h2>
             <p class="texto-sm texto-secundario">
-                Configuración del sistema, equipos, usuarios e historial
+                Historial de órdenes, usuarios y habilitación del relé
             </p>
         </div>
         <span class="badge badge--advertencia">Solo Administradores</span>
@@ -13,8 +13,7 @@
 
     <!-- Pestañas de administración -->
     <div class="admin-tabs">
-        <button class="admin-tab activo" data-tab="dispositivos">Dispositivos</button>
-        <button class="admin-tab" data-tab="historial">Historial</button>
+        <button class="admin-tab activo" data-tab="historial">Historial</button>
         <button class="admin-tab" data-tab="usuarios">Usuarios</button>
         <button class="admin-tab" data-tab="config">Configuración</button>
     </div>

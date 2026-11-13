@@ -3,6 +3,7 @@
 # como tal podría quedar corrompido. Las librerías y el modelo de visión se suben tal cual.
 backend/public/libs/** binary
 *.bin binary
+*.stl binary
 *.png binary
 *.jpg binary
 *.jpeg binary
@@ -10,3 +11,4 @@ backend/public/libs/** binary
 *.pdf binary
 *.keystore binary
 *.jks binary
+*.sh text eol=lf

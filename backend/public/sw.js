@@ -1,15 +1,15 @@
 /**
- * Service Worker — Grupo 5: Control de Sistemas y Dron
+ * Service Worker de la app del DRON — Grupo 5: Control de Sistemas y Dron
  *
  * Solo se usa en el navegador (en el APK los archivos ya son locales y no se registra).
- * Estrategia:
- *  - API (/api/): siempre por red; sin conexión responde un JSON de error.
- *  - Páginas, JS, CSS e imágenes: PRIMERO LA RED (así nunca se ven versiones viejas estando online)
- *    y la copia en caché si no hay conexión o la red tarda más de 3 s.
+ * Estrategia: PRIMERO LA RED para la app del dron (así nunca se ven versiones viejas estando online)
+ * y la copia en caché si no hay conexión o la red tarda más de 3 s.
+ * Solo atiende los archivos del dron: la API (/api/) y la web del aula (otra carpeta del mismo hosting,
+ * por ejemplo /aula/) quedan fuera y van siempre directo a la red.
  */
 
 // Subir este número cuando cambie la lista de recursos precacheados
-const CACHE_NAME = 'grupo5dron-v11';
+const CACHE_NAME = 'grupo5dron-v13';
 
 // Si la red tarda más que esto y hay copia en caché, se usa la copia (la red sigue actualizando en segundo plano)
 const ESPERA_RED_MS = 3000;
@@ -20,12 +20,7 @@ const RECURSOS_ESTATICOS = [
     '/manifest.json',
     '/favicon.ico',
     '/css/app.css',
-    '/js/api.js',
-    '/js/auth.js',
-    '/js/aula.js',
-    '/js/admin.js',
     '/js/app.js',
-    // Etapa 4: Módulo Dron, Sensores y Configuración
     '/js/dron-adaptadores.js',
     '/js/dron-joystick.js',
     '/js/dron-giroscopio.js',
@@ -35,7 +30,11 @@ const RECURSOS_ESTATICOS = [
     '/libs/coco-ssd/group1-shard1of3.bin',
     '/libs/coco-ssd/group1-shard2of3.bin',
     '/libs/coco-ssd/group1-shard3of3.bin',
+    '/libs/blazeface/model.json',
+    '/libs/blazeface/group1-shard1of1.bin',
+    '/js/dron-caras.js',
     '/js/dron-seguimiento.js',
+    '/js/dron-seguimiento-ui.js',
     '/js/dron-objetos.js',
     '/libs/mobilenet/model.json',
     '/libs/mobilenet/group1-shard1of1.bin',
@@ -45,17 +44,21 @@ const RECURSOS_ESTATICOS = [
     '/js/dron.js',
     '/img/icon-192.png',
     '/img/icon-512.png',
-    '/pages/login.php',
+    '/img/prueba-persona.jpg',
     '/pages/inicio.php',
-    '/pages/aula.php',
-    '/pages/admin.php',
     '/pages/dron.php',
+    '/pages/seguimiento.php',
     '/pages/sensores.php',
     '/pages/objetos.php',
     '/pages/prueba-tello.php',
     '/pages/config-dron.php',
-    '/pages/cambiar-password.php',
 ];
+
+/** true si el pedido es de la app del dron: la raíz o sus carpetas de archivos. */
+function esDeLaAppDelDron(pathname) {
+    return pathname === '/' || pathname === '/index.php' || RECURSOS_ESTATICOS.includes(pathname)
+        || /^\/(js|css|pages|libs|img)\//.test(pathname);
+}
 
 // Instalación: cachear recursos de a uno para que un fallo no frene a los demás
 self.addEventListener('install', (evento) => {
@@ -130,17 +133,9 @@ self.addEventListener('fetch', (evento) => {
     const url = new URL(request.url);
     if (url.origin !== self.location.origin) return;
 
-    // 1. API REST: siempre por red
-    if (url.pathname.startsWith('/api/')) {
-        evento.respondWith(
-            fetch(request).catch(() => new Response(
-                JSON.stringify({ error: true, mensaje: 'Sin conexión con el servidor. Verificá tu red WiFi.' }),
-                { status: 503, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
-            ))
-        );
-        return;
-    }
+    // La API y todo lo que no es del dron (por ejemplo, la web del aula) van directo a la red
+    if (!esDeLaAppDelDron(url.pathname)) return;
 
-    // 2. Páginas y archivos estáticos: primero la red, la caché si no hay conexión
+    // Páginas y archivos del dron: primero la red, la caché si no hay conexión
     evento.respondWith(primeroLaRed(evento));
 });

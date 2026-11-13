@@ -11,8 +11,8 @@
 IrManager irManager;
 
 IrManager::IrManager() 
-    : emisor(PIN_IR_LED), 
-      receptor(PIN_IR_RECV), 
+    : emisor(PIN_IR_SEND), 
+      receptor(PIN_IR_RECV, IR_TAMANO_CAPTURA, IR_FIN_TRAMA_MS, true), 
       modoAprendizajeActivo(false), 
       botonIdObjetivo(0), 
       tiempoInicioAprendizaje(0) {}
@@ -22,7 +22,7 @@ void IrManager::iniciar() {
 
     // Inicializar emisor
     emisor.begin();
-    Serial.printf("[IR] Emisor IR configurado en GPIO %d\n", PIN_IR_LED);
+    Serial.printf("[IR] Emisor IR configurado en GPIO %d\n", PIN_IR_SEND);
 
     // Configurar receptor (inicia apagado hasta que se active el modo aprendizaje)
     receptor.setUnknownThreshold(12); // Umbral mínimo de pulsos para tramas crudas
@@ -49,49 +49,71 @@ uint64_t IrManager::parsearHex(const String& hexStr) {
     return valor;
 }
 
-bool IrManager::emitirComando(const String& protocolo, const String& codigoHex, int bits, 
+/**
+ * Pasa un código en hexadecimal ("0x" + 2 dígitos por byte) a bytes, para los protocolos de aire
+ * que guardan el estado completo. Devuelve false si no hay la cantidad justa de dígitos.
+ */
+bool IrManager::hexABytes(const String& hexStr, uint8_t* bytes, uint16_t cantidad) {
+    String limpia = hexStr;
+    limpia.trim();
+    while (limpia.startsWith("0x") || limpia.startsWith("0X")) limpia = limpia.substring(2);
+    if (limpia.length() != (size_t)cantidad * 2) return false;
+    for (uint16_t i = 0; i < cantidad; i++) {
+        uint8_t b = 0;
+        for (uint8_t k = 0; k < 2; k++) {
+            char ch = limpia.charAt(i * 2 + k);
+            uint8_t d;
+            if (ch >= '0' && ch <= '9') d = ch - '0';
+            else if (ch >= 'a' && ch <= 'f') d = ch - 'a' + 10;
+            else if (ch >= 'A' && ch <= 'F') d = ch - 'A' + 10;
+            else return false;
+            b = (b << 4) | d;
+        }
+        bytes[i] = b;
+    }
+    return true;
+}
+
+/**
+ * Emite un código aprendido. Orden:
+ *  1. Si la librería conoce el protocolo (NEC, SONY, SAMSUNG, y también los de aire: DAIKIN, LG, MIDEA,
+ *     COOLIX, GREE, etc.), lo manda con ese protocolo: los de aire, con el estado completo en bytes.
+ *  2. Si no lo conoce o falla, manda la trama cruda (los tiempos tal cual se capturaron).
+ * Los 2 LEDs IR emiten siempre juntos: cada aparato responde solo a su código.
+ */
+bool IrManager::emitirComando(const String& protocolo, const String& codigoHex, int bits,
                               const uint16_t* rawData, size_t rawLen, uint32_t frecuencia) {
     String proto = protocolo;
     proto.toUpperCase();
     proto.trim();
+    const uint16_t khz = (frecuencia > 0) ? (frecuencia / 1000) : 38;
 
-    Serial.printf("[IR] 📡 Emitiendo señal IR -> Protocolo: %s | Código: %s | Bits: %d | Frec: %u Hz\n",
-                  proto.c_str(), codigoHex.c_str(), bits, (unsigned int)frecuencia);
+    Serial.printf("[IR] Emitiendo -> Protocolo: %s | Código: %s | Bits: %d | Crudo: %u | %u Hz\n",
+                  proto.c_str(), codigoHex.c_str(), bits, (unsigned int)rawLen, (unsigned int)frecuencia);
 
-    // 1. Emisión RAW si se proporcionó array o el protocolo es RAW
-    if (proto == "RAW" && rawData != nullptr && rawLen > 0) {
-        uint16_t freqKhz = (frecuencia > 0) ? (frecuencia / 1000) : 38;
-        emisor.sendRaw(rawData, rawLen, freqKhz);
-        Serial.printf("[IR] ✓ Trama RAW de %u elementos enviada exitosamente.\n", rawLen);
-        return true;
+    bool enviado = false;
+    const decode_type_t tipo = strToDecodeType(proto.c_str());
+    if (tipo != UNKNOWN && bits > 0) {
+        if (hasACState(tipo)) {
+            const uint16_t nbytes = (bits + 7) / 8;
+            uint8_t estado[kStateSizeMax];
+            if (nbytes <= kStateSizeMax && hexABytes(codigoHex, estado, nbytes)) {
+                enviado = emisor.send(tipo, estado, nbytes);
+            }
+        } else {
+            enviado = emisor.send(tipo, parsearHex(codigoHex), bits);
+        }
     }
 
-    // 2. Emisión por protocolo estándar decodificado
-    uint64_t codigo = parsearHex(codigoHex);
-
-    if (proto == "NEC") {
-        emisor.sendNEC(codigo, bits > 0 ? bits : 32);
-    } else if (proto == "SONY") {
-        emisor.sendSony(codigo, bits > 0 ? bits : 12);
-    } else if (proto == "RC5") {
-        emisor.sendRC5(codigo, bits > 0 ? bits : 12);
-    } else if (proto == "RC6") {
-        emisor.sendRC6(codigo, bits > 0 ? bits : 20);
-    } else if (proto == "SAMSUNG") {
-        emisor.sendSAMSUNG(codigo, bits > 0 ? bits : 32);
-    } else if (proto == "PANASONIC") {
-        emisor.sendPanasonic64(codigo, bits > 0 ? bits : 48);
-    } else if (rawData != nullptr && rawLen > 0) {
-        // Fallback a RAW si el protocolo no es de los anteriores pero hay trama cruda
-        uint16_t freqKhz = (frecuencia > 0) ? (frecuencia / 1000) : 38;
-        emisor.sendRaw(rawData, rawLen, freqKhz);
-    } else {
-        Serial.printf("[IR] ⚠️ Protocolo '%s' no implementado o sin datos RAW disponibles.\n", proto.c_str());
-        return false;
+    if (!enviado && rawData != nullptr && rawLen > 0) {
+        emisor.sendRaw(rawData, rawLen, khz);
+        Serial.printf("[IR] Trama cruda de %u tiempos enviada.\n", (unsigned int)rawLen);
+        enviado = true;
     }
 
-    Serial.println("[IR] ✓ Comando IR emitido con éxito!");
-    return true;
+    if (enviado) Serial.println("[IR] Código IR emitido.");
+    else Serial.printf("[IR] No se pudo emitir: protocolo '%s' sin soporte y sin trama cruda.\n", proto.c_str());
+    return enviado;
 }
 
 void IrManager::activarModoAprendizaje(int botonId) {
@@ -138,13 +160,16 @@ void IrManager::verificarAprendizaje() {
         String protocolo = typeToString(resultados.decode_type);
         protocolo.toUpperCase();
 
-        String codigoHex = "0x" + resultToHexidecimal(&resultados);
+        String codigoHex = resultToHexidecimal(&resultados); // ya viene con "0x"; en los aires, el estado completo
         uint16_t bits = resultados.bits;
 
         Serial.println("\n[IR] 🎯 ¡SEÑAL IR CAPTURADA CON ÉXITO!");
         Serial.printf("[IR] Protocolo detectado: %s\n", protocolo.c_str());
         Serial.printf("[IR] Código Hexadecimal: %s\n", codigoHex.c_str());
         Serial.printf("[IR] Longitud en Bits:   %u\n", bits);
+        if (resultados.overflow) {
+            Serial.printf("[IR] ATENCIÓN: la señal es más larga que %u pulsos y quedó cortada.\n", IR_TAMANO_CAPTURA);
+        }
 
         // Si el protocolo es UNKNOWN o crudo, guardar los tiempos en un array
         uint16_t* rawArray = nullptr;

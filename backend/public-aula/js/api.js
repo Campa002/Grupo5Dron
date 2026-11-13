@@ -1,5 +1,5 @@
 /**
- * Cliente API — Grupo 5: Control de Sistemas y Dron
+ * Cliente API — Grupo 5: Control de Sistemas y Dron (app del aula)
  * 
  * Módulo para comunicarse con la API REST del backend.
  * Maneja autenticación JWT, peticiones y errores.
@@ -222,18 +222,11 @@ const API = (() => {
     const dispositivos = {
         listar: () => get('dispositivos.php?action=listar'),
         obtener: (id) => get(`dispositivos.php?action=obtener&id=${id}`),
-        crear: (datos) => post('dispositivos.php?action=crear', datos),
-        actualizar: (id, datos) => put(`dispositivos.php?action=actualizar&id=${id}`, datos),
-        eliminar: (id) => eliminar(`dispositivos.php?action=eliminar&id=${id}`),
     };
 
     // --- Botones ---
     const botones = {
         listar: (dispositivoId) => get(`botones.php?action=listar&dispositivo_id=${dispositivoId}`),
-        crear: (datos) => post('botones.php?action=crear', datos),
-        actualizar: (id, datos) => put(`botones.php?action=actualizar&id=${id}`, datos),
-        eliminar: (id) => eliminar(`botones.php?action=eliminar&id=${id}`),
-        guardarCodigoIr: (datos) => post('botones.php?action=guardar_codigo_ir', datos),
         eliminarCodigoIr: (id) => eliminar(`botones.php?action=eliminar_codigo_ir&id=${id}`),
     };
 
@@ -248,15 +241,6 @@ const API = (() => {
     // --- ESP32 ---
     const esp32 = {
         estado: () => get('esp32.php?action=estado'),
-    };
-
-    // --- Perfiles de Dron ---
-    const perfilesDron = {
-        listar: () => get('dron-perfiles.php?action=listar'),
-        obtener: (id) => get(`dron-perfiles.php?action=obtener&id=${id}`),
-        crear: (datos) => post('dron-perfiles.php?action=crear', datos),
-        actualizar: (id, datos) => put(`dron-perfiles.php?action=actualizar&id=${id}`, datos),
-        eliminar: (id) => eliminar(`dron-perfiles.php?action=eliminar&id=${id}`),
     };
 
     // --- Configuración ---
@@ -290,7 +274,6 @@ const API = (() => {
         botones,
         comandos,
         esp32,
-        perfilesDron,
         configuracion,
         usuarios,
         setBaseUrl,

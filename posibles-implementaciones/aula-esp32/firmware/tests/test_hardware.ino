@@ -3,12 +3,11 @@
  * Grupo 5: Control de Sistemas y Dron
  * EEST N° 1 de Vicente López "Eduardo Ader" — 7° 2°
  * 
- * Permite probar de forma interactiva y aislada:
- *   [1] Relé Canal 1 (GPIO 25)
- *   [2] Relé Canal 2 (GPIO 27)
- *   [3] LED Emisor IR (GPIO 19)
- *   [4] Sensor Receptor IR (GPIO 4)
- *   [5] Prueba Secuencial Completa
+ * Permite probar de forma interactiva y aislada (mismos pines que config.h.example):
+ *   [1] Relé de las luces (GPIO 26)
+ *   [2] Emisor IR: BC337 con 2 LEDs IR en serie (GPIO 18)
+ *   [3] Receptor IR KY-022 (GPIO 15)
+ *   [4] Prueba secuencial completa
  */
 
 #include <Arduino.h>
@@ -16,19 +15,25 @@
 #include <IRrecv.h>
 #include <IRutils.h>
 
-// Definición de pines bajo prueba
-#define PIN_IR_LED         19
-#define PIN_IR_RECV        4
-#define PIN_RELAY_1        25
-#define PIN_RELAY_2        -1
+// Pines del circuito soldado
+#define PIN_IR_SEND        18
+#define PIN_IR_RECV        15
+#define PIN_RELE_LUCES     26
 #define PIN_LED_ESTADO     2
 
-// Configuración del módulo de relé (ajustar si tu placa es activo-alto)
+// Nivel del módulo relé: 1 = activo en BAJO, 0 = activo en ALTO (cómo averiguarlo: ver config.h.example)
+#define RELE_ACTIVO_EN_BAJO  1
+#if RELE_ACTIVO_EN_BAJO
 #define RELAY_ACTIVE_LEVEL   LOW
 #define RELAY_INACTIVE_LEVEL HIGH
+#else
+#define RELAY_ACTIVE_LEVEL   HIGH
+#define RELAY_INACTIVE_LEVEL LOW
+#endif
 
-IRsend irSend(PIN_IR_LED);
-IRrecv irRecv(PIN_IR_RECV);
+IRsend irSend(PIN_IR_SEND);
+// Buffer de 1024 pulsos y 50 ms de fin de trama: así entran los códigos largos de los aires (como el firmware)
+IRrecv irRecv(PIN_IR_RECV, 1024, 50, true);
 decode_results results;
 
 bool modoMonitoreoReceptor = false;
@@ -39,11 +44,10 @@ void mostrarMenu() {
     Serial.println("  EEST N° 1 de Vicente López \"Eduardo Ader\"");
     Serial.println("============================================================");
     Serial.println("Seleccioná una prueba enviando el número por el Monitor Serie:");
-    Serial.println("  [1] Probar Relé 1 (GPIO 25) -> Conmutar 2 segundos");
-    Serial.println("  [2] Probar Relé 2 (GPIO 27) -> Conmutar 2 segundos");
-    Serial.println("  [3] Probar Emisor IR (GPIO 19) -> Emitir 5 ráfagas NEC");
-    Serial.println("  [4] Probar Receptor IR (GPIO 4) -> Modo escucha en vivo");
-    Serial.println("  [5] Prueba Integral Secuencial de todos los componentes");
+    Serial.println("  [1] Probar el relé de las luces (GPIO 26) -> prender 2 segundos");
+    Serial.println("  [2] Probar el emisor IR (GPIO 18) -> emitir 5 ráfagas NEC");
+    Serial.println("  [3] Probar el receptor IR (GPIO 15) -> modo escucha en vivo");
+    Serial.println("  [4] Prueba secuencial (relé y emisor)");
     Serial.println("  [M] Volver a mostrar este menú");
     Serial.println("============================================================\n");
     Serial.print("Ingresá tu opción: ");
@@ -53,16 +57,10 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
 
-    // 1. Configurar Relés (inician estrictamente apagados)
-    digitalWrite(PIN_RELAY_1, RELAY_INACTIVE_LEVEL);
-    pinMode(PIN_RELAY_1, OUTPUT);
-    digitalWrite(PIN_RELAY_1, RELAY_INACTIVE_LEVEL);
-
-    #if defined(PIN_RELAY_2) && (PIN_RELAY_2 >= 0)
-    digitalWrite(PIN_RELAY_2, RELAY_INACTIVE_LEVEL);
-    pinMode(PIN_RELAY_2, OUTPUT);
-    #endif
-    digitalWrite(PIN_RELAY_2, RELAY_INACTIVE_LEVEL);
+    // 1. Relé (arranca apagado: se escribe el nivel "apagado" antes de configurar el pin)
+    digitalWrite(PIN_RELE_LUCES, RELAY_INACTIVE_LEVEL);
+    pinMode(PIN_RELE_LUCES, OUTPUT);
+    digitalWrite(PIN_RELE_LUCES, RELAY_INACTIVE_LEVEL);
 
     // 2. Configurar LED indicador
     pinMode(PIN_LED_ESTADO, OUTPUT);
@@ -75,34 +73,21 @@ void setup() {
     mostrarMenu();
 }
 
-void probarRele1() {
-    Serial.println("\n[TEST] ⚡ Probando Relé 1 (GPIO 25)...");
-    Serial.println("[TEST] Encendiendo Relé 1...");
-    digitalWrite(PIN_RELAY_1, RELAY_ACTIVE_LEVEL);
+void probarRele() {
+    Serial.println("\n[TEST] Probando el relé de las luces (GPIO 26)...");
+    Serial.println("[TEST] Prendiendo...");
+    digitalWrite(PIN_RELE_LUCES, RELAY_ACTIVE_LEVEL);
     digitalWrite(PIN_LED_ESTADO, HIGH);
     delay(2000);
 
-    Serial.println("[TEST] Apagando Relé 1...");
-    digitalWrite(PIN_RELAY_1, RELAY_INACTIVE_LEVEL);
+    Serial.println("[TEST] Apagando...");
+    digitalWrite(PIN_RELE_LUCES, RELAY_INACTIVE_LEVEL);
     digitalWrite(PIN_LED_ESTADO, LOW);
-    Serial.println("[TEST] ✓ Prueba de Relé 1 finalizada con éxito.");
-}
-
-void probarRele2() {
-    Serial.println("\n[TEST] ⚡ Probando Relé 2 (GPIO 27)...");
-    Serial.println("[TEST] Encendiendo Relé 2...");
-    digitalWrite(PIN_RELAY_2, RELAY_ACTIVE_LEVEL);
-    digitalWrite(PIN_LED_ESTADO, HIGH);
-    delay(2000);
-
-    Serial.println("[TEST] Apagando Relé 2...");
-    digitalWrite(PIN_RELAY_2, RELAY_INACTIVE_LEVEL);
-    digitalWrite(PIN_LED_ESTADO, LOW);
-    Serial.println("[TEST] ✓ Prueba de Relé 2 finalizada con éxito.");
+    Serial.println("[TEST] Prueba del relé terminada (tuvo que hacer clic dos veces).");
 }
 
 void probarEmisorIR() {
-    Serial.println("\n[TEST] 📡 Probando Emisor Infrarrojo (GPIO 19)...");
+    Serial.println("\n[TEST] Probando el emisor IR (GPIO 18)...");
     Serial.println("[TEST] Emitiendo 5 códigos NEC de prueba (0x00FF00FF)...");
 
     for (int i = 1; i <= 5; i++) {
@@ -119,7 +104,7 @@ void iniciarReceptorIR() {
     modoMonitoreoReceptor = true;
     irRecv.enableIRIn();
     Serial.println("\n============================================================");
-    Serial.println("[TEST] 🎯 MODO ESCUCHA RECEPTOR IR (GPIO 4) INICIADO");
+    Serial.println("[TEST] MODO ESCUCHA DEL RECEPTOR IR (GPIO 15)");
     Serial.println("Apuntá cualquier control remoto (TV, Aire, etc.) al receptor.");
     Serial.println("Enviá 'X' o cualquier letra por consola para salir de este modo.");
     Serial.println("============================================================\n");
@@ -136,9 +121,7 @@ void detenerReceptorIR() {
 
 void pruebaSecuencial() {
     Serial.println("\n[TEST] >>> INICIANDO PRUEBA INTEGRAL SECUENCIAL <<<");
-    probarRele1();
-    delay(1000);
-    probarRele2();
+    probarRele();
     delay(1000);
     probarEmisorIR();
     delay(1000);
@@ -153,8 +136,9 @@ void loop() {
             digitalWrite(PIN_LED_ESTADO, HIGH);
             Serial.println("------------------------------------------------------------");
             Serial.printf("✓ SEÑAL DETECTADA -> Protocolo: %s\n", typeToString(results.decode_type).c_str());
-            Serial.printf("  Código Hex: 0x%s\n", resultToHexidecimal(&results).c_str());
+            Serial.printf("  Código Hex: %s\n", resultToHexidecimal(&results).c_str());
             Serial.printf("  Bits:       %u\n", results.bits);
+            Serial.printf("  Pulsos:     %u%s\n", results.rawlen - 1, results.overflow ? " (CORTADA: más larga que el buffer)" : "");
             Serial.println("------------------------------------------------------------");
             irRecv.resume();
             delay(100);
@@ -179,11 +163,10 @@ void loop() {
         }
 
         switch (opcion) {
-            case '1': probarRele1(); break;
-            case '2': probarRele2(); break;
-            case '3': probarEmisorIR(); break;
-            case '4': iniciarReceptorIR(); break;
-            case '5': pruebaSecuencial(); break;
+            case '1': probarRele(); break;
+            case '2': probarEmisorIR(); break;
+            case '3': iniciarReceptorIR(); break;
+            case '4': pruebaSecuencial(); break;
             case 'm':
             case 'M': mostrarMenu(); break;
             default:

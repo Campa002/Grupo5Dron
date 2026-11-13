@@ -105,8 +105,6 @@
                 <div class="dato-diagnostico"><span>Respuestas ("command" / "battery?")</span><strong id="diag-latencia-cmd">Sin probar</strong></div>
                 <div class="dato-diagnostico"><span>Datos del dron (telemetría, UDP 8890)</span><strong id="diag-telemetria-pps">0 pps</strong></div>
                 <div class="dato-diagnostico"><span>Video (UDP 11111)</span><strong id="diag-video-bytes">0 bytes</strong></div>
-                <div class="dato-diagnostico"><span>URL de la API</span><strong id="diag-api-url" style="word-break:break-all;">—</strong></div>
-                <div class="dato-diagnostico"><span>Sesión</span><strong id="diag-conexion-estado">—</strong></div>
                 <div class="dato-diagnostico"><span>Modelos (detector y Mis objetos)</span><strong id="diag-modelo">Sin verificar</strong></div>
             </div>
 
