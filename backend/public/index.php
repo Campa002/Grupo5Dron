@@ -10,68 +10,59 @@
 date_default_timezone_set('America/Argentina/Buenos_Aires');
 ?>
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="description" content="Control del dron Tello desde el celular — Proyecto escolar EEST N° 1 de Vicente López">
-    <meta name="theme-color" content="#0a1628">
+    <meta name="theme-color" content="#0b1220">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
     <title>Grupo 5 — Dron</title>
 
-    <!-- PWA Manifest & Favicon -->
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="/img/icon-192.png">
     <link rel="apple-touch-icon" href="/img/icon-192.png">
     <link rel="shortcut icon" href="/favicon.ico">
 
-    <!-- Tipografía del sistema (offline) -->
-
-    <!-- Estilos -->
+    <!-- Bootstrap 5.3 y Bootstrap Icons, locales (en el WiFi del Tello no hay internet) -->
+    <link rel="stylesheet" href="/libs/bootstrap/bootstrap.min.css">
+    <link rel="stylesheet" href="/libs/bootstrap/bootstrap-icons.min.css">
     <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-    <!-- Barra de navegación superior -->
-    <header id="header-principal" class="header">
-        <div class="header__contenido">
-            <button id="btn-menu" class="header__btn-menu" aria-label="Menú">
-                <span class="header__menu-icono"></span>
-            </button>
-            <h1 class="header__titulo">
-                <span class="header__titulo-icono"><span class="ico ico--dron" aria-hidden="true"></span></span>
-                <span class="header__titulo-texto">Control del Dron</span>
-            </h1>
-        </div>
+    <!-- Barra superior -->
+    <header id="header-principal" class="navbar border-bottom px-3 py-2">
+        <button id="btn-menu" class="btn btn-link text-body px-2" aria-label="Menú"><i class="bi bi-list fs-4" aria-hidden="true"></i></button>
+        <span class="navbar-brand me-auto ms-2 fs-6 fw-semibold text-uppercase">Grupo 5 · Dron</span>
     </header>
 
-    <!-- Menú lateral -->
-    <nav id="menu-lateral" class="menu-lateral">
-        <div class="menu-lateral__overlay" id="menu-overlay"></div>
-        <div class="menu-lateral__contenido">
-            <div class="menu-lateral__header">
-                <span class="menu-lateral__logo"><span class="ico ico--dron" aria-hidden="true"></span></span>
-                <span class="menu-lateral__nombre">Grupo 5 · Dron</span>
+    <!-- Menú lateral (lo abre y lo cierra app.js) -->
+    <nav id="menu-lateral" class="menu-lateral" aria-label="Menú">
+        <div class="offcanvas-backdrop" id="menu-overlay"></div>
+        <div class="offcanvas offcanvas-start">
+            <div class="offcanvas-header border-bottom">
+                <span class="offcanvas-title fw-semibold text-uppercase">Grupo 5 · Dron</span>
             </div>
-            <ul class="menu-lateral__lista">
-                <li><a href="#/inicio" class="menu-lateral__enlace" data-pagina="inicio"><span class="ico ico--inicio" aria-hidden="true"></span> Inicio</a></li>
-                <li><a href="#/dron" class="menu-lateral__enlace" data-pagina="dron"><span class="ico ico--dron" aria-hidden="true"></span> Control del Dron</a></li>
-                <li><a href="#/seguimiento" class="menu-lateral__enlace" data-pagina="seguimiento"><span class="ico ico--camara" aria-hidden="true"></span> Seguimiento</a></li>
-                <li><a href="#/sensores" class="menu-lateral__enlace" data-pagina="sensores"><span class="ico ico--sensores" aria-hidden="true"></span> Sensores</a></li>
-                <li><a href="#/prueba-tello" class="menu-lateral__enlace" data-pagina="prueba-tello"><span class="ico ico--senal" aria-hidden="true"></span> Prueba Tello</a></li>
-                <li><a href="#/objetos" class="menu-lateral__enlace" data-pagina="objetos"><span class="ico ico--objetivo" aria-hidden="true"></span> Mis objetos</a></li>
-                <li class="menu-lateral__separador"></li>
-                <li><a href="#/config-dron" class="menu-lateral__enlace" data-pagina="config-dron"><span class="ico ico--llave-ajuste" aria-hidden="true"></span> Config. Dron</a></li>
-            </ul>
+            <div class="offcanvas-body p-0">
+                <div class="list-group list-group-flush">
+                    <a href="#/inicio" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="inicio">Inicio</a>
+                    <a href="#/dron" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="dron">Cabina</a>
+                    <a href="#/seguimiento" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="seguimiento">Seguimiento</a>
+                    <a href="#/prueba-tello" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="prueba-tello">Prueba Tello</a>
+                    <a href="#/sensores" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="sensores">Sensores</a>
+                    <a href="#/objetos" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="objetos">Mis objetos</a>
+                    <a href="#/config-dron" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="config-dron">Config. Dron</a>
+                </div>
+            </div>
         </div>
     </nav>
 
-    <!-- Contenedor principal (SPA) -->
-    <main id="app-contenido" class="contenido-principal">
-        <!-- Las páginas se cargan dinámicamente aquí -->
-        <div class="cargando">
-            <div class="cargando__spinner"></div>
+    <!-- Contenedor principal (las páginas se cargan acá) -->
+    <main id="app-contenido" class="container py-4">
+        <div class="text-center py-5 text-body-secondary">
+            <div class="spinner-border mb-3" role="status" aria-hidden="true"></div>
             <p>Cargando...</p>
         </div>
     </main>

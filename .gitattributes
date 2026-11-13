@@ -2,6 +2,8 @@
 # La PC de desarrollo tiene core.autocrlf=true: sin esto, un binario que git no detecte
 # como tal podría quedar corrompido. Las librerías y el modelo de visión se suben tal cual.
 backend/public/libs/** binary
+backend/public-aula/libs/** binary
+*.woff2 binary
 *.bin binary
 *.stl binary
 *.png binary

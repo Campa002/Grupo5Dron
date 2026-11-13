@@ -45,6 +45,28 @@ const App = (() => {
         document.body.classList.toggle('modo-tecnico', !!activo);
     }
 
+    /** Íconos de Bootstrap Icons que usa la app (pocos: el resto de los botones va solo con texto). */
+    const ICONOS = Object.freeze({
+        menu: 'bi-list',
+        alto: 'bi-sign-stop',
+        despegar: 'bi-arrow-up-circle',
+        aterrizar: 'bi-arrow-down-circle',
+        'chevron-arriba': 'bi-chevron-up',
+        'chevron-abajo': 'bi-chevron-down',
+        'girar-izq': 'bi-arrow-counterclockwise',
+        'girar-der': 'bi-arrow-clockwise',
+        'tri-arriba': 'bi-caret-up-fill',
+        'tri-abajo': 'bi-caret-down-fill',
+        'tri-izq': 'bi-caret-left-fill',
+        'tri-der': 'bi-caret-right-fill',
+        detener: 'bi-stop-fill',
+        check: 'bi-check-lg',
+        cruz: 'bi-x-lg',
+        alerta: 'bi-exclamation-triangle',
+        info: 'bi-info-circle',
+        borrar: 'bi-trash',
+    });
+
     /**
      * Muestra una notificación emergente (Toast) en pantalla.
      * 
@@ -65,9 +87,9 @@ const App = (() => {
 
         // Texto plano (textContent): un mensaje que venga del servidor no puede inyectar HTML
         const toast = document.createElement('div');
-        toast.className = `toast toast--${tipo}`;
-        const icono = document.createElement('span');
-        icono.className = `toast__icono ico ico--${iconos[tipo] || 'info'}`;
+        toast.className = `toast show toast--${tipo}`;
+        const icono = document.createElement('i');
+        icono.className = `bi ${ICONOS[iconos[tipo]] || ICONOS.info}`;
         icono.setAttribute('aria-hidden', 'true');
         const texto = document.createElement('span');
         texto.className = 'toast__texto';
@@ -157,11 +179,10 @@ const App = (() => {
             return html;
         } catch (error) {
             return `
-                <div class="tarjeta texto-centro" style="padding: var(--espacio-2xl) var(--espacio-md);">
-                    <div style="margin-bottom: var(--espacio-sm);">${icono('alerta', 'ico--grande')}</div>
-                    <h3 class="mb-sm">Error cargando la página</h3>
-                    <p class="texto-sm texto-secundario mb-lg">${error.message}</p>
-                    <button class="btn btn--primario" onclick="App.cargarRutaActual()">Reintentar</button>
+                <div class="alert alert-danger">
+                    <p class="fw-semibold mb-1">Error cargando la página</p>
+                    <p class="small mb-3">${error.message}</p>
+                    <button class="btn btn-primary" onclick="App.cargarRutaActual()">Reintentar</button>
                 </div>
             `;
         }
@@ -204,7 +225,7 @@ const App = (() => {
         const contenedor = document.getElementById('app-contenido');
         if (!contenedor) return;
 
-        contenedor.innerHTML = '<div class="cargando"><div class="cargando__spinner"></div><p>Cargando...</p></div>';
+        contenedor.innerHTML = '<div class="text-center py-5 text-body-secondary"><div class="spinner-border mb-3" aria-hidden="true"></div><p>Cargando...</p></div>';
 
         const html = await cargarPlantilla(destino);
         if (miNavegacion !== navegacionActual) return;
@@ -298,22 +319,23 @@ const App = (() => {
     }
 
     /**
-     * HTML de un ícono propio (SVG definido en app.css). Es decorativo: siempre va junto a un
-     * texto visible o dentro de un botón con aria-label.
-     * @param {string} nombre Por ejemplo 'dron', 'check', 'alerta'
-     * @param {string} [clases] Clases extra (por ejemplo 'ico--grande')
+     * HTML de un ícono (Bootstrap Icons, local). Es decorativo: siempre va junto a un texto visible o
+     * dentro de un botón con aria-label. Hay pocos a propósito: los nombres sin ícono no dibujan nada.
+     * @param {string} nombre Por ejemplo 'alto', 'check', 'tri-arriba'
+     * @param {string} [clases] Clases extra
      */
     function icono(nombre, clases = '') {
-        return `<span class="ico ico--${nombre}${clases ? ' ' + clases : ''}" aria-hidden="true"></span>`;
+        const bi = ICONOS[nombre];
+        return bi ? `<i class="bi ${bi}${clases ? ' ' + clases : ''}" aria-hidden="true"></i>` : '';
     }
 
     /** Pone en `el` un ícono (opcional) y un texto plano (textContent: no interpreta HTML). */
     function textoConIcono(el, nombre, texto) {
         if (!el) return;
         el.replaceChildren();
-        if (nombre) {
-            const ico = document.createElement('span');
-            ico.className = `ico ico--${nombre}`;
+        if (ICONOS[nombre]) {
+            const ico = document.createElement('i');
+            ico.className = `bi ${ICONOS[nombre]}`;
             ico.setAttribute('aria-hidden', 'true');
             el.append(ico, ' ');
         }
@@ -351,21 +373,18 @@ const App = (() => {
             if (!btnDiagnosticar || !panelResultados) return;
             btnDiagnosticar.disabled = true;
             btnDiagnosticar.textContent = 'Diagnosticando...';
-            panelResultados.innerHTML = '<div class="cargando"><div class="cargando__spinner"></div><p>Verificando sensores...</p></div>';
+            panelResultados.innerHTML = '<div class="text-center py-4 text-body-secondary"><div class="spinner-border mb-2" aria-hidden="true"></div><p class="mb-0">Verificando sensores...</p></div>';
 
             await Sensores.diagnosticar();
             if (!contenedor.isConnected) return;
             const resumen = Sensores.obtenerResumen();
             panelResultados.innerHTML = resumen.map(s => `
-                <div class="tarjeta flex items-start gap-md mb-sm">
-                    <span style="font-size:1.5rem; flex-shrink:0; line-height:1; color: var(--color-celeste);">${s.icono}</span>
-                    <div style="flex:1; min-width:0;">
-                        <div class="flex justify-between items-center gap-sm flex-wrap">
-                            <strong class="texto-sm">${s.nombre}</strong>
-                            <span class="badge ${s.ok ? 'badge--exito' : 'badge--error'}">${icono(s.ok ? 'check' : 'cruz')}${s.estado}</span>
-                        </div>
-                        <p class="texto-xs texto-secundario mt-xs">${escaparHtml(s.detalle)}</p>
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                        <strong class="small">${s.nombre}</strong>
+                        <span class="badge ${s.ok ? 'text-bg-success' : 'text-bg-danger'}">${s.estado}</span>
                     </div>
+                    <p class="small text-body-secondary mt-1 mb-0">${escaparHtml(s.detalle)}</p>
                 </div>
             `).join('');
 
@@ -629,9 +648,9 @@ const App = (() => {
                 img.alt = `Foto ${i + 1}`;
                 const quitar = document.createElement('button');
                 quitar.type = 'button';
-                quitar.className = 'fotos-objeto__quitar';
+                quitar.className = 'btn btn-sm btn-dark fotos-objeto__quitar';
                 quitar.setAttribute('aria-label', `Quitar la foto ${i + 1}`);
-                quitar.append(Object.assign(document.createElement('span'), { className: 'ico ico--cruz' }));
+                quitar.insertAdjacentHTML('beforeend', icono('cruz'));
                 quitar.addEventListener('click', () => {
                     URL.revokeObjectURL(f.url);
                     fotos.splice(i, 1);
@@ -642,7 +661,7 @@ const App = (() => {
             }));
             const v = DronObjetos.validarFotos(fotos.length);
             cuenta.textContent = fotos.length ? v.mensaje : `Todavía no hay fotos (de ${DronObjetos.MIN_FOTOS} a ${DronObjetos.MAX_FOTOS}).`;
-            cuenta.className = `texto-sm mb-sm ${fotos.length && !v.ok ? 'texto-advertencia' : ''}`;
+            cuenta.className = `small mb-2 ${fotos.length && !v.ok ? 'text-warning' : ''}`;
             mostrarError('');
         }
 
@@ -668,27 +687,27 @@ const App = (() => {
             try {
                 objetos = await DronObjetos.listar();
             } catch (e) {
-                lista.replaceChildren(Object.assign(document.createElement('li'), { className: 'texto-sm texto-error', textContent: e.message }));
+                lista.replaceChildren(Object.assign(document.createElement('li'), { className: 'list-group-item small text-danger', textContent: e.message }));
                 return;
             }
             if (!contenedor.isConnected) return;
             if (!objetos.length) {
-                lista.replaceChildren(Object.assign(document.createElement('li'), { className: 'texto-sm texto-secundario', textContent: 'Todavía no hay objetos guardados.' }));
+                lista.replaceChildren(Object.assign(document.createElement('li'), { className: 'list-group-item small text-body-secondary', textContent: 'Todavía no hay objetos guardados.' }));
                 return;
             }
             lista.replaceChildren(...objetos.map(o => {
                 const li = document.createElement('li');
-                li.className = 'lista-objetos__item';
+                li.className = 'list-group-item d-flex align-items-center gap-3 lista-objetos__item';
                 const img = document.createElement('img');
                 img.src = o.miniatura || '';
                 img.alt = '';
                 const texto = document.createElement('div');
-                texto.className = 'lista-objetos__texto';
+                texto.className = 'flex-grow-1 d-flex flex-column';
                 texto.append(Object.assign(document.createElement('strong'), { textContent: o.nombre }),
-                    Object.assign(document.createElement('span'), { className: 'texto-xs texto-secundario', textContent: `${o.fotos} fotos` }));
+                    Object.assign(document.createElement('span'), { className: 'small text-body-secondary', textContent: `${o.fotos} fotos` }));
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = 'btn btn--secundario btn--icono';
+                btn.className = 'btn btn-outline-secondary';
                 btn.setAttribute('aria-label', `Borrar «${o.nombre}»`);
                 btn.innerHTML = icono('borrar');
                 btn.addEventListener('click', async () => {
@@ -861,7 +880,7 @@ const App = (() => {
 
         if (badge) {
             textoConPunto(badge, tieneNativo ? 'exito' : 'advertencia', tieneNativo ? 'App instalada: lista para hablar con el dron' : 'Estás en el navegador: la prueba no habla con el dron');
-            badge.style.color = tieneNativo ? 'var(--color-exito)' : 'var(--color-advertencia)';
+            badge.style.color = tieneNativo ? 'var(--bs-success)' : 'var(--bs-warning)';
         }
 
         /** @returns {Promise<{respuesta:string, error:string|null, ms:number}|undefined>} */
@@ -911,15 +930,15 @@ const App = (() => {
         function mostrarResultado(ok, titulo, detalle) {
             const caja = q('#resultado-prueba');
             if (!caja) return;
-            caja.className = `resultado-prueba ${ok === null ? '' : ok ? 'resultado-prueba--ok' : 'resultado-prueba--falta'}`;
+            caja.className = `alert ${ok === null ? 'alert-secondary' : ok ? 'alert-success' : 'alert-warning'}`;
             caja.replaceChildren();
             const t = document.createElement('span');
-            t.className = 'resultado-prueba__titulo';
+            t.className = 'd-block fw-semibold';
             t.textContent = titulo;
             caja.append(t);
             if (detalle) {
                 const d = document.createElement('span');
-                d.className = 'resultado-prueba__detalle';
+                d.className = 'd-block small';
                 d.textContent = detalle;
                 caja.append(d);
             }

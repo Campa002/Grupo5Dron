@@ -9,7 +9,7 @@
  */
 
 // Subir este número cuando cambie la lista de recursos precacheados
-const CACHE_NAME = 'grupo5dron-v13';
+const CACHE_NAME = 'grupo5dron-v14';
 
 // Si la red tarda más que esto y hay copia en caché, se usa la copia (la red sigue actualizando en segundo plano)
 const ESPERA_RED_MS = 3000;
@@ -19,6 +19,9 @@ const RECURSOS_ESTATICOS = [
     '/',
     '/manifest.json',
     '/favicon.ico',
+    '/libs/bootstrap/bootstrap.min.css',
+    '/libs/bootstrap/bootstrap-icons.min.css',
+    '/libs/bootstrap/fonts/bootstrap-icons.woff2',
     '/css/app.css',
     '/js/app.js',
     '/js/dron-adaptadores.js',

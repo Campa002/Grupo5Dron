@@ -1,49 +1,49 @@
 <div class="inicio-pagina">
-    <header class="encabezado">
-        <p class="etiqueta etiqueta--linea">Grupo 5 · EEST N° 1 Vicente López</p>
-        <h2 class="titulo-grande">Control del dron</h2>
-        <p class="bajada">Conectá el celular al WiFi del Tello. No hace falta internet ni cuenta.</p>
+    <header class="mb-4">
+        <p class="etiqueta">Grupo 5 · EEST N° 1 Vicente López</p>
+        <h1 class="h3 fw-bold text-uppercase">Control del dron</h1>
+        <p class="text-body-secondary mb-0">Conectá el celular al WiFi del Tello. No hace falta internet ni cuenta.</p>
     </header>
 
-    <div class="inicio-opciones mb-lg">
-        <a href="#/dron" class="opcion">
-            <span class="etiqueta">01 — Volar</span>
-            <span class="opcion__icono"><span class="ico ico--dron" aria-hidden="true"></span></span>
-            <span class="opcion__titulo">Cabina</span>
-            <span class="opcion__desc">Video, botones de mando, inclinación del celular y seguimiento.</span>
-            <span class="opcion__ir">Entrar <span class="ico ico--ir" aria-hidden="true"></span></span>
+    <div class="list-group mb-4">
+        <a href="#/dron" class="list-group-item list-group-item-action py-3">
+            <p class="etiqueta">01 — Volar</p>
+            <span class="d-flex justify-content-between align-items-center">
+                <span>
+                    <span class="d-block h5 fw-bold text-uppercase mb-1">Cabina</span>
+                    <span class="d-block small text-body-secondary">Video, botones de mando, inclinación del celular y seguimiento.</span>
+                </span>
+                <i class="bi bi-chevron-right text-body-secondary" aria-hidden="true"></i>
+            </span>
         </a>
-        <a href="#/prueba-tello" class="opcion">
-            <span class="etiqueta">02 — Antes de volar</span>
-            <span class="opcion__icono"><span class="ico ico--senal" aria-hidden="true"></span></span>
-            <span class="opcion__titulo">Prueba Tello</span>
-            <span class="opcion__desc">Revisa la conexión, la batería, los datos y el video sin despegar.</span>
-            <span class="opcion__ir">Entrar <span class="ico ico--ir" aria-hidden="true"></span></span>
+        <a href="#/prueba-tello" class="list-group-item list-group-item-action py-3">
+            <p class="etiqueta">02 — Antes de volar</p>
+            <span class="d-flex justify-content-between align-items-center">
+                <span>
+                    <span class="d-block h5 fw-bold text-uppercase mb-1">Prueba Tello</span>
+                    <span class="d-block small text-body-secondary">Revisa la conexión, la batería, los datos y el video sin despegar.</span>
+                </span>
+                <i class="bi bi-chevron-right text-body-secondary" aria-hidden="true"></i>
+            </span>
         </a>
-        <a href="#/seguimiento" class="opcion">
-            <span class="etiqueta">03 — Sin volar</span>
-            <span class="opcion__icono"><span class="ico ico--camara" aria-hidden="true"></span></span>
-            <span class="opcion__titulo">Seguimiento</span>
-            <span class="opcion__desc">Probá el seguimiento con la cámara del celular, sin el dron.</span>
-            <span class="opcion__ir">Entrar <span class="ico ico--ir" aria-hidden="true"></span></span>
+        <a href="#/seguimiento" class="list-group-item list-group-item-action py-3">
+            <p class="etiqueta">03 — Sin volar</p>
+            <span class="d-flex justify-content-between align-items-center">
+                <span>
+                    <span class="d-block h5 fw-bold text-uppercase mb-1">Seguimiento</span>
+                    <span class="d-block small text-body-secondary">Probá el seguimiento con la cámara del celular, sin el dron.</span>
+                </span>
+                <i class="bi bi-chevron-right text-body-secondary" aria-hidden="true"></i>
+            </span>
         </a>
     </div>
 
     <!-- Modo técnico: accesos a las herramientas -->
     <div class="solo-tecnico">
         <p class="etiqueta">Modo técnico</p>
-        <p class="texto-xs texto-secundario mb-sm">Accesos directos a las herramientas.</p>
-        <div class="grilla-accesos mb-lg">
-            <a href="#/sensores" class="acceso">
-                <span class="acceso__icono" style="font-size: 2.2rem;"><span class="ico ico--sensores" aria-hidden="true"></span></span>
-                <span class="acceso__titulo">Sensores</span>
-                <span class="acceso__desc">Inclinación y detección</span>
-            </a>
-            <a href="#/config-dron" class="acceso">
-                <span class="acceso__icono" style="font-size: 2.2rem;"><span class="ico ico--llave-ajuste" aria-hidden="true"></span></span>
-                <span class="acceso__titulo">Config. Dron</span>
-                <span class="acceso__desc">Perfil y ajustes</span>
-            </a>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="#/sensores" class="btn btn-outline-secondary">Sensores</a>
+            <a href="#/config-dron" class="btn btn-outline-secondary">Config. Dron</a>
         </div>
     </div>
 </div>
