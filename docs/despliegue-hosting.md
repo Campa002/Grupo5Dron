@@ -79,8 +79,17 @@ Las cuentas iniciales tienen la contraseña `password`. La app obliga a cambiarl
 
 ## 7. Configurar la URL en las dos apps
 
-- **App del aula (APK):** la primera vez, en el login aparece "URL del servidor": poné `https://tu-dominio.com/api`. Queda guardada en el celular.
-- **Web del aula:** no hace falta nada: usa la `/api/` del mismo dominio.
+- **Web del aula:** no hace falta nada: usa la API del mismo servidor de donde se cargó (la carpeta `api/` al lado de `aula/`).
+- **App del aula (APK):** la dirección del servidor va fija dentro del APK; el usuario no la escribe nunca. Mientras esté vacía, el login del APK muestra "Falta configurar el servidor del aula". Para completarla:
+  1. En `backend/public-aula/js/config-aula.js`, cambiá la constante por la dirección de la API, con `https` y sin barra al final:
+     ```js
+     const SERVIDOR_AULA = 'https://tu-dominio.com/api';
+     ```
+  2. Commiteá y subí el cambio. El CI recompila el APK: bajá el artefacto `Grupo5Aula-app-debug` de esa corrida.
+  3. Instalá el APK nuevo en los celulares (encima del anterior; si Android se queja de la firma, desinstalá el viejo primero).
+  4. Abrí la app: el aviso ya no aparece y se puede iniciar sesión.
+
+  Si algún día cambia el dominio, se repiten estos pasos (el APK viejo deja de conectarse).
 - **ESP32:** en `config.h`, `API_URL` = `https://tu-dominio.com/api/esp32.php` y `ESP32_TOKEN` igual al de `config.php`. Con `CLIENT_INSECURE_MODE true` se conecta sin verificar el certificado (para empezar); para dejarlo seguro, `false` y el certificado raíz del hosting en `ROOT_CA_CERT`.
 - **App del dron:** no usa el servidor.
 
@@ -89,6 +98,7 @@ Las cuentas iniciales tienen la contraseña `password`. La app obliga a cambiarl
 | Problema | Revisar |
 | :--- | :--- |
 | Error 500 en la API | Datos de la base en `config.php`; versión de PHP (8.0 o más) en "Seleccionar versión de PHP" |
-| El APK dice que no puede conectarse | Que la URL sea `https://…/api` y que `https://localhost` esté en `cors_origenes` |
+| El APK dice "Falta configurar el servidor del aula" | Falta completar `SERVIDOR_AULA` en `js/config-aula.js` y recompilar (paso 7), o se instaló un APK viejo |
+| El APK dice que no puede conectarse | Que `SERVIDOR_AULA` sea `https://…/api` (con `https`) y que `https://localhost` esté en `cors_origenes` |
 | "Equipo del aula desconectado" | `API_URL` y `ESP32_TOKEN` del ESP32; que el ESP32 tenga WiFi con internet |
 | El login falla siempre | Que se haya importado `schema.sql`; que la cuenta no esté bloqueada (5 intentos: esperar 15 min) |

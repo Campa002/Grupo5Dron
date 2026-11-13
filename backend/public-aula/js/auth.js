@@ -189,24 +189,17 @@ const Auth = (() => {
         const form = document.getElementById('form-login');
         if (!form) return;
 
-        const contApiUrl = document.getElementById('contenedor-api-url');
-        const inputApiUrl = document.getElementById('login-api-url');
         const avisoOffline = document.getElementById('aviso-offline-login');
+        const avisoSinServidor = document.getElementById('aviso-sin-servidor');
+        const btnIngresar = form.querySelector('button[type="submit"]');
 
-        // En APK o si no hay baseUrl configurada, mostrar campo de URL del servidor
-        const esNativo = API.esNativo && API.esNativo();
-        if (contApiUrl && (esNativo || !API.getBaseUrl())) {
-            contApiUrl.style.display = 'block';
-            if (inputApiUrl) {
-                inputApiUrl.value = API.getBaseUrl() || '';
-                inputApiUrl.addEventListener('change', () => {
-                    API.setBaseUrl(inputApiUrl.value);
-                });
-            }
-        }
+        // APK sin SERVIDOR_AULA (js/config-aula.js): no hay a quién pedirle el login; no se le pide nada al usuario
+        const sinServidor = !API.servidorConfigurado();
+        if (avisoSinServidor) avisoSinServidor.hidden = !sinServidor;
+        if (sinServidor && btnIngresar) btnIngresar.disabled = true;
 
         // Si no hay usuario cacheado y no hay conexión con el servidor
-        if (avisoOffline) {
+        if (avisoOffline && !sinServidor) {
             if (!obtenerUsuario() && (!navigator.onLine || modoSinConexion)) {
                 avisoOffline.style.display = 'block';
             } else {
@@ -217,13 +210,8 @@ const Auth = (() => {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            if (inputApiUrl && inputApiUrl.value.trim()) {
-                API.setBaseUrl(inputApiUrl.value.trim());
-            }
-
-            if (esNativo && !API.getBaseUrl()) {
-                App.mostrarToast('Ingresá la URL del servidor antes de iniciar sesión.', 'advertencia');
-                inputApiUrl?.focus();
+            if (sinServidor) {
+                App.mostrarToast(API.MENSAJE_SIN_SERVIDOR, 'advertencia');
                 return;
             }
 

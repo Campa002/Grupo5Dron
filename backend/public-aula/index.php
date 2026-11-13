@@ -69,6 +69,7 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
     <!-- Avisos -->
     <div id="toast-contenedor" class="toast-contenedor"></div>
 
+    <script src="js/config-aula.js"></script>
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/aula.js"></script>

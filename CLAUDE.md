@@ -50,6 +50,7 @@ App del AULA (APK "Grupo 5 Aula", appId ar.edu.eest1vl.grupo5aula, con login)
 - NO hay ESP32 en el dron. El celular habla directo con el Tello.
 - La app del dron funciona SIN internet y SIN cuenta (decisiones de Luciano del 6/11 y del 11/11): no tiene login, ni `api.js`/`auth.js`, ni llama al servidor. Los perfiles son dos, fijos: DJI Tello y Simulador (`ConfigDron`); un id guardado que no sea uno de esos (por ejemplo, de un perfil viejo del servidor) usa el Tello. El service worker (solo en el navegador) atiende únicamente los archivos del dron: `/api/` y la web del aula van directo a la red.
 - La app del aula pide iniciar sesión para todo (docente o admin). Después del login (y del cambio de contraseña obligatorio, si corresponde) vuelve a la pantalla pedida (`Auth.recordarDestino` / `Auth.tomarDestino`). Con la sesión guardada pero sin servidor muestra "Sin conexión con el servidor". Administración, solo admin.
+- Dirección del servidor del aula (13/11): nunca se le pide al usuario. Desde la web usa `../api` del mismo servidor de donde se cargó (`api/` al lado de `aula/`); en el APK, la constante `SERVIDOR_AULA` de `backend/public-aula/js/config-aula.js` (vacía hasta tener hosting: el login muestra "Falta configurar el servidor del aula" y deshabilita Ingresar). Cambiarla = editar la constante y recompilar el APK (`docs/despliegue-hosting.md`, paso 7).
 - El APK del aula no puede loguearse contra un servidor HTTP local: la página es `https://localhost` y Android bloquea el HTTP. Para loguearse desde el APK hace falta un servidor HTTPS. El APK del dron solo permite HTTP hacia 192.168.10.1 (`network_security_config.xml`).
 
 ## Protocolo del Tello (SDK 1.3, el del Tello común)
@@ -103,7 +104,7 @@ backend/
     libs/tfjs, libs/coco-ssd  modelo de visión LOCAL (pesos en float16, ~10 MB, sí va al repo)
     libs/mobilenet            MobileNet v1 0.25 cortado en la "huella" (256 números) para Mis objetos, float16, 437 KB
     js/dron-objetos.js        Mis objetos: huellas, IndexedDB y alta con 3 a 15 fotos
-  public-aula/      app del AULA: index.php, js/ (app, api, auth, aula, admin), pages/ (login, aula, admin, cambiar-password), css/, img/
+  public-aula/      app del AULA: index.php, js/ (config-aula, app, api, auth, aula, admin), pages/ (login, aula, admin, cambiar-password), css/, img/
 capacitor/        APK del dron: capacitor.config.json, package.json, network_security_config.xml, android_plugin/
 capacitor-aula/   APK del aula: capacitor.config.json, package.json (sin plugin propio)
 scripts/          build-apk.js (dron | aula), check_js.py, check_refs.py (las dos apps), ci_firma_debug.sh (firma de los dos APK), generar_hash.php
@@ -298,7 +299,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 1. **Prueba en clase** con `docs/guia-pruebas-en-clase.md` (APK del PR #5: `Grupo5Dron-app-debug` y `Grupo5Aula-app-debug`). Traer los resultados, los informes y diagnósticos copiados.
 2. **Corregir lo que salga de la prueba.** En especial: conexión y video del Tello, detección en el A06 (diagnóstico), control real (ganancias), códigos del aire real, si el relé es activo en alto o en bajo (`RELE_ACTIVO_EN_BAJO`), si el ESP32 aguanta con el cargador.
 3. **Mergear el PR #5** cuando Luciano lo apruebe y cerrar los PR #3 y #4.
-4. **Hosting** (`docs/despliegue-hosting.md`) y probar el APK del aula contra HTTPS.
+4. **Hosting** (`docs/despliegue-hosting.md`): completar `SERVIDOR_AULA` en `js/config-aula.js`, recompilar y probar el APK del aula contra HTTPS.
 5. **Firma fija de los APK:** que Luciano cargue el secreto `DEBUG_KEYSTORE_BASE64`.
 6. **Imprimir la carcasa** (confirmar medidas con calibre antes) y armarla con el profe.
 7. **Informe:** aplicar `docs/correcciones-informe.md` (Luciano habla con el profe lo de las dos apps).

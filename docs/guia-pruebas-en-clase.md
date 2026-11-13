@@ -24,7 +24,7 @@ Si algo falla, no te trabes: anotá, copiá los datos que dice la sección "Qué
 
 ### 0.3 Preparar el servidor del aula en la notebook (XAMPP)
 
-En clase no hace falta el hosting: el aula se prueba con la notebook como servidor y el **navegador** del celular (el APK del aula necesita HTTPS, así que en clase usamos el navegador; el APK se prueba cuando esté el hosting).
+En clase no hace falta el hosting: el aula se prueba con la notebook como servidor y el **navegador** del celular. La web usa sola la API de la notebook (no se configura nada). El APK del aula todavía no tiene servidor (necesita el hosting con HTTPS): si lo abrís, el login muestra "Falta configurar el servidor del aula" y no deja entrar; eso es lo esperado.
 
 1. En `C:\xampp\htdocs\` armá esta estructura (copiando del repo):
    - `htdocs\api\` ← `backend\api\`
@@ -134,6 +134,11 @@ Todo con el ESP32 alimentado por USB (de la notebook o del cargador). **Sin 220 
 ### B2. Entrar a la app del aula
 - **Hacer:** en el **navegador** del celular (en la misma red), entrá a `http://IP-de-la-notebook/aula/` e iniciá sesión con `piris@grupo5dron.local` / `password`.
 - **Debería:** te pide cambiar la contraseña (poné una nueva y anotala) y después muestra "Control del aula" con Luces, Proyector, Aire acondicionado y "04 — Aprender código". Arriba: "Equipo del aula en línea" con punto verde.
+- **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
+
+### B2b. APK del aula (sin servidor todavía)
+- **Hacer:** abrí la app "Grupo 5 Aula" en el celular.
+- **Debería:** el login muestra "Falta configurar el servidor del aula", el botón Ingresar queda apagado y no pide ninguna dirección. (Es lo esperado hasta tener el hosting.)
 - **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
 
 ### B3. Aprender el código del proyector

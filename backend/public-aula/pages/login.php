@@ -8,10 +8,10 @@
             El primer ingreso requiere conexión a internet para autenticar con el servidor.
         </div>
 
-        <div id="contenedor-api-url" class="mb-3" style="display:none;">
-            <label class="form-label" for="login-api-url">URL del servidor</label>
-            <input class="form-control" id="login-api-url" type="url" placeholder="https://mihosting.com/api" autocomplete="url">
-            <div class="form-text">Ingresá la dirección base de la API del servidor (requerido en APK).</div>
+        <!-- Solo en el APK sin la constante SERVIDOR_AULA (js/config-aula.js) -->
+        <div id="aviso-sin-servidor" class="alert alert-warning" role="alert" hidden>
+            <p class="fw-semibold mb-1">Falta configurar el servidor del aula</p>
+            <p class="small mb-0">Esta versión de la app todavía no tiene la dirección del servidor, así que no puede iniciar sesión. Mientras tanto, usá la web del aula desde el navegador.</p>
         </div>
 
         <div class="mb-3">

@@ -10,16 +10,13 @@ const API = (() => {
     'use strict';
 
     // ============================================================
-    // URL base de la API
+    // URL base de la API (no se le pide al usuario)
     // ============================================================
     //
-    // En el navegador web: usa window.location.origin + '/api' (sin cambios).
-    // En el APK Capacitor: el origen es capacitor://localhost, por lo que
-    //   se lee la URL del hosting desde localStorage (clave 'grupo5dron_api_url').
-    //   Si no está configurada, se usa HOSTING_URL_DEFECTO como fallback.
-    //
-    // Para configurar la URL desde la app, llamar:
-    //   API.setBaseUrl('https://tuhosting.com/api')
+    // Desde la web (hosting o XAMPP): la API del mismo servidor de donde se cargó la app,
+    //   en la carpeta api/ al lado de aula/ (https://dominio/aula/ → https://dominio/api).
+    // En el APK (la página es https://localhost): la constante SERVIDOR_AULA de js/config-aula.js.
+    //   Vacía → no hay servidor: el login muestra "Falta configurar el servidor del aula".
     //
     function esNativo() {
         return !!(window.Capacitor?.isNativePlatform?.());
@@ -27,25 +24,24 @@ const API = (() => {
 
     function _resolverBaseUrl() {
         if (esNativo()) {
-            return localStorage.getItem('grupo5dron_api_url') || '';
+            const fija = typeof SERVIDOR_AULA === 'string' ? SERVIDOR_AULA : '';
+            return fija.trim().replace(/\/+$/, '');
         }
-        return window.location.origin + '/api';
+        return new URL('../api', window.location.href).href.replace(/\/+$/, '');
     }
 
-    let _baseUrl = _resolverBaseUrl();
-
-    function setBaseUrl(nuevaUrl) {
-        _baseUrl = (nuevaUrl || '').trim().replace(/\/+$/, '');
-        if (_baseUrl) {
-            localStorage.setItem('grupo5dron_api_url', _baseUrl);
-        } else {
-            localStorage.removeItem('grupo5dron_api_url');
-        }
-    }
+    const _baseUrl = _resolverBaseUrl();
 
     function getBaseUrl() {
         return _baseUrl;
     }
+
+    /** true si la app sabe a qué servidor hablarle (en el APK, si SERVIDOR_AULA está completa). */
+    function servidorConfigurado() {
+        return !!_baseUrl;
+    }
+
+    const MENSAJE_SIN_SERVIDOR = 'Falta configurar el servidor del aula.';
 
     /**
      * Obtiene el token JWT almacenado.
@@ -95,7 +91,7 @@ const API = (() => {
      */
     async function peticion(endpoint, opciones = {}) {
         if (!_baseUrl) {
-            throw new Error('URL del servidor no configurada. Por favor, ingresá la URL del servidor.');
+            throw new Error(MENSAJE_SIN_SERVIDOR);
         }
         const { timeoutMs = TIMEOUT_POR_DEFECTO_MS, signal: signalExterno, sinAvisoSesion = false, ...opcionesFetch } = opciones;
         const url = `${_baseUrl}/${endpoint.replace(/^\/+/, '')}`;
@@ -276,7 +272,8 @@ const API = (() => {
         esp32,
         configuracion,
         usuarios,
-        setBaseUrl,
+        servidorConfigurado,
+        MENSAJE_SIN_SERVIDOR,
         getBaseUrl,
         esNativo,
         EVENTO_SESION_VENCIDA,
