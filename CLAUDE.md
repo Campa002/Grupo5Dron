@@ -38,11 +38,11 @@ App móvil con una pantalla principal que permite elegir entre "Control del Aula
 App del DRON (APK "Grupo 5 — Dron", frontend local en https://localhost, sin login ni API)
  └─ WiFi del Tello (sin internet) ──UDP──> DJI Ryze Tello 192.168.10.1
 App del AULA (APK "Grupo 5 Aula", appId ar.edu.eest1vl.grupo5aula, con login)
- └─ con internet ──HTTPS + JWT──> Hosting PHP 8 + MySQL ──(polling)── ESP32 del aula
+ └─ con internet ──HTTPS + JWT──> Hosting PHP 8 + MySQL ──(polling)── ESP32 del aula (luces por relé; proyector y aire por IR)
 ```
 
 - Frontends: PWA en HTML/CSS/JS vanilla, router por hash.
-  - Dron, `backend/public/`: `#/inicio`, `#/dron`, `#/prueba-tello`, `#/sensores`, `#/config-dron`, `#/objetos`. Cualquier otra ruta (por ejemplo la vieja `#/acerca` o `#/aula`) va al inicio. Rutas absolutas (`/js/...`): va en la raíz del hosting.
+  - Dron, `backend/public/`: `#/inicio`, `#/dron`, `#/seguimiento` (cámara del celular), `#/prueba-tello`, `#/sensores`, `#/config-dron`, `#/objetos`. Cualquier otra ruta (por ejemplo la vieja `#/acerca` o `#/aula`) va al inicio. Rutas absolutas (`/js/...`): va en la raíz del hosting.
   - Aula, `backend/public-aula/`: `#/login`, `#/aula` (la principal), `#/admin`, `#/cambiar-password`. Cualquier otra ruta va a `#/aula`. Rutas relativas (`js/...`, `pages/...`): en el hosting va en una subcarpeta (por ejemplo `/aula/`) y usa la misma `/api/`.
 - Cada app tiene su propio `app.css` con solo sus estilos (se separaron sin cambiar ningún estilo calculado: comparado contra `main` con Playwright).
 - Los APK empaquetan esos frontends: `node scripts/build-apk.js dron` genera `capacitor/www/` y `node scripts/build-apk.js aula` genera `capacitor-aula/www/` (los dos generados e ignorados por git), con un `index.html` estático a partir de `index.php` y las páginas (`pages/*.php`) con el mismo nombre, sin ningún bloque `<?php ... ?>`.
@@ -92,7 +92,10 @@ backend/
     js/dron.js              cabina, pasos, misiones, failsafe, modos giro/seguimiento
     js/dron-adaptadores.js  DronNativo (contrato del plugin), TelloAdapter, SimulatorDroneAdapter
     js/dron-joystick.js     botones de mantener apretado (DronBotonesMovimiento, mando por defecto) y joysticks (modo técnico)
-    js/dron-giroscopio.js, dron-seguimiento.js, dron-video.js
+    js/dron-giroscopio.js, dron-video.js
+    js/dron-seguimiento.js  tubería del seguimiento (COCO-SSD + caras, Selector con reglas de RAC, Controlador, límites del control real, diagnóstico)
+    js/dron-caras.js        BlazeFace (libs/blazeface, float16, 270 KB): decodificación pura y detección
+    js/dron-seguimiento-ui.js  tarjetas estilo RAC (estado, confianza, historial, diagnóstico, interruptor de control real)
     js/config-dron.js       los dos perfiles fijos, modo técnico, failsafe, sentido del avance y ajustes del seguimiento
     js/sensores.js          diagnóstico de sensores del celular
     js/app.js               router, Prueba Tello, Sensores y Mis objetos
@@ -105,6 +108,7 @@ capacitor/        APK del dron: capacitor.config.json, package.json, network_sec
 capacitor-aula/   APK del aula: capacitor.config.json, package.json (sin plugin propio)
 scripts/          build-apk.js (dron | aula), check_js.py, check_refs.py (las dos apps), ci_firma_debug.sh (firma de los dos APK), generar_hash.php
 posibles-implementaciones/  firmware del aula (pines del circuito soldado), carcasa del equipo del aula (aula-esp32/carcasa: OpenSCAD, para-imprimir/ y vistas), adaptadores genéricos (HTTP, UDP/TCP), herramientas viejas
+docs/             guía de pruebas en clase, manuales, API, plan de pruebas, limitaciones, correcciones del informe, despliegue, seguimiento
 docs/contexto/    informe, historial, reportes
 ```
 
@@ -117,7 +121,7 @@ docs/contexto/    informe, historial, reportes
   - MySQL: base `grupo5dron_db` importada desde `backend/sql/schema.sql`; `backend/config/config.php` local con root sin contraseña.
 - Usuarios del seed: la contraseña de todos es `password` y tienen `debe_cambiar_password = 1`: la app obliga a cambiarla en el primer login (`auth.php?action=cambiar_mi_password`). Para volver al estado inicial de la base local, reimportá `schema.sql`.
 - CORS: `config.php` tiene que incluir `https://localhost` en `cors_origenes` (ya está en `config.example.php`) para que el APK pueda usar la API.
-- Pruebas automáticas: `node --test tests/seguimiento.test.js tests/inclinacion.test.js tests/objetos.test.js tests/botones.test.js` (selector de Mis objetos, seguimiento con recorridos sintéticos, marco con bordes de la imagen analizada, inclinación por acelerómetro con eventos simulados, botones de mantener apretado con eventos de puntero simulados).
+- Pruebas automáticas: `node --test tests/seguimiento.test.js tests/rac.test.js tests/control-real.test.js tests/inclinacion.test.js tests/objetos.test.js tests/botones.test.js` (107 pruebas; rac: reglas 75/8/3 de 5, cara/cuerpo, tocar recuadro, BlazeFace, diagnóstico; control-real: límites y perdido = quieto) (selector de Mis objetos, seguimiento con recorridos sintéticos, marco con bordes de la imagen analizada, inclinación por acelerómetro con eventos simulados, botones de mantener apretado con eventos de puntero simulados).
 - Pruebas en navegador: Playwright con Microsoft Edge del sistema (`chromium.launch({ channel: 'msedge' })`). Para el TelloAdapter sin dron, se puede inyectar un mock de `window.Capacitor.Plugins.DronNative` que respete el contrato de arriba.
 - APK: se compilan en GitHub Actions en cada push a `main` y en cada PR. Artefactos: `Grupo5Dron-app-debug` (dron) y `Grupo5Aula-app-debug` (aula).
 - Firmware del aula: el job "firmware" lo compila con PlatformIO (usa `config.h.example` como `config.h`) y compila también `tests/test_hardware.ino`. Desde este entorno de Claude no se puede: la red bloquea el registro de PlatformIO.
@@ -144,7 +148,7 @@ docs/contexto/    informe, historial, reportes
   - el failsafe por pérdida de telemetría: freno + `land`, un reintento y aviso fijo. Desde que se dispara, NO sale ningún comando automático (ni `rc` ni keep-alive) para que el Tello pueda aterrizar solo a los ~15 s. Si vuelve la telemetría, reintenta `land`. Decisión de Luciano: NO cortar motores automáticamente;
   - que giroscopio, seguimiento y misiones arranquen desactivados y que al apagarlos sus ejes vuelvan a cero;
   - que los botones de movimiento frenen su eje al soltar, al salir del botón, al perder el toque, al pasar a segundo plano o al perder el foco, que arranquen en Lenta y que solo se puedan apretar en vuelo;
-  - el seguimiento está SOLO EN ENSAYO (calcula y muestra, no envía) hasta la etapa S3, después de la primera prueba con el Tello;
+  - el seguimiento arranca en ENSAYO; el control real (S3, 13/11) está apagado por defecto, pide confirmación cada vez, solo en vuelo y con las condiciones; límites fijos `LIMITES_CONTROL_REAL` (giro 20, altura y avance 15, nunca roll, zona muerta 4); sin objetivo, rc 0 0 0 0; vuelve a ensayo con botones/joysticks, inclinación, sin conexión, condiciones, segundo plano o al salir;
   - el aterrizaje al salir de la cabina en vuelo.
 - Interfaz en español, tema oscuro con azul institucional, sin violetas.
 - Diseño (estilo de racvision.org, con nuestros colores): una etiqueta chica arriba de cada título (`.etiqueta`), títulos en mayúsculas (`.titulo-grande`, `.bloque__titulo`), bloques numerados "01 —" (`.bloque`), pares de botones (`.par-botones`), datos en grande (`.dato-grande`) y estados sobre la imagen (`.sobre-imagen` + `.chip`). Poco texto en la vista normal.
@@ -163,6 +167,35 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 - Consistente: mismos colores (variables de app.css), mismos componentes y textos en español claro en todas las pantallas.
 - Robusto: errores de red con mensajes entendibles, nada que quede colgado esperando para siempre, estados de carga visibles.
 - Limpio: sin código muerto, sin funciones duplicadas, sin `console.log` de depuración sueltos, sin archivos referenciados que no existen.
+
+## Etapa C: carcasa del equipo del aula (versión 2 del 13/11, sin fuente)
+
+- `posibles-implementaciones/aula-esp32/carcasa/`: `carcasa_aula.scad` (paramétrico), `para-imprimir/` (STL y `LEEME.txt` con configuración y tiempos), `vistas/`, `README.md` y `version-anterior-dos-pisos-con-HLK/` (versión con HLK y fusible: NO borrar).
+- Dos pisos: abajo el relé (bornera al frente) y 2 PG7 para la fase de la lámpara; bandeja con un paso de 7 mm; arriba ESP32 (25 mm debajo para las fichas, USB-C contra el frente con ventana abierta hasta la tapa y ranuras para un precinto), BC337 y KY-022. Tapa con dos rótulas (giran 50°, `rotula_apriete` 0,1).
+- Paredes de 2 mm, L = 68, 60 mm de alto, la pieza más grande Ø137. PrusaSlicer 2.7 (0,28 mm, 2 perímetros, 15 %): cuerpo 3 h 39, bandeja 1 h 14, tapa 1 h 16, cápsulas y tapones 9 min; total ~6 h 45 (con las mismas velocidades el cuerpo viejo daba 10 h 21, lo que tardó de verdad).
+- Verificado en OpenSCAD: sólidos únicos y cerrados, vista `"choques"` vacía. Sin imprimir ni medir con calibre.
+
+## Estado al 13/11/2026 (rama `prueba-en-clase`, PR #5, "NO MERGEAR: para probar en clase")
+
+- Pedido de Luciano del 13/11: dejar todo listo para probarlo junto en clase. La rama `prueba-en-clase` junta la Etapa A (PR #3), la C (PR #4), la B, el S3, el aula y la documentación. El CI deja los dos APK. Recomendación: después de la clase, mergear solo el PR #5 y cerrar #3 y #4 (quedan contenidos).
+- **Etapa B (seguimiento estilo RAC):** BlazeFace local para la cara (cuerpo de respaldo; tamaño ideal 7,5 % cara y 55 % cuerpo, ~3 m); un solo `Selector` para persona, clase tocada y Mis objetos con las reglas 75 % / 8 seguidas / 3 de 5; tocar un recuadro elige; pantalla `#/seguimiento` (cámara del celular, nunca manda nada) y las mismas tarjetas en la cabina (estado, confianza, historial de 20 con Limpiar, FPS, diagnóstico con foto de prueba de la NASA `img/prueba-persona.jpg`). La demo de Sensores se movió a `#/seguimiento`. `sw.js` v13.
+- **S3:** control real en la cabina (ver "Reglas de trabajo"). Emergencia, failsafe, freno y despegue sin cambios (al apagarse por ellos, el control real no manda nada extra).
+- **Aula:** solo luces (relé), proyector y aire (IR). Base con acciones fijas (`botones.accion`), código hasta 255 y trama cruda MEDIUMTEXT; API sin altas genéricas; aprender solo docente/admin. Arreglos: `esp32.php` incluía `botones.php` y los códigos nunca se guardaban; el firmware cortaba los aires (buffer 100 → 1024, fin de trama 50 ms), reenvía con el protocolo de IRremoteESP8266 o con la trama cruda, y el `WiFiClient` plano se destruía antes de usarse. Firmware 1.1.0.
+- **Alimentación:** ESP32 por USB-C con cargador (5 V, 1 A o más; pico calculado ~520 mA). HLK y fusible fuera (mejora futura).
+- **Verificado:** 107 pruebas; Chromium con WebGL (SwiftShader) y cámara falsa: sigue la cara al 96 %, historial y diagnóstico sin errores; cabina con mock del Tello: ensayo sin rc, control real dentro de límites, perdido = rc 0 0 0 0, botón y pérdida de conexión vuelven a ensayo y el failsafe aterriza; 360/390/412 vertical y horizontal; aula con PHP 8.3 + MariaDB y ESP32 simulado (aprender, código DAIKIN de 280 bits y 583 tiempos que vuelve igual, luces, permisos); OpenSCAD y PrusaSlicer (carcasa).
+- **Sin probar:** todo con el celular, el dron, el ESP32 real, los controles del aula y la impresión. Guía: `docs/guia-pruebas-en-clase.md`.
+
+## Decisiones tomadas sin consultar (13/11)
+
+- Etapa B, S3, aula y documentación como commits en `prueba-en-clase` (no una rama por etapa): Luciano pidió una sola rama para probar. Los PR #3 y #4 quedan como estaban.
+- BlazeFace "back" (entrada 256) de @vladmandic/human-models (MIT; original de MediaPipe, Apache 2.0) con decodificador propio: el paquete oficial no anda con ese modelo y el "front" no detecta caras de menos del 20 % del alto.
+- Después de "Objetivo perdido" solo se retoma algo cerca de donde estaba durante 5 s; si no, hay que volver a elegir (para que el control real no se enganche solo con otra persona). En Mis objetos se busca en cualquier lugar.
+- Tamaño ideal del cuerpo de 45 % a 55 % para que coincida con la cara (7,5 %) a la misma distancia (~3 m).
+- Diagnóstico con una foto de dominio público (NASA, astronauta Eileen Collins, de scikit-image) para separar "la GPU calcula mal" de "la cámara no ve".
+- Control real: además de lo pedido, exige las condiciones ya definidas (altura 80-250 cm, batería ≥ 30 %, datos del dron, WebGL, ≥ 4 FPS) y vuelve a ensayo si dejan de cumplirse o si se activa la inclinación.
+- Aula: una instalación = un aula (sin tabla de aulas). Se sacaron las altas genéricas de aparatos y botones, la tarjeta "Parámetros del ESP32" (no hacía nada) y el giroscopio de la administración del aula. "Subir/Bajar temperatura" aparecen solo con código.
+- En clase el aula se prueba con XAMPP en una notebook y el navegador del celular (el APK necesita HTTPS).
+- Carcasa: dos pisos (no entra en uno), L = 68, 60 mm de alto; se aceptó 6 h 45 min de impresión.
 
 ## Estado al 11/11/2026
 
@@ -259,27 +292,13 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
   - "Despegar" queda deshabilitado con "⏳ Esperando telemetría…" hasta el primer paquete.
   - La cancelación por toque de joystick se implementa en S3 con el control real: en ensayo los joysticks siguen funcionando.
 - Seguimiento, etapa S0 (6/11): en la cabina "🎯 Ensayo" calcula el comando y lo muestra sobre el video, pero nunca escribe los ejes del rc. Se puede usar en tierra y no interfiere con los joysticks ni con el giroscopio. Auditoría y plan completos del seguimiento: historial, §3, punto 17.
-- Observación para el compañero del aula (no se tocó): en `app.css`, `.dispositivo__botones` tiene padding con `max-height: 0`, así que las tarjetas de dispositivos cerradas muestran una franja de los botones.
 
 ## Próximos pasos (lista única)
 
-1. **Primera prueba real con el Tello.** Commit, APK de CI e instalación. Con el secreto de firma cargado, los APK nuevos se instalan encima. La primera vez con la clave fija hay que desinstalar la versión anterior. Después: abrir la app (entra directo al inicio), `#/prueba-tello` ("Probar conexión"), "Copiar informe" y pegarlo. Luego la cabina: despegar, aterrizar, paso, freno, giroscopio, failsafe, emergencia.
-2. **Corregir lo que salga de esa prueba.** Lo más probable: red sin internet (`vincularRedWifi`), video en el WebView, si el `rc` interfiere con los pasos y la unidad de `vgx`/`vgy`.
-   - Detección en el A06: con el modo técnico, mirar la miniatura "lo que ve el modelo" y el brillo. Si la imagen llega rotada o negra, corregir la captura del cuadro.
-   - Verificar en el celular el sentido de la inclinación en las dos horizontales (en la PC se simuló con la convención de Android: 90° = girado en sentido antihorario).
-3. ~~Fase 2, funciones~~: hecha (ver "Estado").
-4. ~~Fase 3, interfaz~~: hecha (ver "Estado").
-5. ~~Fase 4, limpieza~~: hecha (ver "Estado").
-6. **Seguimiento v2** (una sola tubería: candidatos → selector de objetivo → suavizado → controlador; ensayo y control real comparten todo):
-   - ~~S1~~: hecha (ver "Estado"). Pasan a S3: cancelar el seguimiento real con cualquier toque de joystick y aplicar las condiciones de activación.
-   - ~~S2~~: hecha (ver "Estado").
-   - ~~Firma fija del APK debug~~: hecha en el workflow. Falta que Luciano genere la clave y cargue el secreto `DEBUG_KEYSTORE_BASE64`.
-   - S3 (después de la primera prueba con el Tello): habilitar el control real (con cancelación por toque de joystick y las condiciones de activación) y ajustar ganancias con el dron.
-   - ~~S4~~: "Mis objetos" simple, hecho el 6/11 (ver "Estado"). La selección por toque con rastreador no se hizo (no se pidió).
-7. **Hosting:** subir el backend, importar `schema.sql` y crear `config.php` (con `https://localhost` en CORS). Cada cuenta del seed pide cambiar `password` en su primer login.
-8. **Al final:** documentación (README, manual de usuario, manual del programador, API, plan de pruebas, limitaciones) y corrección del informe:
-   - el LED IR figura en GPIO35, que es solo de entrada (el circuito real usa GPIO18 con un BC337 y 2 LEDs IR);
-   - el informe pide "una pantalla principal que permita elegir entre el aula y el dron", pero desde la Etapa A son dos apps separadas. Luciano lo habla con el profe (11/11).
-9. **Etapa A, pendientes de Luciano:** probar con el método del README del firmware si el relé es activo en alto o en bajo y avisar (hoy `RELE_ACTIVO_EN_BAJO 1`); instalar los dos APK; subir la web del aula al hosting en `/aula/`.
-10. **Etapa B:** seguimiento "como RAC" (pregunta del profe sobre la IA del Tello, diagnóstico en el A06, YOLO o COCO-SSD, recuadro de la cara con BlazeFace, pantalla con el layout de RAC, prueba con la cámara del celular; sigue en ensayo).
-11. **Etapa C:** carcasa triangular imprimible en OpenSCAD para el equipo del aula, con LEDs IR movibles.
+1. **Prueba en clase** con `docs/guia-pruebas-en-clase.md` (APK del PR #5: `Grupo5Dron-app-debug` y `Grupo5Aula-app-debug`). Traer los resultados, los informes y diagnósticos copiados.
+2. **Corregir lo que salga de la prueba.** En especial: conexión y video del Tello, detección en el A06 (diagnóstico), control real (ganancias), códigos del aire real, si el relé es activo en alto o en bajo (`RELE_ACTIVO_EN_BAJO`), si el ESP32 aguanta con el cargador.
+3. **Mergear el PR #5** cuando Luciano lo apruebe y cerrar los PR #3 y #4.
+4. **Hosting** (`docs/despliegue-hosting.md`) y probar el APK del aula contra HTTPS.
+5. **Firma fija de los APK:** que Luciano cargue el secreto `DEBUG_KEYSTORE_BASE64`.
+6. **Imprimir la carcasa** (confirmar medidas con calibre antes) y armarla con el profe.
+7. **Informe:** aplicar `docs/correcciones-informe.md` (Luciano habla con el profe lo de las dos apps).
