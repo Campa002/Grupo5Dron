@@ -104,7 +104,7 @@ backend/
 capacitor/        APK del dron: capacitor.config.json, package.json, network_security_config.xml, android_plugin/
 capacitor-aula/   APK del aula: capacitor.config.json, package.json (sin plugin propio)
 scripts/          build-apk.js (dron | aula), check_js.py, check_refs.py (las dos apps), ci_firma_debug.sh (firma de los dos APK), generar_hash.php
-posibles-implementaciones/  firmware del aula (pines del circuito soldado), adaptadores genéricos (HTTP, UDP/TCP), herramientas viejas
+posibles-implementaciones/  firmware del aula (pines del circuito soldado), carcasa del equipo del aula (aula-esp32/carcasa: OpenSCAD, para-imprimir/ y vistas), adaptadores genéricos (HTTP, UDP/TCP), herramientas viejas
 docs/contexto/    informe, historial, reportes
 ```
 
@@ -136,7 +136,7 @@ docs/contexto/    informe, historial, reportes
 - Nada de recursos externos (CDN, Google Fonts): el APK tiene que andar sin internet.
 - Todo archivo que use la app tiene que tener extensión. En el APK, Capacitor responde index.html a cualquier ruta sin "." (html5mode). Por eso los shards del modelo son `group1-shardNofM.bin`. Si se cambia el modelo, renombrar los shards y sus `paths` en `model.json`, pasarlo a float16 con `python scripts/modelo_float16.py` y actualizar la lista de `sw.js` (y subir `CACHE_NAME`).
 - Las páginas son .php pero no pueden depender de PHP para funcionar en el APK. No hay archivos `.html` en el proyecto (`check_refs.py` falla si aparece uno en `pages/` y avisa si una página trae código PHP). `build-apk.js` quita todo bloque `<?php ... ?>` / `<?= ... ?>` al generar `www/` y falla si queda alguno. Capacitor sirve `/pages/x.php` como archivo porque tiene extensión; `cargarPlantilla` (app.js) no depende del content-type y avisa si en lugar de la vista llega una página completa.
-- `.gitattributes` marca como binarios `backend/public/libs/**`, imágenes, `.bin` y keystores (la PC tiene `core.autocrlf=true`).
+- `.gitattributes` marca como binarios `backend/public/libs/**`, imágenes, `.bin`, `.stl` y keystores (la PC tiene `core.autocrlf=true`).
 - Sin credenciales reales en el repo. `config.php` y `config.h` están en `.gitignore`.
 - Seguridad de vuelo. No debilites:
   - el botón de emergencia fijo y siempre visible;
