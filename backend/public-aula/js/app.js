@@ -35,16 +35,15 @@ const App = (() => {
         const contenedor = document.getElementById('toast-contenedor');
         if (!contenedor) return;
 
-        const iconos = { exito: 'check', error: 'cruz', advertencia: 'alerta', info: 'info' };
+        const iconos = { exito: 'bi-check-lg', error: 'bi-x-lg', advertencia: 'bi-exclamation-triangle', info: 'bi-info-circle' };
 
         // Texto plano (textContent): un mensaje que venga del servidor no puede inyectar HTML
         const toast = document.createElement('div');
-        toast.className = `toast toast--${tipo}`;
-        const ico = document.createElement('span');
-        ico.className = `toast__icono ico ico--${iconos[tipo] || 'info'}`;
+        toast.className = `toast show toast--${tipo}`;
+        const ico = document.createElement('i');
+        ico.className = `bi ${iconos[tipo] || iconos.info}`;
         ico.setAttribute('aria-hidden', 'true');
         const texto = document.createElement('span');
-        texto.className = 'toast__texto';
         texto.textContent = mensaje;
         toast.append(ico, texto);
         contenedor.appendChild(toast);
@@ -87,11 +86,10 @@ const App = (() => {
             return html;
         } catch (error) {
             return `
-                <div class="tarjeta texto-centro" style="padding: var(--espacio-2xl) var(--espacio-md);">
-                    <div style="margin-bottom: var(--espacio-sm);">${icono('alerta', 'ico--grande')}</div>
-                    <h3 class="mb-sm">Error cargando la página</h3>
-                    <p class="texto-sm texto-secundario mb-lg">${escaparHtml(error.message)}</p>
-                    <button class="btn btn--primario" onclick="App.cargarRutaActual()">Reintentar</button>
+                <div class="alert alert-danger">
+                    <p class="fw-semibold mb-1">Error cargando la página</p>
+                    <p class="small mb-3">${escaparHtml(error.message)}</p>
+                    <button class="btn btn-primary" onclick="App.cargarRutaActual()">Reintentar</button>
                 </div>`;
         }
     }
@@ -99,11 +97,10 @@ const App = (() => {
     /** Pantalla para cuando no hay conexión con el servidor (el aula no funciona sin él). */
     function plantillaSinConexion() {
         return `
-            <div class="tarjeta texto-centro" style="padding: var(--espacio-2xl) var(--espacio-md);">
-                <div style="margin-bottom: var(--espacio-sm);">${icono('senal', 'ico--grande')}</div>
-                <h3 class="mb-sm">Sin conexión con el servidor</h3>
-                <p class="texto-sm texto-secundario mb-lg">El aula necesita internet para mandar las órdenes al ESP32. Revisá la conexión y volvé a intentar.</p>
-                <button class="btn btn--primario" onclick="location.reload()">${icono('recargar')} Reintentar</button>
+            <div class="alert alert-warning">
+                <p class="fw-semibold mb-1">Sin conexión con el servidor</p>
+                <p class="small mb-3">El aula necesita internet para mandar las órdenes al ESP32. Revisá la conexión y volvé a intentar.</p>
+                <button class="btn btn-primary" onclick="location.reload()">Reintentar</button>
             </div>`;
     }
 
@@ -160,7 +157,7 @@ const App = (() => {
             return;
         }
 
-        contenedor.innerHTML = '<div class="cargando"><div class="cargando__spinner"></div><p>Cargando...</p></div>';
+        contenedor.innerHTML = '<div class="text-center py-5 text-body-secondary"><div class="spinner-border mb-3" aria-hidden="true"></div><p>Cargando...</p></div>';
         const html = await cargarPlantilla(destino);
         if (miNavegacion !== navegacionActual) return;
         contenedor.innerHTML = html;
@@ -171,18 +168,20 @@ const App = (() => {
         await inicializarControladorPagina(destino);
     }
 
+    const NOMBRE_ROL = { admin: 'administrador', docente: 'docente', usuario: 'usuario' };
+
     /**
-     * Ajusta el header y el menú: en el login no hay menú ni usuario.
+     * Ajusta el header y el menú: en el login no hay menú. Arriba del menú, quién está usando la app;
+     * "Administración" solo para el admin (body.rol-admin).
      * @param {string} destino ruta actual
      */
     function actualizarEncabezado(destino) {
         const enLogin = destino === 'login';
         const btnMenu = document.getElementById('btn-menu');
-        const btnUsuario = document.getElementById('btn-usuario');
-        const indicadorEsp = document.getElementById('indicador-esp32');
         if (btnMenu) btnMenu.style.visibility = enLogin ? 'hidden' : 'visible';
-        if (btnUsuario) btnUsuario.style.visibility = enLogin ? 'hidden' : 'visible';
-        if (indicadorEsp) indicadorEsp.style.display = enLogin ? 'none' : 'flex';
+        const usuario = Auth.obtenerUsuario();
+        const menuUsuario = document.getElementById('menu-usuario');
+        if (menuUsuario) menuUsuario.textContent = usuario ? `${usuario.nombre} · ${NOMBRE_ROL[usuario.rol] || usuario.rol}` : '';
         document.body.classList.toggle('rol-admin', Auth.esAdmin());
     }
 
@@ -235,79 +234,6 @@ const App = (() => {
             .replace(/'/g, '&#39;');
     }
 
-    /**
-     * HTML de un ícono propio (SVG definido en app.css). Decorativo: siempre junto a un texto visible
-     * o dentro de un botón con aria-label.
-     */
-    function icono(nombre, clases = '') {
-        return `<span class="ico ico--${nombre}${clases ? ' ' + clases : ''}" aria-hidden="true"></span>`;
-    }
-
-    /** Pone en `el` un ícono (opcional) y un texto plano. */
-    function textoConIcono(el, nombre, texto) {
-        if (!el) return;
-        el.replaceChildren();
-        if (nombre) {
-            const ico = document.createElement('span');
-            ico.className = `ico ico--${nombre}`;
-            ico.setAttribute('aria-hidden', 'true');
-            el.append(ico, ' ');
-        }
-        el.append(texto);
-    }
-
-    /** Muestra los datos de la sesión, con "Cambiar contraseña" y "Cerrar sesión". */
-    function mostrarModalUsuario() {
-        const usuario = Auth.obtenerUsuario();
-        if (!usuario) {
-            window.location.hash = '#/login';
-            return;
-        }
-        document.getElementById('modal-usuario')?.remove();
-
-        const modalOverlay = document.createElement('div');
-        modalOverlay.id = 'modal-usuario';
-        modalOverlay.className = 'modal-overlay';
-        modalOverlay.innerHTML = `
-            <div class="modal">
-                <div class="modal__header">
-                    <h3 class="modal__titulo">Perfil de usuario</h3>
-                    <button class="modal__cerrar" id="btn-cerrar-modal-user" aria-label="Cerrar">&times;</button>
-                </div>
-                <div class="modal__body">
-                    <div class="tarjeta mb-md" style="background: var(--color-fondo-claro);">
-                        <div class="flex items-center gap-md">
-                            <div>${icono('usuario', 'ico--grande')}</div>
-                            <div>
-                                <h4 style="font-weight: 700;">${escaparHtml(usuario.nombre)}</h4>
-                                <p class="texto-sm texto-secundario">${escaparHtml(usuario.email)}</p>
-                                <span class="badge badge--info mt-xs">${escaparHtml(String(usuario.rol || '').toUpperCase())}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <button class="btn btn--secundario btn--bloque mb-md" id="btn-modal-cambiar-pass">${icono('llave')} Cambiar contraseña</button>
-                </div>
-                <div class="modal__footer">
-                    <button class="btn btn--secundario" id="btn-modal-cancelar">Cerrar</button>
-                    <button class="btn btn--peligro" id="btn-modal-logout">${icono('salir')} Cerrar sesión</button>
-                </div>
-            </div>`;
-        document.body.appendChild(modalOverlay);
-
-        const cerrar = () => modalOverlay.remove();
-        document.getElementById('btn-cerrar-modal-user').onclick = cerrar;
-        document.getElementById('btn-modal-cancelar').onclick = cerrar;
-        document.getElementById('btn-modal-cambiar-pass').onclick = () => {
-            cerrar();
-            window.location.hash = '#/cambiar-password';
-        };
-        modalOverlay.onclick = (e) => { if (e.target === modalOverlay) cerrar(); };
-        document.getElementById('btn-modal-logout').onclick = async () => {
-            cerrar();
-            await cerrarSesion();
-        };
-    }
-
     /** Cierra la sesión y vuelve al login. */
     async function cerrarSesion() {
         await Auth.logout();
@@ -319,7 +245,6 @@ const App = (() => {
     async function iniciar() {
         document.getElementById('btn-menu')?.addEventListener('click', toggleMenu);
         document.getElementById('menu-overlay')?.addEventListener('click', cerrarMenu);
-        document.getElementById('btn-usuario')?.addEventListener('click', mostrarModalUsuario);
         document.getElementById('btn-cerrar-sesion')?.addEventListener('click', async (e) => {
             e.preventDefault();
             cerrarMenu();
@@ -358,7 +283,5 @@ const App = (() => {
         mostrarToast,
         cargarRutaActual,
         cerrarMenu,
-        icono,
-        textoConIcono,
     };
 })();

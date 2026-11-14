@@ -15,7 +15,6 @@ const Aula = (() => {
 
     const ESPERA_EQUIPO_MS = 20000;   // el ESP32 consulta cada ~2 s: si no tomó la orden en 20 s, no está andando
     const ESPERA_CODIGO_MS = 25000;   // el receptor escucha 15 s (APRENDIZAJE_TIMEOUT_MS) + margen
-    const ICONO_ACCION = { encender: 'encender', apagar: 'encender', subir_temp: 'chevron-arriba', bajar_temp: 'chevron-abajo' };
     const ES_TEMPERATURA = a => a === 'subir_temp' || a === 'bajar_temp';
 
     let dispositivos = [];
@@ -25,13 +24,6 @@ const Aula = (() => {
 
     const $ = sel => document.querySelector(`.aula-pagina ${sel}`);
     const esperar = ms => new Promise(r => setTimeout(r, ms));
-
-    function icono(nombre) {
-        const s = document.createElement('span');
-        s.className = `ico ico--${nombre}`;
-        s.setAttribute('aria-hidden', 'true');
-        return s;
-    }
 
     function textoConPunto(el, color, texto) {
         const p = document.createElement('span');
@@ -65,7 +57,7 @@ const Aula = (() => {
         } catch (error) {
             document.querySelectorAll('.aula-pagina [data-aparato]').forEach(c => {
                 const p = document.createElement('p');
-                p.className = 'texto-sm texto-error';
+                p.className = 'small text-danger mb-0';
                 p.textContent = `No se pudieron cargar los aparatos: ${error.message}`;
                 c.replaceChildren(p);
             });
@@ -80,7 +72,7 @@ const Aula = (() => {
             const disp = dispositivos.find(d => d.tipo === tipo);
             if (!disp) {
                 const p = document.createElement('p');
-                p.className = 'texto-sm texto-secundario';
+                p.className = 'small text-body-secondary mb-0';
                 p.textContent = 'Este aparato no está en la base de datos (revisá schema.sql).';
                 caja.replaceChildren(p);
                 continue;
@@ -92,10 +84,10 @@ const Aula = (() => {
                 // Subir y bajar la temperatura aparecen solo cuando tienen su código
                 if (ES_TEMPERATURA(b.accion) && !b.tiene_codigo_ir) continue;
                 const btn = document.createElement('button');
-                btn.className = `btn ${b.accion === 'encender' ? 'btn--exito' : 'btn--secundario'}`;
+                btn.className = `btn flex-fill ${b.accion === 'encender' ? 'btn-success' : 'btn-outline-secondary'}`;
                 btn.disabled = !b.tiene_codigo_ir;
                 btn.title = b.tiene_codigo_ir ? `Código ${b.protocolo || ''}`.trim() : 'Sin código: hay que aprenderlo';
-                btn.append(icono(ICONO_ACCION[b.accion] || 'rayo'), ` ${b.nombre}`);
+                btn.textContent = b.nombre;
                 btn.addEventListener('click', () => enviarIr(b, disp, btn));
                 botones.push(btn);
             }
@@ -246,12 +238,6 @@ const Aula = (() => {
             const resp = await API.esp32.estado();
             const estado = resp.estado;
             if (!estado) return;
-            // Insignia "ESP32" del encabezado
-            const indicador = document.getElementById('indicador-esp32');
-            if (indicador) {
-                indicador.className = `indicador indicador--${estado.en_linea ? 'online' : 'offline'}`;
-                indicador.title = estado.en_linea ? 'Equipo del aula en línea' : 'Equipo del aula desconectado';
-            }
             const info = document.getElementById('info-esp32');
             if (!info) return;
             if (estado.en_linea) {

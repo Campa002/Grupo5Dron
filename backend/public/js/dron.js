@@ -191,13 +191,12 @@ const Dron = (() => {
                 chipFps: _q('#cab-chip-fps'),
                 fuente: 'dron',
                 fuenteTamano: () => { const v = _q('#canvas-video'); return [v?.width || 0, v?.height || 0]; },
-                onIniciar: _activarSeguimiento,
+                onIniciar: _seguirObjetivo,
                 onDetener: () => { _apagarSeguimiento(); App.mostrarToast('Seguimiento detenido.', 'info'); },
                 onTocar: (x, y) => _seguimiento?.elegirEnPunto(x, y) || { ok: false },
                 onDiagnosticar: () => _seguimiento.diagnosticar(_q('#cab-foto-prueba')),
                 onControlReal: _cambiarControlReal,
             });
-            _pantallaSeg.selectQueSeguir.addEventListener('change', _elegirQueSeguir);
         }
         // Al pasar a segundo plano, el control real vuelve a ensayo
         _onVisibilidad = () => { if (document.hidden) _volverAEnsayo('La app pasó a segundo plano: el seguimiento volvió a ensayo.'); };
@@ -206,7 +205,11 @@ const Dron = (() => {
         _agregarEventosCabina();
         _actualizarSelectMisiones();
         if (typeof DronObjetos !== 'undefined' && _pantallaSeg) {
-            App.llenarQueSeguir(_pantallaSeg.selectQueSeguir).then(lista => { if (gen === _generacion) _objetosGuardados = lista; });
+            App.objetosGuardados().then(lista => {
+                if (gen !== _generacion) return;
+                _objetosGuardados = lista;
+                _pantallaSeg?.setObjetos(lista);
+            });
         }
         await _conectar();
     }
@@ -791,7 +794,7 @@ const Dron = (() => {
     function _actualizarBotonGiro() {
         const btn = _q('#btn-toggle-giro');
         if (!btn) return;
-        btn.textContent = _modoGiro ? '🧭 Inclinación: ON' : '🧭 Inclinación: OFF';
+        btn.textContent = _modoGiro ? 'Inclinación: ON' : 'Inclinación: OFF';
         btn.classList.toggle('cab-activo', _modoGiro);
     }
 
@@ -802,10 +805,33 @@ const Dron = (() => {
     // (15 Hz) escribe los ejes con los límites de DronSeguimiento.LIMITES_CONTROL_REAL; sin objetivo, en 0.
     // ----------------------------------------------------------------
 
+    /** Botón del costado (a mano con el celular acostado): sigue a una persona, o detiene el seguimiento. */
     async function _toggleSeguimiento() {
         if (_modoSeguimiento) {
             _apagarSeguimiento();
             App.mostrarToast('Seguimiento detenido.', 'info');
+            return;
+        }
+        _pantallaSeg?.marcarObjetivo({ tipo: 'persona' });
+        await _seguirObjetivo({ tipo: 'persona' });
+    }
+
+    /**
+     * "Seguir persona" / "Seguir objeto": elige qué seguir y arranca el seguimiento (en ensayo).
+     * Si ya estaba andando, cambia el objetivo y vuelve a ensayo.
+     * @param {{tipo:'persona'}|{tipo:'clase', clase:string}|{tipo:'mio', id:string}} meta
+     */
+    async function _seguirObjetivo(meta) {
+        if (!_seguimiento) { App.mostrarToast('El seguimiento no está disponible.', 'advertencia'); return; }
+        const res = await _seguimiento.elegirObjetivo(meta, _objetosGuardados);
+        if (!_seguimiento) return; // salió de la cabina mientras cargaba
+        if (!res.ok) { App.mostrarToast(res.error, 'advertencia', 7000); return; }
+        if (_modoSeguimiento) {
+            _volverAEnsayo('Cambiaste qué seguir: el seguimiento volvió a ensayo.');
+            _seguimiento.desactivar();
+            _seguimiento.activar();
+            _pantallaSeg?.setActivo(true);
+            App.mostrarToast('Ahora sigue lo que elegiste (en ensayo).', 'info');
             return;
         }
         await _activarSeguimiento();
@@ -854,7 +880,7 @@ const Dron = (() => {
             _volverAEnsayo('Control real apagado: el seguimiento volvió a ensayo.');
             return false;
         }
-        if (!_modoSeguimiento) { App.mostrarToast('Primero tocá Iniciar seguimiento.', 'advertencia'); return false; }
+        if (!_modoSeguimiento) { App.mostrarToast('Primero tocá Seguir persona o Seguir objeto.', 'advertencia'); return false; }
         if (_failsafeBloquea()) return false;
         if (_maniobraEnCurso()) { App.mostrarToast('Esperá a que termine la maniobra en curso.', 'advertencia'); return false; }
         if (_modoGiro) { App.mostrarToast('Apagá la inclinación antes de activar el control real.', 'advertencia'); return false; }
@@ -915,7 +941,7 @@ const Dron = (() => {
                 const ejes = DronSeguimiento.comandoControlReal(cmd, info.estado);
                 a.actualizarEjes(ejes);
                 textoComando = `Mandando al dron: ${DronSeguimiento.textoRc(ejes)}`;
-                _mostrarEnsayo(`CONTROL REAL · ${DronSeguimiento.estadoCorto(info).texto} · ${DronSeguimiento.textoRc(ejes)}`);
+                _mostrarEnsayo(`CONTROL REAL · ${DronSeguimiento.estadoCorto(info).texto}${App.modoTecnico() ? ` · ${DronSeguimiento.textoRc(ejes)}` : ''}`);
             }
         }
         if (!_controlReal) {
@@ -932,24 +958,6 @@ const Dron = (() => {
                 chip.dataset.texto = e.texto;
             }
             chip.hidden = false;
-        }
-    }
-
-    /** "¿Qué seguir?": una persona o un objeto guardado. Si el ensayo está activo, vuelve a empezar con lo elegido. */
-    async function _elegirQueSeguir() {
-        const sel = _pantallaSeg?.selectQueSeguir;
-        if (!sel || !_seguimiento) return;
-        const objeto = _objetosGuardados.find(o => o.id === sel.value) || null;
-        const res = await _seguimiento.elegirObjeto(objeto);
-        if (!res.ok) {
-            App.mostrarToast(res.error, 'advertencia', 7000);
-            sel.value = 'persona';
-            await _seguimiento.elegirObjeto(null);
-        }
-        if (_modoSeguimiento) {
-            _volverAEnsayo('Cambiaste qué seguir: el seguimiento volvió a ensayo.');
-            _seguimiento.desactivar();
-            _seguimiento.activar();
         }
     }
 
@@ -995,7 +1003,7 @@ const Dron = (() => {
     function _actualizarBotonSeguimiento() {
         const btn = _q('#btn-toggle-seguimiento');
         if (!btn) return;
-        App.textoConIcono(btn, 'objetivo', _modoSeguimiento ? 'Seguimiento: ON' : 'Seguimiento: OFF');
+        btn.textContent = _modoSeguimiento ? 'Detener seguimiento' : 'Seguir persona';
         btn.classList.toggle('cab-activo', _modoSeguimiento);
     }
 
@@ -1215,13 +1223,10 @@ const Dron = (() => {
     function _mostrarError(contenedor, mensaje) {
         contenedor.innerHTML = `
         <div class="dron-pagina">
-            <h2 class="seccion-titulo mb-md">Control del Dron</h2>
-            <div class="tarjeta tarjeta--acento texto-centro">
-                <div style="margin-bottom: var(--espacio-md);">${App.icono('alerta', 'ico--grande')}</div>
-                <h3 class="tarjeta__titulo">Error</h3>
-                <p class="texto-sm texto-secundario mb-lg">${_esc(mensaje)}</p>
-                <a href="#/config-dron" class="btn btn--primario">${App.icono('llave-ajuste')} Ir a Configuración del dron</a>
-            </div>
+            <p class="etiqueta">Cabina</p>
+            <h1 class="h3 fw-bold text-uppercase">Error</h1>
+            <div class="alert alert-danger">${_esc(mensaje)}</div>
+            <a href="#/config-dron" class="btn btn-primary">Ir a Config. Dron</a>
         </div>`;
     }
 
@@ -1234,64 +1239,64 @@ const Dron = (() => {
     // ----------------------------------------------------------------
 
     function _plantillaCabina() {
+        const mantener = (mover, etiqueta, ico) =>
+            `<button class="btn btn-outline-secondary cab-mantener" data-mover="${mover}" aria-label="${etiqueta}" title="${etiqueta}" disabled>${App.icono(ico)}</button>`;
         return `
-        <div class="dron-pagina cabina">
-            <!-- Barra superior: nombre del perfil (y en el modo técnico, más telemetría) -->
-            <div class="cab-barra">
-                <button id="btn-cab-menu" class="cab-btn-menu" aria-label="Abrir menú">${App.icono('menu')}</button>
-                <p class="etiqueta cab-titulo">Cabina · <span id="nombre-perfil-activo">—</span></p>
-                <div class="cab-datos-tecnicos solo-tecnico" id="panel-telemetria">
-                    <span>Velocidad <b id="tel-velocidad-valor">-- cm/s</b></span>
-                    <span>Motores <b id="tel-tiempo-valor">-- s</b></span>
+        <div class="dron-pagina cabina d-flex flex-column gap-2">
+            <!-- Barra: menú (en horizontal), perfil y, en el modo técnico, más datos -->
+            <div class="cab-barra d-flex align-items-center gap-3">
+                <button id="btn-cab-menu" class="btn btn-link text-body px-2 cab-btn-menu" aria-label="Abrir menú">${App.icono('menu')}</button>
+                <p class="etiqueta mb-0 me-auto text-truncate titulo-app" data-titulo-app>Cabina · <span id="nombre-perfil-activo">—</span></p>
+                <div class="solo-tecnico small text-body-secondary text-nowrap" id="panel-telemetria">
+                    Velocidad <b id="tel-velocidad-valor">-- cm/s</b> · Motores <b id="tel-tiempo-valor">-- s</b>
                 </div>
             </div>
 
             <!-- EMERGENCIA: fija y siempre visible -->
-            <button id="btn-emergencia" class="cab-emergencia" disabled>${App.icono('alto')} EMERGENCIA</button>
+            <button id="btn-emergencia" class="btn btn-danger cab-emergencia" disabled>${App.icono('alto')} EMERGENCIA</button>
 
             <!-- Aviso fijo (por ejemplo, failsafe sin aterrizaje confirmado) -->
-            <div id="cab-aviso-fijo" class="cab-aviso-fijo" role="alert" hidden>
-                ${App.icono('alerta')}
-                <span id="cab-aviso-fijo-texto"></span>
-                <button id="btn-cerrar-aviso-fijo" class="btn btn--secundario">Entendido</button>
+            <div id="cab-aviso-fijo" class="alert alert-warning d-flex flex-wrap align-items-center gap-2 mb-0" role="alert" hidden>
+                <span id="cab-aviso-fijo-texto" class="flex-grow-1"></span>
+                <button id="btn-cerrar-aviso-fijo" class="btn btn-outline-warning">Entendido</button>
             </div>
 
             <!-- Zona principal: mando izquierdo | video | mando derecho (botones de mantener apretado o joysticks) -->
             <div class="cab-principal">
                 <div class="cab-lado cab-lado--izq">
-                    <div class="cab-botones">
-                        <button id="btn-despegar" class="btn btn--primario" disabled>${App.icono('despegar')} Despegar</button>
-                        <button id="btn-aterrizar" class="btn btn--secundario" disabled>${App.icono('aterrizar')} Aterrizar</button>
+                    <div class="d-grid gap-2">
+                        <button id="btn-despegar" class="btn btn-primary" disabled>${App.icono('despegar')} Despegar</button>
+                        <button id="btn-aterrizar" class="btn btn-outline-secondary" disabled>${App.icono('aterrizar')} Aterrizar</button>
                     </div>
                     <div class="cab-mando">
-                        <span class="cab-joy-etq">Subir y bajar · Girar</span>
+                        <span class="small text-body-secondary">Subir y bajar · Girar</span>
                         <div class="cab-cruz cab-cruz--mantener">
-                            <span></span><button class="btn btn--secundario cab-mantener" data-mover="subir" aria-label="Subir" title="Subir" disabled>${App.icono('chevron-arriba')}</button><span></span>
-                            <button class="btn btn--secundario cab-mantener" data-mover="girar-izq" aria-label="Girar a la izquierda" title="Girar a la izquierda" disabled>${App.icono('girar-izq')}</button><span></span><button class="btn btn--secundario cab-mantener" data-mover="girar-der" aria-label="Girar a la derecha" title="Girar a la derecha" disabled>${App.icono('girar-der')}</button>
-                            <span></span><button class="btn btn--secundario cab-mantener" data-mover="bajar" aria-label="Bajar" title="Bajar" disabled>${App.icono('chevron-abajo')}</button><span></span>
+                            <span></span>${mantener('subir', 'Subir', 'chevron-arriba')}<span></span>
+                            ${mantener('girar-izq', 'Girar a la izquierda', 'girar-izq')}<span></span>${mantener('girar-der', 'Girar a la derecha', 'girar-der')}
+                            <span></span>${mantener('bajar', 'Bajar', 'chevron-abajo')}<span></span>
                         </div>
                     </div>
                     <div class="cab-joystick" hidden>
-                        <span class="cab-joy-etq">${App.icono('flechas-v')} Subir y bajar · ${App.icono('flechas-h')} Girar</span>
+                        <span class="small text-body-secondary">Subir y bajar · Girar</span>
                         <div id="joystick-izquierdo"></div>
                     </div>
                 </div>
 
-                <div class="cab-video">
+                <div class="cab-video rounded border">
                     <canvas id="canvas-video" width="960" height="720"></canvas>
                     <canvas id="canvas-seguimiento"></canvas>
-                    <div id="overlay-video-off" class="cab-video__aviso">Sin señal de video</div>
+                    <div id="overlay-video-off" class="caja-video__aviso">Sin señal de video</div>
                     <!-- Estados sobre la imagen -->
                     <div class="sobre-imagen">
                         <div class="sobre-imagen__grupo">
-                            <span id="estado-conexion" class="chip"><span class="punto punto--advertencia" aria-hidden="true"></span>Conectando...</span>
-                            <span id="estado-telemetria" class="chip chip--alerta" hidden><span class="punto punto--alerta" aria-hidden="true"></span>Sin datos del dron</span>
-                            <span id="cab-chip-seguimiento" class="chip" hidden></span>
+                            <span id="estado-conexion" class="badge"><span class="punto punto--advertencia" aria-hidden="true"></span>Conectando...</span>
+                            <span id="estado-telemetria" class="badge text-warning" hidden><span class="punto punto--alerta" aria-hidden="true"></span>Sin datos del dron</span>
+                            <span id="cab-chip-seguimiento" class="badge" hidden></span>
                         </div>
                         <div class="sobre-imagen__grupo sobre-imagen__grupo--der">
-                            <span class="chip chip--dato" title="Batería"><span id="tel-bateria-icono" class="punto" aria-hidden="true"></span><span class="chip__etq">Bat.</span><span id="tel-bateria-valor">--%</span></span>
-                            <span class="chip chip--dato" title="Altura"><span class="chip__etq">Alt.</span><span id="tel-altura-valor">-- cm</span></span>
-                            <span id="cab-chip-fps" class="chip chip--dato" hidden></span>
+                            <span class="badge" title="Batería"><span id="tel-bateria-icono" class="punto" aria-hidden="true"></span><span class="fw-normal opacity-75">Bat. </span><span id="tel-bateria-valor">--%</span></span>
+                            <span class="badge" title="Altura"><span class="fw-normal opacity-75">Alt. </span><span id="tel-altura-valor">-- cm</span></span>
+                            <span id="cab-chip-fps" class="badge solo-tecnico" hidden></span>
                         </div>
                     </div>
                     <div id="cab-ensayo" class="cartel-ensayo" hidden></div>
@@ -1299,163 +1304,150 @@ const Dron = (() => {
 
                 <!-- Velocidad de los botones (arranca siempre en Lenta) -->
                 <div id="cab-velocidad" class="cab-velocidad">
-                    <div class="cab-velocidad__selector" role="group" aria-label="Velocidad">
-                        <span class="cab-velocidad__etq">Velocidad</span>
-                        <button class="btn btn--secundario cab-vel" data-velocidad="lenta" aria-pressed="true">Lenta</button>
-                        <button class="btn btn--secundario cab-vel" data-velocidad="normal" aria-pressed="false">Normal</button>
-                        <button class="btn btn--secundario cab-vel" data-velocidad="rapida" aria-pressed="false">Rápida</button>
+                    <div class="btn-group" role="group" aria-label="Velocidad">
+                        <button class="btn btn-outline-primary cab-vel" data-velocidad="lenta" aria-pressed="true">Lenta</button>
+                        <button class="btn btn-outline-primary cab-vel" data-velocidad="normal" aria-pressed="false">Normal</button>
+                        <button class="btn btn-outline-primary cab-vel" data-velocidad="rapida" aria-pressed="false">Rápida</button>
                     </div>
-                    <p class="cab-ayuda-mando">Mantené apretado para mover el dron; soltá para frenar.</p>
+                    <p class="small text-body-secondary mb-0 mt-1">Mantené apretado para mover el dron; soltá para frenar.</p>
                 </div>
 
                 <div class="cab-lado cab-lado--der">
-                    <div class="cab-botones">
-                        <button id="btn-toggle-giro" class="btn btn--secundario">🧭 Inclinación: OFF</button>
-                        <button id="btn-toggle-seguimiento" class="btn btn--secundario">${App.icono('objetivo')} Seguimiento: OFF</button>
+                    <div class="d-grid gap-2">
+                        <button id="btn-toggle-giro" class="btn btn-outline-secondary">Inclinación: OFF</button>
+                        <button id="btn-toggle-seguimiento" class="btn btn-outline-secondary">Seguir persona</button>
                     </div>
                     <div class="cab-mando">
-                        <span class="cab-joy-etq">Avanzar · De costado</span>
+                        <span class="small text-body-secondary">Avanzar · De costado</span>
                         <div class="cab-cruz cab-cruz--mantener">
-                            <span></span><button class="btn btn--secundario cab-mantener" data-mover="adelante" aria-label="Adelante" title="Adelante" disabled>${App.icono('tri-arriba')}</button><span></span>
-                            <button class="btn btn--secundario cab-mantener" data-mover="izquierda" aria-label="Izquierda" title="Izquierda" disabled>${App.icono('tri-izq')}</button><span></span><button class="btn btn--secundario cab-mantener" data-mover="derecha" aria-label="Derecha" title="Derecha" disabled>${App.icono('tri-der')}</button>
-                            <span></span><button class="btn btn--secundario cab-mantener" data-mover="atras" aria-label="Atrás" title="Atrás" disabled>${App.icono('tri-abajo')}</button><span></span>
+                            <span></span>${mantener('adelante', 'Adelante', 'tri-arriba')}<span></span>
+                            ${mantener('izquierda', 'Izquierda', 'tri-izq')}<span></span>${mantener('derecha', 'Derecha', 'tri-der')}
+                            <span></span>${mantener('atras', 'Atrás', 'tri-abajo')}<span></span>
                         </div>
                     </div>
                     <div class="cab-joystick" hidden>
-                        <span class="cab-joy-etq">${App.icono('flechas-v')} Avanzar · ${App.icono('flechas-h')} De costado</span>
+                        <span class="small text-body-secondary">Avanzar · De costado</span>
                         <div id="joystick-derecho"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Modo técnico: detalle del seguimiento, lo que ve el modelo, prueba en CPU y registro -->
-            <section class="cab-panel solo-tecnico">
-                <p class="etiqueta">Modo técnico · Seguimiento</p>
-                <ul class="ayuda-tecnica">
-                    <li><b>Lo que ve el modelo:</b> la imagen que analiza el detector, con todo lo que encuentra y su puntaje (desde el 10 %).</li>
-                    <li><b>Probar este cuadro en CPU:</b> analiza la misma imagen con la placa de video (WebGL) y con el procesador (CPU) para ver si la placa analiza mal.</li>
-                    <li><b>Copiar registro:</b> copia una tabla (CSV) con cada imagen analizada, para mandarla y revisarla.</li>
-                </ul>
-                <div class="detalle-seguimiento">
-                    <figure class="miniatura-modelo">
-                        <canvas id="cab-miniatura" width="160" height="120"></canvas>
-                        <figcaption>Lo que ve el modelo</figcaption>
-                    </figure>
-                    <div id="cab-panel-seg" class="detalle-seguimiento__panel" data-vacio="Iniciá el seguimiento para ver el detalle."></div>
-                </div>
-                <div class="par-botones mt-sm">
-                    <button id="btn-probar-cpu" class="btn btn--secundario">${App.icono('probeta')} Probar este cuadro en CPU</button>
-                    <button id="btn-copiar-registro-seg" class="btn btn--secundario" hidden>${App.icono('copiar')} Copiar registro</button>
-                </div>
-                <pre id="cab-resultado-cpu" class="panel-seguimiento mt-sm" hidden></pre>
-            </section>
-
-            <!-- Modo técnico: joysticks en lugar de los botones -->
-            <section class="cab-panel solo-tecnico">
-                <p class="etiqueta">Modo técnico · Mandos</p>
-                <ul class="ayuda-tecnica">
-                    <li><b>Usar joysticks:</b> cambia los botones por las palancas de antes (mueven según cuánto las corrés: son más sensibles). Al salir de la cabina vuelven los botones.</li>
-                </ul>
-                <div class="par-botones mt-sm">
-                    <button id="btn-cambiar-mando" class="btn btn--secundario">Usar joysticks</button>
-                </div>
-            </section>
-
-            <!-- Modo técnico: comandos y respuestas del dron -->
-            <section class="cab-panel solo-tecnico">
-                <p class="etiqueta">Modo técnico · Conexión</p>
-                <ul class="ayuda-tecnica">
-                    <li><b>Copiar registro de comandos:</b> copia cada orden que se mandó al dron y cada respuesta que llegó, con su puerto (UDP), para revisar la conexión.</li>
-                </ul>
-                <div class="par-botones mt-sm">
-                    <button id="btn-copiar-registro-udp" class="btn btn--secundario">${App.icono('copiar')} Copiar registro de comandos</button>
-                </div>
-            </section>
-
-            <div class="cab-acciones">
-                <button id="btn-reconectar" class="btn btn--primario" hidden>${App.icono('recargar')} Reconectar</button>
-                <button id="btn-ir-config-dron" class="btn btn--secundario">${App.icono('llave-ajuste')} Config. dron</button>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <button id="btn-reconectar" class="btn btn-primary flex-fill" hidden>Reconectar</button>
+                <button id="btn-ir-config-dron" class="btn btn-outline-secondary flex-fill solo-tecnico">Config. Dron</button>
             </div>
 
             <!-- Seguimiento estilo RAC (las tarjetas las arma dron-seguimiento-ui.js) -->
-            <section class="cab-panel">
+            <section class="border-top pt-4 mt-3">
                 <p class="etiqueta">01 — Seguimiento</p>
-                <h3 class="cab-panel__titulo">Seguimiento</h3>
-                <p class="cab-ayuda">La app busca a una persona (la cara o, si no se ve, el cuerpo) o lo que elijas, y muestra qué haría el dron. Arranca en ensayo: no lo mueve.</p>
+                <p class="small text-body-secondary">Elegí qué seguir: una persona (la cara o, si no se ve, el cuerpo) o un objeto. Arranca en ensayo: muestra qué haría el dron, pero no lo mueve.</p>
                 <div id="cab-seguimiento"></div>
                 <img id="cab-foto-prueba" src="/img/prueba-persona.jpg" alt="" hidden>
             </section>
 
-            <!-- Inclinación -->
-            <section class="cab-panel">
-                <p class="etiqueta">02 — Inclinación</p>
-                <h3 class="cab-panel__titulo">Inclinación</h3>
-                <p class="cab-ayuda">Movés el dron inclinando el celular. Sostené el celular como lo vas a usar y tocá Calibrar: esa posición será "quieto".</p>
-                <div class="cab-opciones">
-                    <button id="btn-calibrar-giro" class="btn btn--secundario">${App.icono('objetivo')} Calibrar</button>
+            <!-- Modo técnico: detalle del seguimiento, lo que ve el modelo, prueba en CPU y registro -->
+            <section class="solo-tecnico border-top pt-4 mt-3">
+                <p class="etiqueta">Modo técnico · Seguimiento</p>
+                <ul class="small text-body-secondary ps-3">
+                    <li><b>Lo que ve el modelo:</b> la imagen que analiza el detector, con todo lo que encuentra y su puntaje (desde el 10 %).</li>
+                    <li><b>Probar este cuadro en CPU:</b> analiza la misma imagen con la placa de video (WebGL) y con el procesador (CPU) para ver si la placa analiza mal.</li>
+                    <li><b>Copiar registro:</b> copia una tabla (CSV) con cada imagen analizada, para mandarla y revisarla.</li>
+                </ul>
+                <div class="d-flex flex-wrap gap-3 align-items-start">
+                    <figure class="miniatura-modelo m-0">
+                        <canvas id="cab-miniatura" width="160" height="120"></canvas>
+                        <figcaption class="small text-body-secondary mt-1">Lo que ve el modelo</figcaption>
+                    </figure>
+                    <div id="cab-panel-seg" class="detalle-seguimiento__panel" data-vacio="Iniciá el seguimiento para ver el detalle."></div>
                 </div>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button id="btn-probar-cpu" class="btn btn-outline-secondary">Probar este cuadro en CPU</button>
+                    <button id="btn-copiar-registro-seg" class="btn btn-outline-secondary" hidden>Copiar registro</button>
+                </div>
+                <pre id="cab-resultado-cpu" class="panel-seguimiento mt-2" hidden></pre>
+            </section>
+
+            <!-- Modo técnico: joysticks en lugar de los botones -->
+            <section class="solo-tecnico border-top pt-4 mt-3">
+                <p class="etiqueta">Modo técnico · Mandos</p>
+                <p class="small text-body-secondary"><b>Usar joysticks:</b> cambia los botones por las palancas de antes (mueven según cuánto las corrés: son más sensibles). Al salir de la cabina vuelven los botones.</p>
+                <button id="btn-cambiar-mando" class="btn btn-outline-secondary">Usar joysticks</button>
+            </section>
+
+            <!-- Modo técnico: comandos y respuestas del dron -->
+            <section class="solo-tecnico border-top pt-4 mt-3">
+                <p class="etiqueta">Modo técnico · Conexión</p>
+                <p class="small text-body-secondary"><b>Copiar registro de comandos:</b> copia cada orden que se mandó al dron y cada respuesta que llegó, con su puerto (UDP), para revisar la conexión.</p>
+                <button id="btn-copiar-registro-udp" class="btn btn-outline-secondary">Copiar registro de comandos</button>
+            </section>
+
+            <!-- Inclinación -->
+            <section class="border-top pt-4 mt-3">
+                <p class="etiqueta">02 — Inclinación</p>
+                <p class="small text-body-secondary">Movés el dron inclinando el celular. Sostené el celular como lo vas a usar y tocá Calibrar: esa posición será "quieto".</p>
+                <button id="btn-calibrar-giro" class="btn btn-outline-secondary">Calibrar</button>
             </section>
 
             <!-- Movimientos por paso -->
-            <section class="cab-panel">
+            <section class="border-top pt-4 mt-3">
                 <p class="etiqueta">03 — Por pasos</p>
-                <h3 class="cab-panel__titulo">Movimientos por paso</h3>
-                <p class="cab-ayuda">Cada botón mueve el dron la distancia elegida y lo deja quieto. El botón rojo lo frena.</p>
-                <div class="cab-opciones">
-                    <label>Distancia
-                        <select id="sel-paso-distancia" class="cab-select">
+                <p class="small text-body-secondary">Cada botón mueve el dron la distancia elegida y lo deja quieto. El botón rojo lo frena.</p>
+                <div class="row g-2 mb-3">
+                    <div class="col">
+                        <label class="form-label small text-body-secondary mb-1" for="sel-paso-distancia">Distancia</label>
+                        <select id="sel-paso-distancia" class="form-select">
                             <option value="20">20 cm</option>
                             <option value="30" selected>30 cm</option>
                             <option value="50">50 cm</option>
                             <option value="100">100 cm</option>
                         </select>
-                    </label>
-                    <label>Giro
-                        <select id="sel-paso-angulo" class="cab-select">
+                    </div>
+                    <div class="col">
+                        <label class="form-label small text-body-secondary mb-1" for="sel-paso-angulo">Giro</label>
+                        <select id="sel-paso-angulo" class="form-select">
                             <option value="45">45°</option>
                             <option value="90" selected>90°</option>
                             <option value="180">180°</option>
                         </select>
-                    </label>
+                    </div>
                 </div>
-                <div class="cab-pasos">
+                <div class="d-flex flex-wrap align-items-center justify-content-center gap-3">
                     <div class="cab-cruz">
                         <span></span>
-                        <button id="btn-paso-adelante" class="btn btn--secundario" aria-label="Adelante">${App.icono('tri-arriba')}</button>
+                        <button id="btn-paso-adelante" class="btn btn-outline-secondary" aria-label="Adelante">${App.icono('tri-arriba')}</button>
                         <span></span>
-                        <button id="btn-paso-izquierda" class="btn btn--secundario" aria-label="Izquierda">${App.icono('tri-izq')}</button>
-                        <button id="btn-paso-frenar" class="btn btn--peligro" aria-label="Frenar">${App.icono('detener')}</button>
-                        <button id="btn-paso-derecha" class="btn btn--secundario" aria-label="Derecha">${App.icono('tri-der')}</button>
+                        <button id="btn-paso-izquierda" class="btn btn-outline-secondary" aria-label="Izquierda">${App.icono('tri-izq')}</button>
+                        <button id="btn-paso-frenar" class="btn btn-danger" aria-label="Frenar">${App.icono('detener')}</button>
+                        <button id="btn-paso-derecha" class="btn btn-outline-secondary" aria-label="Derecha">${App.icono('tri-der')}</button>
                         <span></span>
-                        <button id="btn-paso-atras" class="btn btn--secundario" aria-label="Atrás">${App.icono('tri-abajo')}</button>
+                        <button id="btn-paso-atras" class="btn btn-outline-secondary" aria-label="Atrás">${App.icono('tri-abajo')}</button>
                         <span></span>
                     </div>
-                    <div class="cab-pasos__extra">
-                        <button id="btn-paso-subir" class="btn btn--secundario">${App.icono('chevron-arriba')} Subir</button>
-                        <button id="btn-paso-bajar" class="btn btn--secundario">${App.icono('chevron-abajo')} Bajar</button>
-                        <button id="btn-paso-girar-izq" class="btn btn--secundario">${App.icono('girar-izq')} Girar izq.</button>
-                        <button id="btn-paso-girar-der" class="btn btn--secundario">${App.icono('girar-der')} Girar der.</button>
+                    <div class="row row-cols-2 g-2 flex-grow-1">
+                        <div class="col"><button id="btn-paso-subir" class="btn btn-outline-secondary w-100">Subir</button></div>
+                        <div class="col"><button id="btn-paso-bajar" class="btn btn-outline-secondary w-100">Bajar</button></div>
+                        <div class="col"><button id="btn-paso-girar-izq" class="btn btn-outline-secondary w-100">Girar izq.</button></div>
+                        <div class="col"><button id="btn-paso-girar-der" class="btn btn-outline-secondary w-100">Girar der.</button></div>
                     </div>
                 </div>
-                <p id="estado-paso-texto" class="cab-panel__estado">Listo. El botón rojo del centro frena.</p>
+                <p id="estado-paso-texto" class="small text-body-secondary mt-3 mb-0">Listo. El botón rojo del centro frena.</p>
             </section>
 
             <!-- Misiones -->
-            <section class="cab-panel">
+            <section class="border-top pt-4 mt-3">
                 <p class="etiqueta">04 — Automático</p>
-                <h3 class="cab-panel__titulo">Misiones</h3>
-                <p class="cab-ayuda">Una lista de pasos que el dron hace solo. Elegí una y tocá Iniciar; Cancelar la frena.</p>
-                <div class="cab-mision">
-                    <select id="sel-mision-activa" class="cab-select" aria-label="Misión"></select>
-                    <button id="btn-ejecutar-mision" class="btn btn--primario">${App.icono('play')} Iniciar</button>
-                    <button id="btn-cancelar-mision" class="btn btn--peligro" hidden>${App.icono('alto')} Cancelar misión</button>
-                    <button id="btn-nueva-mision" class="btn btn--secundario">${App.icono('mas')} Nueva</button>
+                <p class="small text-body-secondary">Una lista de pasos que el dron hace solo. Elegí una y tocá Iniciar; Cancelar la frena.</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <select id="sel-mision-activa" class="form-select flex-grow-1 w-auto" aria-label="Misión"></select>
+                    <button id="btn-ejecutar-mision" class="btn btn-primary">Iniciar</button>
+                    <button id="btn-cancelar-mision" class="btn btn-danger" hidden>Cancelar misión</button>
+                    <button id="btn-nueva-mision" class="btn btn-outline-secondary solo-tecnico">Nueva</button>
                 </div>
-                <div id="info-mision-pasos" class="cab-panel__estado"></div>
+                <div id="info-mision-pasos" class="small text-body-secondary mt-2"></div>
             </section>
 
-            <p class="cab-nota">
-                ${App.icono('escudo')} Vuelo supervisado, con 3×3 m libres de personas. El seguimiento arranca en ensayo; el control real es experimental y pide confirmación.
+            <p class="small text-body-secondary text-center border-top pt-3 mt-3">
+                Vuelo supervisado, con 3×3 m libres de personas. El seguimiento arranca en ensayo; el control real es experimental y pide confirmación.
             </p>
         </div>`;
     }

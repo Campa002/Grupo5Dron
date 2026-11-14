@@ -96,11 +96,11 @@
 // ============================================================
 // Para entornos de prueba o desarrollo local sin certificado SSL válido,
 // poner en true para usar client.setInsecure().
-// ⚠️ ADVERTENCIA: CLIENT_INSECURE_MODE en true NO valida el certificado del
+// AVISO: ADVERTENCIA: CLIENT_INSECURE_MODE en true NO valida el certificado del
 // servidor, permitiendo ataques Man-in-the-Middle en redes públicas.
 // En producción, poner en false e incluir el certificado raíz CA (ROOT_CA_CERT).
 //
-// 📌 GUÍA: ¿QUÉ CERTIFICADO RAÍZ USAR SEGÚN EL PROVEEDOR DE HOSTING?
+// GUÍA: ¿QUÉ CERTIFICADO RAÍZ USAR SEGÚN EL PROVEEDOR DE HOSTING?
 //  1. Let's Encrypt (cPanel AutoSSL o Certbot):
 //     - Certificado Raíz: "ISRG Root X1" (incluido por defecto abajo). Válido hasta 2035.
 //  2. cPanel (Sectigo / Comodo AutoSSL):

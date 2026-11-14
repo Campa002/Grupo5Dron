@@ -38,9 +38,13 @@ const ConfigDron = (() => {
         },
     ];
 
-    /** El perfil elegido (si lo guardado no es uno de los dos, por ejemplo uno viejo del servidor, el Tello). */
+    /**
+     * El perfil elegido. Si lo guardado no es uno de los dos (por ejemplo, uno viejo del servidor), el Tello.
+     * El Simulador es de prueba: solo vale con el modo técnico; sin él, la cabina usa siempre el Tello.
+     */
     function perfilActivoId() {
         const id = localStorage.getItem('grupo5dron_perfil_activo');
+        if (id === 'simulador-local' && !App.modoTecnico()) return 'tello-default';
         return PERFILES.some(p => p.id === id) ? id : 'tello-default';
     }
 
@@ -75,67 +79,52 @@ const ConfigDron = (() => {
     function _plantillaBase() {
         return `
         <div class="config-dron-pagina">
-            <header class="encabezado">
-                <p class="etiqueta etiqueta--linea">Configuración</p>
-                <h2 class="titulo-grande">Config. del dron</h2>
-                <p class="bajada">Elegí con qué dron vuela la cabina. Se guarda en el teléfono y funciona sin internet.</p>
+            <header class="mb-4">
+                <p class="etiqueta">Configuración</p>
+                <h1 class="h3 fw-bold text-uppercase">Configuración</h1>
+                <p class="text-body-secondary mb-0">El dron que usa la cabina y, en el modo técnico, los ajustes avanzados. Se guarda en el teléfono.</p>
             </header>
 
             <!-- 01 — Perfil -->
-            <section class="bloque">
+            <section class="mb-5">
                 <p class="etiqueta">01 — Perfil</p>
-                <h3 class="bloque__titulo">Dron de la cabina</h3>
+                <h2 class="h5 fw-bold text-uppercase">Dron de la cabina</h2>
                 <div id="config-dron-contenido"></div>
             </section>
 
-            <!-- 02 — Modo técnico -->
-            <section class="bloque">
-                <p class="etiqueta">02 — Diagnóstico</p>
-                <h3 class="bloque__titulo">Modo técnico</h3>
-                <p class="bloque__texto">
-                    Muestra herramientas para buscar problemas: registros de la conexión, el detalle del seguimiento,
-                    lo que analiza la cámara y ajustes avanzados. Arranca apagado.
-                </p>
-                <label class="switch" for="switch-modo-tecnico">
-                    <input type="checkbox" id="switch-modo-tecnico">
-                    <span class="switch__control" aria-hidden="true"></span>
-                    <span class="switch__label">Mostrar el modo técnico</span>
-                </label>
-            </section>
-
-            <!-- 03 — Failsafe (modo técnico; el failsafe está siempre activo) -->
-            <section class="bloque solo-tecnico">
-                <p class="etiqueta">03 — Seguridad</p>
-                <h3 class="bloque__titulo">Aterrizaje de seguridad (failsafe)</h3>
-                <p class="bloque__texto">
+            <!-- 02 — Failsafe (modo técnico; el failsafe está siempre activo) -->
+            <section class="mb-5 solo-tecnico">
+                <p class="etiqueta">02 — Seguridad</p>
+                <h2 class="h5 fw-bold text-uppercase">Aterrizaje de seguridad (failsafe)</h2>
+                <p class="small text-body-secondary">
                     Siempre está activo. Si dejan de llegar los datos del dron (telemetría, por UDP 8890) durante este tiempo,
                     la app lo frena y lo hace aterrizar.
                 </p>
-                <div class="flex items-center gap-sm flex-wrap">
-                    <input type="number" id="input-failsafe-timeout" class="campo__input" style="width:8rem;" min="1000" max="30000" step="500" value="3500" aria-label="Tiempo del failsafe en milisegundos">
-                    <span class="texto-xs texto-secundario">ms (1000 a 30000; por defecto 3500)</span>
-                    <button id="btn-guardar-failsafe" class="btn btn--secundario">Guardar</button>
+                <div class="input-group" style="max-width: 22rem;">
+                    <input type="number" id="input-failsafe-timeout" class="form-control" min="1000" max="30000" step="500" value="3500" aria-label="Tiempo del failsafe en milisegundos">
+                    <span class="input-group-text">ms</span>
+                    <button id="btn-guardar-failsafe" class="btn btn-outline-secondary">Guardar</button>
                 </div>
+                <div class="form-text">De 1000 a 30000; por defecto 3500.</div>
             </section>
 
-            <!-- 04 — Sentido del avance por inclinación (modo técnico) -->
-            <section class="bloque solo-tecnico">
-                <p class="etiqueta">04 — Inclinación</p>
-                <h3 class="bloque__titulo">Sentido del avance</h3>
-                <p class="bloque__texto">
+            <!-- 03 — Sentido del avance por inclinación (modo técnico) -->
+            <section class="mb-5 solo-tecnico">
+                <p class="etiqueta">03 — Inclinación</p>
+                <h2 class="h5 fw-bold text-uppercase">Sentido del avance</h2>
+                <p class="small text-body-secondary">
                     Normal: inclinar el celular hacia adelante (el borde de arriba de la pantalla hacia abajo) avanza,
                     como empujar un joystick. Invertido: levantar el borde de arriba hacia vos avanza (el sentido anterior).
                     Vale desde la próxima vez que actives la inclinación.
                 </p>
-                <label class="switch" for="switch-invertir-avance">
-                    <input type="checkbox" id="switch-invertir-avance">
-                    <span class="switch__control" aria-hidden="true"></span>
-                    <span class="switch__label">Invertir avance</span>
-                </label>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="switch-invertir-avance">
+                    <label class="form-check-label" for="switch-invertir-avance">Invertir avance</label>
+                </div>
             </section>
 
-            <!-- 05 — Ajustes del seguimiento (modo técnico; se guardan en el teléfono) -->
-            <section class="bloque solo-tecnico" id="ajustes-seguimiento"></section>
+            <!-- 04 — Ajustes del seguimiento (modo técnico; se guardan en el teléfono) -->
+            <section class="mb-5 solo-tecnico" id="ajustes-seguimiento"></section>
 
         </div>`;
     }
@@ -144,7 +133,7 @@ const ConfigDron = (() => {
         const div = contenedor.querySelector('#config-dron-contenido');
         if (!div) return;
         const activoId = perfilActivoId();
-        div.innerHTML = `<div class="grilla-perfiles" style="display:grid; gap: var(--espacio-md); grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));">
+        div.innerHTML = `<div class="list-group">
             ${PERFILES.map(p => _tarjetaPerfil(p, activoId)).join('')}
         </div>`;
 
@@ -163,16 +152,17 @@ const ConfigDron = (() => {
         const esTello = p.tipo_adaptador === 'tello';
 
         return `
-        <div class="tarjeta tarjeta-perfil ${esActivo ? 'tarjeta--acento' : ''}" data-id="${_esc(perfil.id)}">
-            <div class="flex items-center gap-sm mb-md">
-                <span style="font-size:1.5rem; line-height:1; color: var(--color-celeste);">${App.icono(esTello ? 'dron' : 'simulador')}</span>
-                <h3 class="tarjeta__titulo" style="margin:0;">${_esc(perfil.nombre)}</h3>
+        <div class="list-group-item py-3 ${esActivo ? 'border-primary' : ''} ${esTello ? '' : 'solo-tecnico'}" data-id="${_esc(perfil.id)}">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+                <div>
+                    <p class="fw-semibold mb-1">${_esc(perfil.nombre)}</p>
+                    <p class="small text-body-secondary mb-0">${_esc(perfil.descripcion)}</p>
+                    ${esTello ? `<p class="small text-body-secondary mt-1 mb-0 solo-tecnico">IP: <code>${_esc(p.ip)}</code> · Puerto de comandos: <code>${_esc(String(p.puerto_comando))}</code></p>` : ''}
+                </div>
+                <button class="btn ${esActivo ? 'btn-outline-secondary' : 'btn-primary'} text-nowrap btn-seleccionar-perfil solo-tecnico" data-id="${_esc(perfil.id)}" ${esActivo ? 'disabled' : ''}>
+                    ${esActivo ? 'Seleccionado' : 'Seleccionar'}
+                </button>
             </div>
-            <p class="texto-sm texto-secundario mb-md">${_esc(perfil.descripcion)}</p>
-            ${esTello ? `<p class="texto-xs texto-secundario mb-md solo-tecnico">IP: <code>${_esc(p.ip)}</code> · Puerto de comandos: <code>${_esc(String(p.puerto_comando))}</code></p>` : ''}
-            <button class="btn ${esActivo ? 'btn--secundario' : 'btn--primario'} btn--bloque btn-seleccionar-perfil" data-id="${_esc(perfil.id)}" ${esActivo ? 'disabled' : ''}>
-                ${esActivo ? App.icono('check') + ' Seleccionado' : 'Seleccionar'}
-            </button>
         </div>`;
     }
 
@@ -199,30 +189,30 @@ const ConfigDron = (() => {
         for (const [clave, r] of Object.entries(R)) (grupos[r.grupo] = grupos[r.grupo] || []).push([clave, r]);
 
         caja.innerHTML = `
-            <p class="etiqueta">05 — Seguimiento</p>
-            <h3 class="bloque__titulo">Ajustes del seguimiento</h3>
-            <p class="bloque__texto">
+            <p class="etiqueta">04 — Seguimiento</p>
+            <h2 class="h5 fw-bold text-uppercase">Ajustes del seguimiento</h2>
+            <p class="small text-body-secondary">
                 Se guardan en este teléfono y se aplican la próxima vez que inicies el seguimiento.
                 El seguimiento arranca en ensayo; el control real se activa en la cabina, con confirmación.
             </p>
             ${Object.entries(grupos).map(([grupo, campos]) => `
-                <fieldset style="border:1px solid var(--color-borde); border-radius: var(--radio-md); padding: var(--espacio-sm) var(--espacio-md); margin-bottom: var(--espacio-md);">
-                    <legend class="texto-sm font-semibold" style="padding: 0 var(--espacio-xs);">${_esc(grupo)}</legend>
-                    ${AYUDA_GRUPOS[grupo] ? `<p class="texto-xs texto-secundario mb-sm">${_esc(AYUDA_GRUPOS[grupo])}</p>` : ''}
-                    <div style="display:grid; gap: var(--espacio-sm) var(--espacio-md); grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));">
+                <fieldset class="border rounded p-3 mb-3">
+                    <legend class="float-none w-auto px-2 fs-6 fw-semibold mb-0">${_esc(grupo)}</legend>
+                    ${AYUDA_GRUPOS[grupo] ? `<p class="small text-body-secondary mb-2">${_esc(AYUDA_GRUPOS[grupo])}</p>` : ''}
+                    <div class="row row-cols-1 row-cols-sm-2 g-2">
                         ${campos.map(([clave, r]) => `
-                            <label class="campo" style="margin:0;">
-                                <span class="campo__label">${_esc(r.etiqueta)}${r.unidad ? ` (${_esc(r.unidad)})` : ''}</span>
-                                <input class="campo__input" type="number" inputmode="decimal" data-ajuste="${clave}"
+                            <label class="col">
+                                <span class="form-label small d-block mb-1">${_esc(r.etiqueta)}${r.unidad ? ` (${_esc(r.unidad)})` : ''}</span>
+                                <input class="form-control" type="number" inputmode="decimal" data-ajuste="${clave}"
                                     min="${redondear(r.min * (r.escala || 1))}" max="${redondear(r.max * (r.escala || 1))}" step="${redondear(r.paso * (r.escala || 1))}"
                                     value="${redondear(actuales[clave] * (r.escala || 1))}">
                             </label>`).join('')}
                     </div>
                 </fieldset>`).join('')}
-            <div id="ajustes-seguimiento-errores" class="alerta alerta--error mb-md" hidden></div>
-            <div class="flex gap-sm flex-wrap">
-                <button id="btn-guardar-ajustes-seg" class="btn btn--primario">Guardar ajustes</button>
-                <button id="btn-restaurar-ajustes-seg" class="btn btn--secundario">Valores por defecto</button>
+            <div id="ajustes-seguimiento-errores" class="alert alert-danger" hidden></div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button id="btn-guardar-ajustes-seg" class="btn btn-primary">Guardar ajustes</button>
+                <button id="btn-restaurar-ajustes-seg" class="btn btn-outline-secondary">Valores por defecto</button>
             </div>`;
 
         caja.querySelector('#btn-guardar-ajustes-seg').addEventListener('click', () => {
@@ -252,15 +242,6 @@ const ConfigDron = (() => {
 
     function _agregarEventos(contenedor) {
         _renderizarAjustesSeguimiento(contenedor);
-
-        const sw = contenedor.querySelector('#switch-modo-tecnico');
-        if (sw) {
-            sw.checked = App.modoTecnico();
-            sw.addEventListener('change', () => {
-                App.cambiarModoTecnico(sw.checked);
-                App.mostrarToast(sw.checked ? 'Modo técnico activado.' : 'Modo técnico apagado.', 'info');
-            });
-        }
 
         const swAvance = contenedor.querySelector('#switch-invertir-avance');
         if (swAvance && typeof DronGiroscopio !== 'undefined') {

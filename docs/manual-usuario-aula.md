@@ -11,7 +11,8 @@ El celular manda la orden al servidor por internet. El equipo del aula (un ESP32
 
 ## Iniciar sesión
 
-- Email y contraseña. En el APK, la primera vez también pide la dirección del servidor.
+- Email y contraseña. La dirección del servidor no se escribe: la web usa el servidor de donde se abrió y el APK la trae fija.
+- Si el APK muestra **"Falta configurar el servidor del aula"**, esa versión todavía no tiene la dirección del servidor y no deja iniciar sesión: usá la web del aula desde el navegador o pedile al administrador el APK nuevo (ver `despliegue-hosting.md`, paso 7).
 - En el primer ingreso obliga a cambiar la contraseña.
 - Roles: **docente** (usa el aula y aprende códigos), **administrador** (además, la administración) y **usuario** (usa el aula, no aprende códigos).
 
@@ -45,4 +46,4 @@ Si dice "No llegó ningún código", probá de nuevo más cerca. Si dice "El equ
 
 ## Cambiar la contraseña
 
-Menú de usuario (arriba a la derecha) → Cambiar contraseña.
+Menú (arriba a la izquierda) → Cambiar contraseña. Arriba del menú figura quién está usando la app; ahí también está Cerrar sesión. "Administración" aparece solo para el administrador.

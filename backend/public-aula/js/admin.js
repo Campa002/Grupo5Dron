@@ -58,26 +58,26 @@ const Admin = (() => {
     // Tab: Historial
     // ============================================================
     async function cargarTabHistorial(contenedor) {
-        contenedor.innerHTML = '<div class="cargando"><div class="cargando__spinner"></div></div>';
+        contenedor.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-body-secondary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
 
         try {
             const resp = await API.comandos.historial(50);
             const historial = resp.historial || [];
 
             contenedor.innerHTML = `
-                <h3 class="mb-md">Historial de comandos</h3>
-                <div class="tabla-contenedor">
-                    <table class="tabla">
+                <h2 class="h5 fw-bold text-uppercase mb-3">Historial de órdenes</h2>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
                         <thead><tr><th>Fecha</th><th>Dispositivo</th><th>Botón</th><th>Estado</th><th>Resultado</th></tr></thead>
                         <tbody>
-                            ${historial.length === 0 ? '<tr><td colspan="5" class="texto-centro texto-secundario">Sin registros</td></tr>' : ''}
+                            ${historial.length === 0 ? '<tr><td colspan="5" class="text-center text-body-secondary">Sin registros</td></tr>' : ''}
                             ${historial.map((h) => `
                                 <tr>
-                                    <td class="texto-xs">${new Date(h.ejecutado_en).toLocaleString('es-AR')}</td>
+                                    <td class="small text-nowrap">${new Date(h.ejecutado_en).toLocaleString('es-AR')}</td>
                                     <td>${h.dispositivo || '-'}</td>
                                     <td>${h.boton || '-'}</td>
-                                    <td><span class="badge badge--${h.estado === 'ejecutado' ? 'exito' : 'error'}">${h.estado}</span></td>
-                                    <td class="texto-xs">${h.resultado || '-'}</td>
+                                    <td><span class="badge ${h.estado === 'ejecutado' ? 'text-bg-success' : 'text-bg-danger'}">${h.estado}</span></td>
+                                    <td class="small">${h.resultado || '-'}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -85,7 +85,7 @@ const Admin = (() => {
                 </div>
             `;
         } catch (error) {
-            contenedor.innerHTML = `<p class="texto-error">Error: ${error.message}</p>`;
+            contenedor.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
         }
     }
 
@@ -93,29 +93,29 @@ const Admin = (() => {
     // Tab: Usuarios
     // ============================================================
     async function cargarTabUsuarios(contenedor) {
-        contenedor.innerHTML = '<div class="cargando"><div class="cargando__spinner"></div></div>';
+        contenedor.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-body-secondary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
 
         try {
             const resp = await API.usuarios.listar();
             const usuarios = resp.usuarios || [];
 
             contenedor.innerHTML = `
-                <div class="flex justify-between items-center mb-md">
-                    <h3>Usuarios</h3>
-                    <button class="btn btn--primario" onclick="Admin.mostrarFormUsuario()">+ Nuevo usuario</button>
+                <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                    <h2 class="h5 fw-bold text-uppercase mb-0">Usuarios</h2>
+                    <button class="btn btn-primary" onclick="Admin.mostrarFormUsuario()">Nuevo usuario</button>
                 </div>
-                <div class="tabla-contenedor">
-                    <table class="tabla">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
                         <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
                         <tbody>
                             ${usuarios.map((u) => `
                                 <tr>
                                     <td><strong>${u.nombre}</strong></td>
-                                    <td class="texto-xs">${u.email}</td>
-                                    <td><span class="badge badge--info">${u.rol}</span></td>
-                                    <td><span class="badge badge--${u.activo ? 'exito' : 'error'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
+                                    <td class="small">${u.email}</td>
+                                    <td><span class="badge text-bg-secondary">${u.rol}</span></td>
+                                    <td><span class="badge ${u.activo ? 'text-bg-success' : 'text-bg-danger'}">${u.activo ? 'Activo' : 'Inactivo'}</span></td>
                                     <td>
-                                        <button class="btn btn--secundario btn--icono" onclick="Admin.eliminarUsuario(${u.id})" title="Desactivar" aria-label="Desactivar"><span class="ico ico--prohibido" aria-hidden="true"></span></button>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="Admin.eliminarUsuario(${u.id})" title="Desactivar">Desactivar</button>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -124,7 +124,7 @@ const Admin = (() => {
                 </div>
             `;
         } catch (error) {
-            contenedor.innerHTML = `<p class="texto-error">Error: ${error.message}</p>`;
+            contenedor.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
         }
     }
 
@@ -133,30 +133,32 @@ const Admin = (() => {
      */
     function mostrarFormUsuario() {
         const html = `
-            <div class="modal-overlay" id="modal-usuario">
-                <div class="modal">
-                    <div class="modal__header">
-                        <h3 class="modal__titulo">Nuevo usuario</h3>
-                        <button class="modal__cerrar" onclick="Admin.cerrarModal()">&times;</button>
+            <div class="modal-overlay modal" id="modal-usuario">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title fs-5">Nuevo usuario</h2>
+                        <button type="button" class="btn-close" onclick="Admin.cerrarModal()" aria-label="Cerrar"></button>
                     </div>
-                    <div class="modal__body">
-                        <div class="campo"><label class="campo__label">Nombre</label><input class="campo__input" id="usr-nombre" type="text" required></div>
-                        <div class="campo"><label class="campo__label">Email</label><input class="campo__input" id="usr-email" type="email" required></div>
-                        <div class="campo"><label class="campo__label">Contraseña</label><input class="campo__input" id="usr-password" type="password" minlength="6" required></div>
-                        <div class="campo">
-                            <label class="campo__label">Rol</label>
-                            <select class="campo__input" id="usr-rol">
+                    <div class="modal-body">
+                        <div class="mb-3"><label class="form-label" for="usr-nombre">Nombre</label><input class="form-control" id="usr-nombre" type="text" required></div>
+                        <div class="mb-3"><label class="form-label" for="usr-email">Email</label><input class="form-control" id="usr-email" type="email" required></div>
+                        <div class="mb-3"><label class="form-label" for="usr-password">Contraseña</label><input class="form-control" id="usr-password" type="password" minlength="6" required></div>
+                        <div>
+                            <label class="form-label" for="usr-rol">Rol</label>
+                            <select class="form-select" id="usr-rol">
                                 <option value="usuario">Usuario</option>
                                 <option value="docente">Docente</option>
                                 <option value="admin">Administrador</option>
                             </select>
                         </div>
                     </div>
-                    <div class="modal__footer">
-                        <button class="btn btn--secundario" onclick="Admin.cerrarModal()">Cancelar</button>
-                        <button class="btn btn--primario" onclick="Admin.crearUsuario()">Crear</button>
+                    <div class="modal-footer">
+                        <button class="btn btn-outline-secondary" onclick="Admin.cerrarModal()">Cancelar</button>
+                        <button class="btn btn-primary" onclick="Admin.crearUsuario()">Crear</button>
                     </div>
                 </div>
+              </div>
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', html);
@@ -198,7 +200,7 @@ const Admin = (() => {
     // Tab: Configuración
     // ============================================================
     async function cargarTabConfig(contenedor) {
-        contenedor.innerHTML = '<div class="cargando"><div class="cargando__spinner"></div></div>';
+        contenedor.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-body-secondary" role="status"><span class="visually-hidden">Cargando...</span></div></div>';
 
         try {
             const resp = await API.configuracion.obtener();
@@ -206,27 +208,19 @@ const Admin = (() => {
             const valores = resp.valores || {};
 
             contenedor.innerHTML = `
-                <h3 class="mb-md">Configuración del sistema</h3>
-
-                <div class="tarjeta mb-md">
-                    <div class="tarjeta__titulo">Control de relé 220V</div>
-                    <div class="advertencia-seguridad">
-                        <span class="advertencia-seguridad__icono"><span class="ico ico--alerta" aria-hidden="true"></span></span>
-                        <div>
-                            <strong>Requiere supervisión docente y medidas de seguridad eléctrica.</strong>
-                            <p class="texto-xs mt-sm">El control de un circuito de 220V mediante relé involucra riesgo eléctrico. Solo activar bajo supervisión de un docente calificado.</p>
-                        </div>
-                    </div>
-                    <label class="switch mt-md">
-                        <input type="checkbox" id="cfg-rele" ${valores.rele_habilitado === '1' ? 'checked' : ''} onchange="Admin.toggleRele(this.checked)">
-                        <span class="switch__control"></span>
-                        <span class="switch__label">Relé habilitado</span>
-                    </label>
+                <h2 class="h5 fw-bold text-uppercase mb-3">Relé de las luces (220 V)</h2>
+                <div class="alert alert-warning small">
+                    <strong class="d-block mb-1">Requiere supervisión docente y medidas de seguridad eléctrica.</strong>
+                    El control de un circuito de 220 V mediante relé involucra riesgo eléctrico. Solo activar bajo supervisión de un docente calificado.
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="cfg-rele" ${valores.rele_habilitado === '1' ? 'checked' : ''} onchange="Admin.toggleRele(this.checked)">
+                    <label class="form-check-label" for="cfg-rele">Relé habilitado</label>
                 </div>
 
             `;
         } catch (error) {
-            contenedor.innerHTML = `<p class="texto-error">Error: ${error.message}</p>`;
+            contenedor.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
         }
     }
 
