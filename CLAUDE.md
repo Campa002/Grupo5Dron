@@ -42,7 +42,7 @@ App del AULA (APK "Grupo 5 Aula", appId ar.edu.eest1vl.grupo5aula, con login)
 ```
 
 - Frontends: PWA en HTML/CSS/JS vanilla, router por hash.
-  - Dron, `backend/public/`: `#/inicio`, `#/dron`, `#/seguimiento` (cámara del celular), `#/prueba-tello`, `#/sensores`, `#/config-dron`, `#/objetos`. Cualquier otra ruta (por ejemplo la vieja `#/acerca` o `#/aula`) va al inicio. Rutas absolutas (`/js/...`): va en la raíz del hosting.
+  - Dron, `backend/public/`: `#/inicio` (botón Entrar a la cabina), `#/dron`, `#/config-dron`, `#/objetos` (se entra desde "Seguir objeto" de la cabina) y, solo con el modo técnico, `#/prueba-tello`, `#/sensores` y `#/seguimiento` (cámara del celular). Menú: Inicio, Cabina y Configuración (más las técnicas con el modo). Cualquier otra ruta (por ejemplo la vieja `#/acerca` o `#/aula`) va al inicio. Rutas absolutas (`/js/...`): va en la raíz del hosting.
   - Aula, `backend/public-aula/`: `#/login`, `#/aula` (la principal), `#/admin`, `#/cambiar-password`. Cualquier otra ruta va a `#/aula`. Rutas relativas (`js/...`, `pages/...`): en el hosting va en una subcarpeta (por ejemplo `/aula/`) y usa la misma `/api/`.
 - Cada app tiene su propio `app.css` con solo sus estilos (se separaron sin cambiar ningún estilo calculado: comparado contra `main` con Playwright).
 - Los APK empaquetan esos frontends: `node scripts/build-apk.js dron` genera `capacitor/www/` y `node scripts/build-apk.js aula` genera `capacitor-aula/www/` (los dos generados e ignorados por git), con un `index.html` estático a partir de `index.php` y las páginas (`pages/*.php`) con el mismo nombre, sin ningún bloque `<?php ... ?>`.
@@ -153,9 +153,9 @@ docs/contexto/    informe, historial, reportes
   - el aterrizaje al salir de la cabina en vuelo.
 - Interfaz en español, tema oscuro con azul institucional, sin violetas.
 - Diseño (rama `interfaz-bootstrap`, 13/11): Bootstrap 5.3.3 LOCAL (`libs/bootstrap/` en cada app, sin JS de Bootstrap) con `data-bs-theme="dark"` y el azul institucional en las variables `--bs-*` de `app.css`. Usar los componentes tal cual (navbar, list-group, alert, form-switch, progress, badge, table, nav-pills); `app.css` queda chico, solo con lo que Bootstrap no resuelve (cabina, estados sobre la imagen, colores del seguimiento, avisos, menú). Estilo racvision: `.etiqueta` arriba de cada título, títulos en mayúsculas, secciones "01 —", poco texto. `[hidden]` gana siempre (las utilidades `d-flex` usan `!important`). Sin sombras, gradientes ni brillos.
-- Modo técnico: lo que sirve para diagnosticar va con la clase `solo-tecnico` (oculta salvo `body.modo-tecnico`). Se activa en Config. Dron (`App.modoTecnico()`, `App.cambiarModoTecnico()`, clave `grupo5dron_modo_tecnico`) y arranca apagado. Lo oculto sigue funcionando (por ejemplo, el failsafe).
+- Modo técnico (14/11): lo que sirve para probar o diagnosticar va con la clase `solo-tecnico` (oculta salvo `body.modo-tecnico`) y las pantallas `RUTAS_TECNICAS` (Prueba Tello, Sensores, Seguimiento con la cámara: sin el modo van al inicio). Se prende y se apaga con 5 toques seguidos en el título de la app (`[data-titulo-app]`: barra de arriba y título de la cabina; `App.modoTecnico()`, `App.cambiarModoTecnico()`, clave `grupo5dron_modo_tecnico`) y arranca apagado. El perfil Simulador solo vale con el modo técnico (`perfilActivoId`). Lo oculto sigue funcionando (por ejemplo, el failsafe).
 - Lenguaje simple (pedido de Luciano del 6/11): en la interfaz normal nada de rc, UDP, telemetría, backend ni FPS; cada sección con una ayuda corta de una o dos líneas. En el modo técnico se pueden usar, con la explicación entre paréntesis, y cada herramienta lleva una línea que dice para qué sirve.
-- Sin emojis en la interfaz (el único que queda es 🧭 del giroscopio). Íconos: pocos, de Bootstrap Icons local (solo woff2), desde JS con `App.icono(nombre)` / `App.textoConIcono(el, nombre, texto)` (mapa `ICONOS` en `app.js`; un nombre sin ícono no dibuja nada) y `App.textoConPunto(el, color, texto)` para estados. Íconos decorativos con `aria-hidden` y siempre con texto visible o `aria-label`. Si cambia la lista de archivos de Bootstrap, actualizar `sw.js` (v14).
+- Sin emojis en ningún lado (interfaz, firmware, scripts y CI; 14/11). Íconos: pocos, de Bootstrap Icons local (solo woff2), desde JS con `App.icono(nombre)` / `App.textoConIcono(el, nombre, texto)` (mapa `ICONOS` en `app.js`; un nombre sin ícono no dibuja nada) y `App.textoConPunto(el, color, texto)` para estados. Íconos decorativos con `aria-hidden` y siempre con texto visible o `aria-label`. Si cambia la lista de archivos de Bootstrap, actualizar `sw.js` (v14).
 - Git: Luciano hace commit y push salvo que te pida lo contrario. Nunca uses `git push --force` ni `git reset --hard`.
 - No escribas documentación final salvo que te lo pida (se hace al final del proyecto).
 - Al terminar una tarea, separá siempre: qué verificaste de verdad, qué solo está escrito y qué necesita el dron o un Android real.
@@ -185,6 +185,13 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 - **Alimentación:** ESP32 por USB-C con cargador (5 V, 1 A o más; pico calculado ~520 mA). HLK y fusible fuera (mejora futura).
 - **Verificado:** 107 pruebas; Chromium con WebGL (SwiftShader) y cámara falsa: sigue la cara al 96 %, historial y diagnóstico sin errores; cabina con mock del Tello: ensayo sin rc, control real dentro de límites, perdido = rc 0 0 0 0, botón y pérdida de conexión vuelven a ensayo y el failsafe aterriza; 360/390/412 vertical y horizontal; aula con PHP 8.3 + MariaDB y ESP32 simulado (aprender, código DAIKIN de 280 bits y 583 tiempos que vuelve igual, luces, permisos); OpenSCAD y PrusaSlicer (carcasa).
 - **Sin probar:** todo con el celular, el dron, el ESP32 real, los controles del aula y la impresión. Guía: `docs/guia-pruebas-en-clase.md`.
+
+## Estado al 14/11/2026 (rama `interfaz-bootstrap`, PR #6 hacia `prueba-en-clase`)
+
+- Interfaz con Bootstrap 5.3 local (ver "Reglas de trabajo") y la dirección del servidor del aula fija (`SERVIDOR_AULA`).
+- Dron simple: inicio con Entrar a la cabina; seguimiento en la cabina con botones grandes **Seguir persona** / **Seguir objeto** (lista con los objetos propios y los de COCO-SSD en español, `DronSeguimiento.clasesParaSeguir`, `elegirObjetivo`) y **Detener**; "Agregar objeto propio" dentro de Seguir objeto; el botón del costado es un atajo (Seguir persona / Detener seguimiento). Modo técnico con 5 toques (ver arriba).
+- Aula sin la insignia ESP32 de la barra ni el botón de usuario (repetían lo de la página y el menú); usuario arriba del menú; Administración solo para el admin.
+- Verificado con Playwright: modo normal y técnico, rutas técnicas, cabina con el Tello simulado (seguir persona, objeto, detener, atajo, mantener apretado), cámara falsa, aula con admin y docente. Sin probar en el celular.
 
 ## Decisiones tomadas sin consultar (13/11)
 
@@ -281,7 +288,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 - Seguimiento, etapa S2 (6/11):
   - Panel sobre el video (backend, FPS, demora, estado, personas y condiciones del control real); el comando lo muestra el cartel "ENSAYO".
   - Ajustes editables en Config. del dron, guardados en el teléfono (`grupo5dron_seguimiento_ajustes`, rangos en `DronSeguimiento.RANGOS`). Incluyen los de "Mis objetos" con el criterio de RAC (75 % y 8 detecciones; pérdida 3 de 5).
-  - "📋 Copiar registro": CSV por cuadro con detección, comando y telemetría; hasta 3000 cuadros.
+  - "Copiar registro": CSV por cuadro con detección, comando y telemetría; hasta 3000 cuadros.
   - Demo con la cámara del celular en Sensores: misma tubería y panel, en ensayo; apaga la cámara al salir.
   - Capacitor 5.7.8 pide el permiso CAMERA en tiempo de ejecución para el WebView (`BridgeWebChromeClient.onPermissionRequest`).
 - Seguimiento, etapa S1 (6/11): `dron-seguimiento.js` es una sola tubería.
@@ -290,9 +297,9 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
   - Controlador puro: yaw centra, throttle altura (no actúa si el recuadro está cortado), pitch distancia por la altura del recuadro, nunca roll; zona muerta, límites, aceleración gradual y vencimiento con decaimiento.
   - Bucle a 15 Hz y condiciones para el control real (función pura, se aplica en S3).
   - Pruebas: `tests/seguimiento.test.js` (`node --test`, 25 pruebas, también en CI).
-  - "Despegar" queda deshabilitado con "⏳ Esperando telemetría…" hasta el primer paquete.
+  - "Despegar" queda deshabilitado con "Esperando telemetría…" hasta el primer paquete.
   - La cancelación por toque de joystick se implementa en S3 con el control real: en ensayo los joysticks siguen funcionando.
-- Seguimiento, etapa S0 (6/11): en la cabina "🎯 Ensayo" calcula el comando y lo muestra sobre el video, pero nunca escribe los ejes del rc. Se puede usar en tierra y no interfiere con los joysticks ni con el giroscopio. Auditoría y plan completos del seguimiento: historial, §3, punto 17.
+- Seguimiento, etapa S0 (6/11): en la cabina "Ensayo" calcula el comando y lo muestra sobre el video, pero nunca escribe los ejes del rc. Se puede usar en tierra y no interfiere con los joysticks ni con el giroscopio. Auditoría y plan completos del seguimiento: historial, §3, punto 17.
 
 ## Próximos pasos (lista única)
 

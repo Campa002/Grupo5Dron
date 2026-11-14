@@ -24,7 +24,7 @@ if (!$password) {
 }
 
 if (strlen($password) < 8) {
-    die("⚠️ Error: La contraseña debe tener al menos 8 caracteres.\n");
+    die("AVISO: Error: La contraseña debe tener al menos 8 caracteres.\n");
 }
 
 $hash = password_hash($password, PASSWORD_DEFAULT);

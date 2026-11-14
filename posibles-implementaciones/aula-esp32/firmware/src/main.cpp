@@ -26,7 +26,7 @@ bool estadoLedOnboard = false;
 void imprimirBannerInicio() {
     Serial.println("\n");
     Serial.println("============================================================");
-    Serial.println("  ⚡ GRUPO 5: CONTROL DE SISTEMAS Y DRON");
+    Serial.println("  GRUPO 5: CONTROL DE SISTEMAS Y DRON");
     Serial.println("  EEST N° 1 de Vicente López \"Eduardo Ader\" — 7° 2°");
     Serial.printf("  Firmware ESP32 v%s | Compilación: %s %s\n", FIRMWARE_VERSION, __DATE__, __TIME__);
     Serial.println("============================================================");
@@ -64,7 +64,7 @@ void setup() {
         apiClient.enviarHeartbeat();
     }
 
-    Serial.println("\n[SISTEMA] ✓ Inicialización completada. Entrando al bucle principal.");
+    Serial.println("\n[SISTEMA] OK: Inicialización completada. Entrando al bucle principal.");
     Serial.printf("[SISTEMA] Intervalo de Polling: %d ms | Intervalo de Heartbeat: %d ms\n\n",
                   POLLING_INTERVAL_MS, HEARTBEAT_INTERVAL_MS);
 }

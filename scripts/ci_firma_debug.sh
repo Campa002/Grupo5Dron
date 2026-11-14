@@ -11,14 +11,14 @@ set -u
 instalar() {
   if [ -z "${DEBUG_KEYSTORE_BASE64:-}" ]; then
     echo "::notice::No existe el secreto DEBUG_KEYSTORE_BASE64: se usa la clave debug por defecto (cambia en cada build)."
-    echo "### 🔑 Firma: clave debug por defecto (cambia en cada build)" >> "$GITHUB_STEP_SUMMARY"
+    echo "### Firma: clave debug por defecto (cambia en cada build)" >> "$GITHUB_STEP_SUMMARY"
     return 0
   fi
   TMP="$RUNNER_TEMP/debug.keystore"
   if ! printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 -d > "$TMP" 2>/dev/null \
      || ! keytool -list -keystore "$TMP" -storepass android -alias androiddebugkey > /dev/null 2>&1; then
     echo "::warning::El secreto DEBUG_KEYSTORE_BASE64 no es un keystore válido (alias androiddebugkey, contraseña android): se usa la clave por defecto."
-    echo "### ⚠️ Firma: el secreto no es válido, se usó la clave por defecto" >> "$GITHUB_STEP_SUMMARY"
+    echo "### AVISO: Firma: el secreto no es válido, se usó la clave por defecto" >> "$GITHUB_STEP_SUMMARY"
     rm -f "$TMP"
     return 0
   fi
@@ -43,15 +43,15 @@ verificar() {
   fi
   FIRMA=$("${BT}apksigner" verify --print-certs "$APK" | grep -m1 'SHA-256 digest' | sed 's/.*digest: *//')
   echo "SHA-256 del certificado del APK: $FIRMA"
-  echo "### 🔑 Certificado del APK (SHA-256): \`$FIRMA\`" >> "$GITHUB_STEP_SUMMARY"
+  echo "### Certificado del APK (SHA-256): \`$FIRMA\`" >> "$GITHUB_STEP_SUMMARY"
   if [ -n "${HUELLA_CLAVE:-}" ]; then
     ESPERADA=$(printf '%s' "$HUELLA_CLAVE" | tr -d ':' | tr 'A-F' 'a-f')
     if [ "$FIRMA" = "$ESPERADA" ]; then
-      echo "✅ El APK quedó firmado con la clave fija."
-      echo "✅ Firmado con la clave fija: se instala encima del anterior sin desinstalar." >> "$GITHUB_STEP_SUMMARY"
+      echo "OK: El APK quedó firmado con la clave fija."
+      echo "OK: Firmado con la clave fija: se instala encima del anterior sin desinstalar." >> "$GITHUB_STEP_SUMMARY"
     else
       echo "::warning::El APK NO quedó firmado con la clave fija (esperada $ESPERADA)."
-      echo "⚠️ El APK no quedó firmado con la clave fija." >> "$GITHUB_STEP_SUMMARY"
+      echo "AVISO: El APK no quedó firmado con la clave fija." >> "$GITHUB_STEP_SUMMARY"
     fi
   fi
 }

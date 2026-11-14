@@ -125,7 +125,7 @@ void IrManager::activarModoAprendizaje(int botonId) {
     receptor.enableIRIn();
 
     Serial.println("============================================================");
-    Serial.printf("[IR] 🔴 MODO APRENDIZAJE ACTIVADO para botón ID: %d\n", botonId);
+    Serial.printf("[IR] MODO APRENDIZAJE ACTIVADO para botón ID: %d\n", botonId);
     Serial.printf("[IR] Apuntá el control remoto al receptor (GPIO %d) y presioná el botón...\n", PIN_IR_RECV);
     Serial.printf("[IR] Tiempo límite: %d segundos.\n", APRENDIZAJE_TIMEOUT_MS / 1000);
     Serial.println("============================================================");
@@ -150,7 +150,7 @@ void IrManager::verificarAprendizaje() {
 
     // Verificar timeout de aprendizaje
     if (millis() - tiempoInicioAprendizaje > APRENDIZAJE_TIMEOUT_MS) {
-        Serial.println("[IR] ⏰ Tiempo de aprendizaje agotado sin detectar señal válida.");
+        Serial.println("[IR] Tiempo de aprendizaje agotado sin detectar señal válida.");
         cancelarModoAprendizaje();
         return;
     }
@@ -163,7 +163,7 @@ void IrManager::verificarAprendizaje() {
         String codigoHex = resultToHexidecimal(&resultados); // ya viene con "0x"; en los aires, el estado completo
         uint16_t bits = resultados.bits;
 
-        Serial.println("\n[IR] 🎯 ¡SEÑAL IR CAPTURADA CON ÉXITO!");
+        Serial.println("\n[IR] ¡SEÑAL IR CAPTURADA CON ÉXITO!");
         Serial.printf("[IR] Protocolo detectado: %s\n", protocolo.c_str());
         Serial.printf("[IR] Código Hexadecimal: %s\n", codigoHex.c_str());
         Serial.printf("[IR] Longitud en Bits:   %u\n", bits);

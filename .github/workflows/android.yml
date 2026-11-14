@@ -192,10 +192,10 @@ jobs:
           APK_PATH="capacitor/android/app/build/outputs/apk/debug/app-debug.apk"
           if [ -f "$APK_PATH" ]; then
             SIZE=$(du -h "$APK_PATH" | cut -f1)
-            echo "📦 Tamaño del APK: $SIZE"
-            echo "### 📦 APK generado: $SIZE" >> $GITHUB_STEP_SUMMARY
+            echo "Tamaño del APK: $SIZE"
+            echo "### APK generado: $SIZE" >> $GITHUB_STEP_SUMMARY
           else
-            echo "⚠ APK no encontrado en $APK_PATH"
+            echo "AVISO: APK no encontrado en $APK_PATH"
           fi
 
   # APK de la app del AULA: otra app (appId ar.edu.eest1vl.grupo5aula, "Grupo 5 Aula"), sin el plugin del dron.

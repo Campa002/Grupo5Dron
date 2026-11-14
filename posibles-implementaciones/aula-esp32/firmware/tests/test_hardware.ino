@@ -40,7 +40,7 @@ bool modoMonitoreoReceptor = false;
 
 void mostrarMenu() {
     Serial.println("\n============================================================");
-    Serial.println("  🛠️ BANCO DE PRUEBAS DE HARDWARE — GRUPO 5");
+    Serial.println("  BANCO DE PRUEBAS DE HARDWARE — GRUPO 5");
     Serial.println("  EEST N° 1 de Vicente López \"Eduardo Ader\"");
     Serial.println("============================================================");
     Serial.println("Seleccioná una prueba enviando el número por el Monitor Serie:");
@@ -97,7 +97,7 @@ void probarEmisorIR() {
         Serial.printf("  -> Ráfaga %d/5 enviada.\n", i);
         delay(600);
     }
-    Serial.println("[TEST] ✓ Emisión IR completada (verificá con la cámara de un celular el parpadeo del LED).");
+    Serial.println("[TEST] OK: Emisión IR completada (verificá con la cámara de un celular el parpadeo del LED).");
 }
 
 void iniciarReceptorIR() {
@@ -135,7 +135,7 @@ void loop() {
         if (irRecv.decode(&results)) {
             digitalWrite(PIN_LED_ESTADO, HIGH);
             Serial.println("------------------------------------------------------------");
-            Serial.printf("✓ SEÑAL DETECTADA -> Protocolo: %s\n", typeToString(results.decode_type).c_str());
+            Serial.printf("OK: SEÑAL DETECTADA -> Protocolo: %s\n", typeToString(results.decode_type).c_str());
             Serial.printf("  Código Hex: %s\n", resultToHexidecimal(&results).c_str());
             Serial.printf("  Bits:       %u\n", results.bits);
             Serial.printf("  Pulsos:     %u%s\n", results.rawlen - 1, results.overflow ? " (CORTADA: más larga que el buffer)" : "");
@@ -170,7 +170,7 @@ void loop() {
             case 'm':
             case 'M': mostrarMenu(); break;
             default:
-                Serial.printf("\n⚠️ Opción '%c' no válida.\n", opcion);
+                Serial.printf("\nAVISO: Opción '%c' no válida.\n", opcion);
                 mostrarMenu();
                 break;
         }
