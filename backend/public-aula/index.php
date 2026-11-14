@@ -33,11 +33,6 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
     <header id="header-principal" class="navbar border-bottom px-3 py-2">
         <button id="btn-menu" class="btn btn-link text-body px-2" aria-label="Menú"><i class="bi bi-list fs-4" aria-hidden="true"></i></button>
         <span class="navbar-brand me-auto ms-2 fs-6 fw-semibold text-uppercase">Grupo 5 · Aula</span>
-        <span id="indicador-esp32" class="indicador indicador--offline me-2" title="ESP32 desconectado">
-            <span class="indicador__punto"></span>
-            <span class="indicador__texto">ESP32</span>
-        </span>
-        <button id="btn-usuario" class="btn btn-link text-body px-2" aria-label="Usuario"><i class="bi bi-person-circle fs-4" aria-hidden="true"></i></button>
     </header>
 
     <!-- Menú lateral (lo abre y lo cierra app.js) -->
@@ -45,12 +40,15 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
         <div class="offcanvas-backdrop" id="menu-overlay"></div>
         <div class="offcanvas offcanvas-start">
             <div class="offcanvas-header border-bottom">
-                <span class="offcanvas-title fw-semibold text-uppercase">Grupo 5 · Aula</span>
+                <div>
+                    <span class="offcanvas-title d-block fw-semibold text-uppercase">Grupo 5 · Aula</span>
+                    <span id="menu-usuario" class="d-block small text-body-secondary"></span>
+                </div>
             </div>
             <div class="offcanvas-body p-0">
                 <div class="list-group list-group-flush">
                     <a href="#/aula" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="aula">Control del aula</a>
-                    <a href="#/admin" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="admin">Administración</a>
+                    <a href="#/admin" class="list-group-item list-group-item-action py-3 menu-lateral__enlace solo-admin" data-pagina="admin">Administración</a>
                     <a href="#/cambiar-password" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="cambiar-password">Cambiar contraseña</a>
                     <a href="#" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" id="btn-cerrar-sesion">Cerrar sesión</a>
                 </div>

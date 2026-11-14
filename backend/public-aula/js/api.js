@@ -32,10 +32,6 @@ const API = (() => {
 
     const _baseUrl = _resolverBaseUrl();
 
-    function getBaseUrl() {
-        return _baseUrl;
-    }
-
     /** true si la app sabe a qué servidor hablarle (en el APK, si SERVIDOR_AULA está completa). */
     function servidorConfigurado() {
         return !!_baseUrl;
@@ -217,13 +213,11 @@ const API = (() => {
     // --- Dispositivos ---
     const dispositivos = {
         listar: () => get('dispositivos.php?action=listar'),
-        obtener: (id) => get(`dispositivos.php?action=obtener&id=${id}`),
     };
 
     // --- Botones ---
     const botones = {
         listar: (dispositivoId) => get(`botones.php?action=listar&dispositivo_id=${dispositivoId}`),
-        eliminarCodigoIr: (id) => eliminar(`botones.php?action=eliminar_codigo_ir&id=${id}`),
     };
 
     // --- Comandos ---
@@ -231,7 +225,6 @@ const API = (() => {
         enviar: (datos) => post('comandos.php?action=enviar', datos),
         estado: (id) => get(`comandos.php?action=estado&id=${id}`),
         historial: (limite) => get(`comandos.php?action=historial&limite=${limite || 50}`),
-        pendientes: () => get('comandos.php?action=pendientes'),
     };
 
     // --- ESP32 ---
@@ -242,17 +235,13 @@ const API = (() => {
     // --- Configuración ---
     const configuracion = {
         obtener: () => get('config.php?action=obtener'),
-        obtenerClave: (clave) => get(`config.php?action=obtener&clave=${clave}`),
         actualizar: (datos) => put('config.php?action=actualizar', datos),
     };
 
     // --- Usuarios ---
     const usuarios = {
         listar: () => get('usuarios.php?action=listar'),
-        obtener: (id) => get(`usuarios.php?action=obtener&id=${id}`),
-        actualizar: (id, datos) => put(`usuarios.php?action=actualizar&id=${id}`, datos),
         eliminar: (id) => eliminar(`usuarios.php?action=eliminar&id=${id}`),
-        cambiarPassword: (id, password) => put(`usuarios.php?action=cambiar_password&id=${id}`, { password }),
     };
 
     // API pública del módulo
@@ -261,10 +250,6 @@ const API = (() => {
         guardarToken,
         eliminarToken,
         estaAutenticado,
-        get,
-        post,
-        put,
-        eliminar,
         auth,
         dispositivos,
         botones,
@@ -274,8 +259,6 @@ const API = (() => {
         usuarios,
         servidorConfigurado,
         MENSAJE_SIN_SERVIDOR,
-        getBaseUrl,
-        esNativo,
         EVENTO_SESION_VENCIDA,
     };
 })();

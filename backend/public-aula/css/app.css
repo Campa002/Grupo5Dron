@@ -121,10 +121,8 @@
 .punto--acento { background: var(--bs-primary); }
 .punto--alerta { background: #f97316; }
 
-/* ---------- Insignia del ESP32 en la barra (aula.js cambia indicador--online / --offline) ---------- */
-.indicador { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8125rem; color: var(--bs-secondary-color); }
-.indicador__punto { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--bs-danger); }
-.indicador--online .indicador__punto { background: var(--bs-success); }
+/* ---------- Solo para administradores (app.js pone "rol-admin" en el body) ---------- */
+body:not(.rol-admin) .solo-admin { display: none !important; }
 
 /* ---------- Ventanas (app.js y admin.js las crean y las sacan; sin el JS de Bootstrap) ---------- */
 .modal-overlay.modal { display: block; background: rgba(0, 0, 0, 0.6); }

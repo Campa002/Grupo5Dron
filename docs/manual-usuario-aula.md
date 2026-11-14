@@ -46,4 +46,4 @@ Si dice "No llegó ningún código", probá de nuevo más cerca. Si dice "El equ
 
 ## Cambiar la contraseña
 
-Menú de usuario (arriba a la derecha) → Cambiar contraseña.
+Menú (arriba a la izquierda) → Cambiar contraseña. Arriba del menú figura quién está usando la app; ahí también está Cerrar sesión. "Administración" aparece solo para el administrador.

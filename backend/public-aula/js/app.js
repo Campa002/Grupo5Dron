@@ -168,18 +168,20 @@ const App = (() => {
         await inicializarControladorPagina(destino);
     }
 
+    const NOMBRE_ROL = { admin: 'administrador', docente: 'docente', usuario: 'usuario' };
+
     /**
-     * Ajusta el header y el menú: en el login no hay menú ni usuario.
+     * Ajusta el header y el menú: en el login no hay menú. Arriba del menú, quién está usando la app;
+     * "Administración" solo para el admin (body.rol-admin).
      * @param {string} destino ruta actual
      */
     function actualizarEncabezado(destino) {
         const enLogin = destino === 'login';
         const btnMenu = document.getElementById('btn-menu');
-        const btnUsuario = document.getElementById('btn-usuario');
-        const indicadorEsp = document.getElementById('indicador-esp32');
         if (btnMenu) btnMenu.style.visibility = enLogin ? 'hidden' : 'visible';
-        if (btnUsuario) btnUsuario.style.visibility = enLogin ? 'hidden' : 'visible';
-        if (indicadorEsp) indicadorEsp.style.display = enLogin ? 'none' : 'flex';
+        const usuario = Auth.obtenerUsuario();
+        const menuUsuario = document.getElementById('menu-usuario');
+        if (menuUsuario) menuUsuario.textContent = usuario ? `${usuario.nombre} · ${NOMBRE_ROL[usuario.rol] || usuario.rol}` : '';
         document.body.classList.toggle('rol-admin', Auth.esAdmin());
     }
 
@@ -232,77 +234,6 @@ const App = (() => {
             .replace(/'/g, '&#39;');
     }
 
-    // Los pocos íconos que usa el aula (Bootstrap Icons, locales). Un nombre sin ícono no dibuja nada.
-    const ICONOS = Object.freeze({ usuario: 'bi-person-circle', llave: 'bi-key', salir: 'bi-box-arrow-right' });
-
-    /**
-     * HTML de un ícono (Bootstrap Icons). Decorativo: siempre junto a un texto visible
-     * o dentro de un botón con aria-label.
-     */
-    function icono(nombre, clases = '') {
-        return ICONOS[nombre] ? `<i class="bi ${ICONOS[nombre]}${clases ? ' ' + clases : ''}" aria-hidden="true"></i>` : '';
-    }
-
-    /** Pone en `el` un ícono (opcional) y un texto plano. */
-    function textoConIcono(el, nombre, texto) {
-        if (!el) return;
-        el.replaceChildren();
-        if (ICONOS[nombre]) {
-            const ico = document.createElement('i');
-            ico.className = `bi ${ICONOS[nombre]}`;
-            ico.setAttribute('aria-hidden', 'true');
-            el.append(ico, ' ');
-        }
-        el.append(texto);
-    }
-
-    /** Muestra los datos de la sesión, con "Cambiar contraseña" y "Cerrar sesión". */
-    function mostrarModalUsuario() {
-        const usuario = Auth.obtenerUsuario();
-        if (!usuario) {
-            window.location.hash = '#/login';
-            return;
-        }
-        document.getElementById('modal-usuario')?.remove();
-
-        const modalOverlay = document.createElement('div');
-        modalOverlay.id = 'modal-usuario';
-        modalOverlay.className = 'modal-overlay modal';
-        modalOverlay.innerHTML = `
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2 class="modal-title fs-5">Perfil de usuario</h2>
-                        <button type="button" class="btn-close" id="btn-cerrar-modal-user" aria-label="Cerrar"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p class="fw-semibold mb-0">${escaparHtml(usuario.nombre)}</p>
-                        <p class="small text-body-secondary mb-2">${escaparHtml(usuario.email)}</p>
-                        <span class="badge text-bg-secondary">${escaparHtml(String(usuario.rol || '').toUpperCase())}</span>
-                        <button class="btn btn-outline-secondary w-100 mt-4" id="btn-modal-cambiar-pass">${icono('llave')} Cambiar contraseña</button>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-outline-secondary" id="btn-modal-cancelar">Cerrar</button>
-                        <button class="btn btn-danger" id="btn-modal-logout">${icono('salir')} Cerrar sesión</button>
-                    </div>
-                </div>
-            </div>`;
-        document.body.appendChild(modalOverlay);
-
-        const cerrar = () => modalOverlay.remove();
-        document.getElementById('btn-cerrar-modal-user').onclick = cerrar;
-        document.getElementById('btn-modal-cancelar').onclick = cerrar;
-        document.getElementById('btn-modal-cambiar-pass').onclick = () => {
-            cerrar();
-            window.location.hash = '#/cambiar-password';
-        };
-        modalOverlay.onclick = (e) => { if (e.target === modalOverlay) cerrar(); };
-        document.getElementById('btn-modal-logout').onclick = async () => {
-            cerrar();
-            await cerrarSesion();
-        };
-    }
-
     /** Cierra la sesión y vuelve al login. */
     async function cerrarSesion() {
         await Auth.logout();
@@ -314,7 +245,6 @@ const App = (() => {
     async function iniciar() {
         document.getElementById('btn-menu')?.addEventListener('click', toggleMenu);
         document.getElementById('menu-overlay')?.addEventListener('click', cerrarMenu);
-        document.getElementById('btn-usuario')?.addEventListener('click', mostrarModalUsuario);
         document.getElementById('btn-cerrar-sesion')?.addEventListener('click', async (e) => {
             e.preventDefault();
             cerrarMenu();
@@ -353,7 +283,5 @@ const App = (() => {
         mostrarToast,
         cargarRutaActual,
         cerrarMenu,
-        icono,
-        textoConIcono,
     };
 })();

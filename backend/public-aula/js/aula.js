@@ -238,12 +238,6 @@ const Aula = (() => {
             const resp = await API.esp32.estado();
             const estado = resp.estado;
             if (!estado) return;
-            // Insignia "ESP32" del encabezado
-            const indicador = document.getElementById('indicador-esp32');
-            if (indicador) {
-                indicador.className = `indicador indicador--${estado.en_linea ? 'online' : 'offline'}`;
-                indicador.title = estado.en_linea ? 'Equipo del aula en línea' : 'Equipo del aula desconectado';
-            }
             const info = document.getElementById('info-esp32');
             if (!info) return;
             if (estado.en_linea) {

@@ -71,10 +71,6 @@ const Auth = (() => {
     function guardarUsuario(usuario) {
         usuarioActual = usuario;
         localStorage.setItem('grupo5dron_usuario', JSON.stringify(usuario));
-
-        // Aplicar clase de rol al body
-        document.body.classList.remove('rol-admin', 'rol-docente', 'rol-usuario');
-        document.body.classList.add(`rol-${usuario.rol}`);
     }
 
     /**
@@ -101,7 +97,6 @@ const Auth = (() => {
         localStorage.removeItem('grupo5dron_usuario');
         usuarioActual = null;
         modoSinConexion = false;
-        document.body.classList.remove('rol-admin', 'rol-docente', 'rol-usuario');
     }
 
     /**
