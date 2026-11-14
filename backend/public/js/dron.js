@@ -191,13 +191,12 @@ const Dron = (() => {
                 chipFps: _q('#cab-chip-fps'),
                 fuente: 'dron',
                 fuenteTamano: () => { const v = _q('#canvas-video'); return [v?.width || 0, v?.height || 0]; },
-                onIniciar: _activarSeguimiento,
+                onIniciar: _seguirObjetivo,
                 onDetener: () => { _apagarSeguimiento(); App.mostrarToast('Seguimiento detenido.', 'info'); },
                 onTocar: (x, y) => _seguimiento?.elegirEnPunto(x, y) || { ok: false },
                 onDiagnosticar: () => _seguimiento.diagnosticar(_q('#cab-foto-prueba')),
                 onControlReal: _cambiarControlReal,
             });
-            _pantallaSeg.selectQueSeguir.addEventListener('change', _elegirQueSeguir);
         }
         // Al pasar a segundo plano, el control real vuelve a ensayo
         _onVisibilidad = () => { if (document.hidden) _volverAEnsayo('La app pasó a segundo plano: el seguimiento volvió a ensayo.'); };
@@ -206,7 +205,11 @@ const Dron = (() => {
         _agregarEventosCabina();
         _actualizarSelectMisiones();
         if (typeof DronObjetos !== 'undefined' && _pantallaSeg) {
-            App.llenarQueSeguir(_pantallaSeg.selectQueSeguir).then(lista => { if (gen === _generacion) _objetosGuardados = lista; });
+            App.objetosGuardados().then(lista => {
+                if (gen !== _generacion) return;
+                _objetosGuardados = lista;
+                _pantallaSeg?.setObjetos(lista);
+            });
         }
         await _conectar();
     }
@@ -791,7 +794,7 @@ const Dron = (() => {
     function _actualizarBotonGiro() {
         const btn = _q('#btn-toggle-giro');
         if (!btn) return;
-        btn.textContent = _modoGiro ? '🧭 Inclinación: ON' : '🧭 Inclinación: OFF';
+        btn.textContent = _modoGiro ? 'Inclinación: ON' : 'Inclinación: OFF';
         btn.classList.toggle('cab-activo', _modoGiro);
     }
 
@@ -802,10 +805,33 @@ const Dron = (() => {
     // (15 Hz) escribe los ejes con los límites de DronSeguimiento.LIMITES_CONTROL_REAL; sin objetivo, en 0.
     // ----------------------------------------------------------------
 
+    /** Botón del costado (a mano con el celular acostado): sigue a una persona, o detiene el seguimiento. */
     async function _toggleSeguimiento() {
         if (_modoSeguimiento) {
             _apagarSeguimiento();
             App.mostrarToast('Seguimiento detenido.', 'info');
+            return;
+        }
+        _pantallaSeg?.marcarObjetivo({ tipo: 'persona' });
+        await _seguirObjetivo({ tipo: 'persona' });
+    }
+
+    /**
+     * "Seguir persona" / "Seguir objeto": elige qué seguir y arranca el seguimiento (en ensayo).
+     * Si ya estaba andando, cambia el objetivo y vuelve a ensayo.
+     * @param {{tipo:'persona'}|{tipo:'clase', clase:string}|{tipo:'mio', id:string}} meta
+     */
+    async function _seguirObjetivo(meta) {
+        if (!_seguimiento) { App.mostrarToast('El seguimiento no está disponible.', 'advertencia'); return; }
+        const res = await _seguimiento.elegirObjetivo(meta, _objetosGuardados);
+        if (!_seguimiento) return; // salió de la cabina mientras cargaba
+        if (!res.ok) { App.mostrarToast(res.error, 'advertencia', 7000); return; }
+        if (_modoSeguimiento) {
+            _volverAEnsayo('Cambiaste qué seguir: el seguimiento volvió a ensayo.');
+            _seguimiento.desactivar();
+            _seguimiento.activar();
+            _pantallaSeg?.setActivo(true);
+            App.mostrarToast('Ahora sigue lo que elegiste (en ensayo).', 'info');
             return;
         }
         await _activarSeguimiento();
@@ -854,7 +880,7 @@ const Dron = (() => {
             _volverAEnsayo('Control real apagado: el seguimiento volvió a ensayo.');
             return false;
         }
-        if (!_modoSeguimiento) { App.mostrarToast('Primero tocá Iniciar seguimiento.', 'advertencia'); return false; }
+        if (!_modoSeguimiento) { App.mostrarToast('Primero tocá Seguir persona o Seguir objeto.', 'advertencia'); return false; }
         if (_failsafeBloquea()) return false;
         if (_maniobraEnCurso()) { App.mostrarToast('Esperá a que termine la maniobra en curso.', 'advertencia'); return false; }
         if (_modoGiro) { App.mostrarToast('Apagá la inclinación antes de activar el control real.', 'advertencia'); return false; }
@@ -915,7 +941,7 @@ const Dron = (() => {
                 const ejes = DronSeguimiento.comandoControlReal(cmd, info.estado);
                 a.actualizarEjes(ejes);
                 textoComando = `Mandando al dron: ${DronSeguimiento.textoRc(ejes)}`;
-                _mostrarEnsayo(`CONTROL REAL · ${DronSeguimiento.estadoCorto(info).texto} · ${DronSeguimiento.textoRc(ejes)}`);
+                _mostrarEnsayo(`CONTROL REAL · ${DronSeguimiento.estadoCorto(info).texto}${App.modoTecnico() ? ` · ${DronSeguimiento.textoRc(ejes)}` : ''}`);
             }
         }
         if (!_controlReal) {
@@ -932,24 +958,6 @@ const Dron = (() => {
                 chip.dataset.texto = e.texto;
             }
             chip.hidden = false;
-        }
-    }
-
-    /** "¿Qué seguir?": una persona o un objeto guardado. Si el ensayo está activo, vuelve a empezar con lo elegido. */
-    async function _elegirQueSeguir() {
-        const sel = _pantallaSeg?.selectQueSeguir;
-        if (!sel || !_seguimiento) return;
-        const objeto = _objetosGuardados.find(o => o.id === sel.value) || null;
-        const res = await _seguimiento.elegirObjeto(objeto);
-        if (!res.ok) {
-            App.mostrarToast(res.error, 'advertencia', 7000);
-            sel.value = 'persona';
-            await _seguimiento.elegirObjeto(null);
-        }
-        if (_modoSeguimiento) {
-            _volverAEnsayo('Cambiaste qué seguir: el seguimiento volvió a ensayo.');
-            _seguimiento.desactivar();
-            _seguimiento.activar();
         }
     }
 
@@ -995,7 +1003,7 @@ const Dron = (() => {
     function _actualizarBotonSeguimiento() {
         const btn = _q('#btn-toggle-seguimiento');
         if (!btn) return;
-        App.textoConIcono(btn, 'objetivo', _modoSeguimiento ? 'Seguimiento: ON' : 'Seguimiento: OFF');
+        btn.textContent = _modoSeguimiento ? 'Detener seguimiento' : 'Seguir persona';
         btn.classList.toggle('cab-activo', _modoSeguimiento);
     }
 
@@ -1238,7 +1246,7 @@ const Dron = (() => {
             <!-- Barra: menú (en horizontal), perfil y, en el modo técnico, más datos -->
             <div class="cab-barra d-flex align-items-center gap-3">
                 <button id="btn-cab-menu" class="btn btn-link text-body px-2 cab-btn-menu" aria-label="Abrir menú">${App.icono('menu')}</button>
-                <p class="etiqueta mb-0 me-auto text-truncate">Cabina · <span id="nombre-perfil-activo">—</span></p>
+                <p class="etiqueta mb-0 me-auto text-truncate titulo-app" data-titulo-app>Cabina · <span id="nombre-perfil-activo">—</span></p>
                 <div class="solo-tecnico small text-body-secondary text-nowrap" id="panel-telemetria">
                     Velocidad <b id="tel-velocidad-valor">-- cm/s</b> · Motores <b id="tel-tiempo-valor">-- s</b>
                 </div>
@@ -1288,7 +1296,7 @@ const Dron = (() => {
                         <div class="sobre-imagen__grupo sobre-imagen__grupo--der">
                             <span class="badge" title="Batería"><span id="tel-bateria-icono" class="punto" aria-hidden="true"></span><span class="fw-normal opacity-75">Bat. </span><span id="tel-bateria-valor">--%</span></span>
                             <span class="badge" title="Altura"><span class="fw-normal opacity-75">Alt. </span><span id="tel-altura-valor">-- cm</span></span>
-                            <span id="cab-chip-fps" class="badge" hidden></span>
+                            <span id="cab-chip-fps" class="badge solo-tecnico" hidden></span>
                         </div>
                     </div>
                     <div id="cab-ensayo" class="cartel-ensayo" hidden></div>
@@ -1306,8 +1314,8 @@ const Dron = (() => {
 
                 <div class="cab-lado cab-lado--der">
                     <div class="d-grid gap-2">
-                        <button id="btn-toggle-giro" class="btn btn-outline-secondary">🧭 Inclinación: OFF</button>
-                        <button id="btn-toggle-seguimiento" class="btn btn-outline-secondary">Seguimiento: OFF</button>
+                        <button id="btn-toggle-giro" class="btn btn-outline-secondary">Inclinación: OFF</button>
+                        <button id="btn-toggle-seguimiento" class="btn btn-outline-secondary">Seguir persona</button>
                     </div>
                     <div class="cab-mando">
                         <span class="small text-body-secondary">Avanzar · De costado</span>
@@ -1326,13 +1334,13 @@ const Dron = (() => {
 
             <div class="d-flex flex-wrap gap-2 mt-2">
                 <button id="btn-reconectar" class="btn btn-primary flex-fill" hidden>Reconectar</button>
-                <button id="btn-ir-config-dron" class="btn btn-outline-secondary flex-fill">Config. Dron</button>
+                <button id="btn-ir-config-dron" class="btn btn-outline-secondary flex-fill solo-tecnico">Config. Dron</button>
             </div>
 
             <!-- Seguimiento estilo RAC (las tarjetas las arma dron-seguimiento-ui.js) -->
             <section class="border-top pt-4 mt-3">
                 <p class="etiqueta">01 — Seguimiento</p>
-                <p class="small text-body-secondary">La app busca a una persona (la cara o, si no se ve, el cuerpo) o lo que elijas, y muestra qué haría el dron. Arranca en ensayo: no lo mueve.</p>
+                <p class="small text-body-secondary">Elegí qué seguir: una persona (la cara o, si no se ve, el cuerpo) o un objeto. Arranca en ensayo: muestra qué haría el dron, pero no lo mueve.</p>
                 <div id="cab-seguimiento"></div>
                 <img id="cab-foto-prueba" src="/img/prueba-persona.jpg" alt="" hidden>
             </section>
@@ -1433,7 +1441,7 @@ const Dron = (() => {
                     <select id="sel-mision-activa" class="form-select flex-grow-1 w-auto" aria-label="Misión"></select>
                     <button id="btn-ejecutar-mision" class="btn btn-primary">Iniciar</button>
                     <button id="btn-cancelar-mision" class="btn btn-danger" hidden>Cancelar misión</button>
-                    <button id="btn-nueva-mision" class="btn btn-outline-secondary">Nueva</button>
+                    <button id="btn-nueva-mision" class="btn btn-outline-secondary solo-tecnico">Nueva</button>
                 </div>
                 <div id="info-mision-pasos" class="small text-body-secondary mt-2"></div>
             </section>

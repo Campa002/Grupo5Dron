@@ -234,6 +234,13 @@ const DronSeguimiento = (() => {
         return mayuscula(NOMBRES_COCO[clase] || clase);
     }
 
+    /** Los objetos que reconoce el detector (sin la persona), en español y por orden alfabético: para "Seguir objeto". */
+    function clasesParaSeguir() {
+        return Object.keys(NOMBRES_COCO).filter(c => c !== 'person')
+            .map(clase => ({ clase, nombre: nombreEspanol(clase) }))
+            .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    }
+
     // ================================================================
     // Candidatos: a cada persona se le busca la cara (pura)
     // ================================================================
@@ -1038,6 +1045,24 @@ const DronSeguimiento = (() => {
         }
 
         /**
+         * Elige qué seguir desde los botones "Seguir persona" / "Seguir objeto".
+         * @param {{tipo:'persona'}|{tipo:'clase', clase:string}|{tipo:'mio', id:string}} meta
+         * @param {Array} [objetos] los de "Mis objetos" (para buscar el id)
+         * @returns {Promise<{ok:boolean, error?:string}>}
+         */
+        async elegirObjetivo(meta, objetos = []) {
+            if (meta?.tipo === 'mio') {
+                const objeto = objetos.find(o => o.id === meta.id);
+                if (!objeto) return { ok: false, error: 'No se encontró ese objeto guardado.' };
+                return this.elegirObjeto(objeto);
+            }
+            this.objeto = null;
+            this._metaTocada = meta?.tipo === 'clase' && meta.clase && meta.clase !== 'person'
+                ? { tipo: 'clase', clase: meta.clase } : null;
+            return { ok: true };
+        }
+
+        /**
          * Tocaron la imagen en (x, y) normalizados: se elige el recuadro de ahí como objetivo (vuelve a confirmar).
          * @returns {{ok:boolean, nombre?:string}}
          */
@@ -1536,9 +1561,9 @@ const DronSeguimiento = (() => {
             case 'perdiendo':
                 return { titulo: `Siguiendo: ${n}`, texto: info.objetivo?.tipo === 'cara' ? 'Sigue la cara.' : info.objetivo?.tipo === 'cuerpo' ? 'No ve la cara: sigue el cuerpo.' : 'Sigue el objeto.', color: 'exito' };
             case 'perdido':
-                return { titulo: 'Objetivo perdido', texto: 'El dron queda quieto (rc 0 0 0 0). Tocá un recuadro o Iniciar seguimiento para volver a elegir.', color: 'error' };
+                return { titulo: 'Objetivo perdido', texto: 'El dron queda quieto. Tocá un recuadro, Seguir persona o Seguir objeto para volver a elegir.', color: 'error' };
             default:
-                return { titulo: 'Seguimiento detenido', texto: 'Tocá Iniciar seguimiento.', color: '' };
+                return { titulo: 'Seguimiento detenido', texto: 'Tocá Seguir persona o Seguir objeto.', color: '' };
         }
     }
 
@@ -1649,6 +1674,7 @@ const DronSeguimiento = (() => {
     Seguimiento.Seguidor = Seguidor;
     Seguimiento.combinarPersonas = combinarPersonas;
     Seguimiento.nombreEspanol = nombreEspanol;
+    Seguimiento.clasesParaSeguir = clasesParaSeguir;
     Seguimiento.comandoControlReal = comandoControlReal;
     Seguimiento.textoRc = textoRc;
     Seguimiento.condicionesControlReal = condicionesControlReal;

@@ -70,7 +70,14 @@
     color: var(--bs-primary-text-emphasis);
 }
 
-/* Modo técnico: lo que se usa para diagnosticar (Config. Dron) */
+/* Título de la app: 5 toques seguidos prenden o apagan el modo técnico (sin seleccionar texto ni hacer zoom) */
+.titulo-app { cursor: default; -webkit-user-select: none; user-select: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+/* Seguir persona / Seguir objeto: el que está en uso queda marcado */
+.rac [data-rac="seguir-persona"].active,
+.rac [data-rac="seguir-objeto"].active { outline: 2px solid var(--bs-primary-text-emphasis); outline-offset: 2px; }
+
+/* Modo técnico: lo que sirve para probar y diagnosticar (se prende con 5 toques en el título) */
 body:not(.modo-tecnico) .solo-tecnico { display: none !important; }
 
 /* ---------- Menú lateral (lo abre y lo cierra app.js con la clase "abierto") ---------- */

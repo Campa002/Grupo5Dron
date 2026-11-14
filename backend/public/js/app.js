@@ -28,8 +28,14 @@ const App = (() => {
     // Rutas que existen (cualquier otra, por ejemplo la vieja #/acerca o #/aula, va al inicio)
     const RUTAS_VALIDAS = ['inicio', ...RUTAS_DRON];
 
-    // Modo técnico: muestra lo que sirve para diagnosticar (elementos .solo-tecnico). Arranca apagado.
+    // Pantallas de prueba y diagnóstico: solo con el modo técnico (sin él, van al inicio)
+    const RUTAS_TECNICAS = ['prueba-tello', 'sensores', 'seguimiento'];
+
+    // Modo técnico: muestra lo que sirve para probar y diagnosticar (elementos .solo-tecnico y RUTAS_TECNICAS).
+    // Arranca apagado. Se prende y se apaga tocando 5 veces seguidas el título de la app ([data-titulo-app]).
     const CLAVE_MODO_TECNICO = 'grupo5dron_modo_tecnico';
+    const TOQUES_MODO_TECNICO = 5;
+    const PAUSA_MAX_TOQUES_MS = 800;
 
     /** @returns {boolean} true si el modo técnico está activado en este teléfono */
     function modoTecnico() {
@@ -43,6 +49,28 @@ const App = (() => {
             else localStorage.removeItem(CLAVE_MODO_TECNICO);
         } catch (_) { /* sin almacenamiento: vale hasta cerrar la app */ }
         document.body.classList.toggle('modo-tecnico', !!activo);
+    }
+
+    // Toques seguidos en el título de la app
+    let toquesTitulo = 0;
+    let ultimoToqueTitulo = 0;
+
+    /** Un toque en el título: al quinto seguido, prende o apaga el modo técnico. */
+    function toqueEnTitulo() {
+        const ahora = Date.now();
+        toquesTitulo = ahora - ultimoToqueTitulo <= PAUSA_MAX_TOQUES_MS ? toquesTitulo + 1 : 1;
+        ultimoToqueTitulo = ahora;
+        if (toquesTitulo < TOQUES_MODO_TECNICO) return;
+        toquesTitulo = 0;
+        const activo = !modoTecnico();
+        cambiarModoTecnico(activo);
+        mostrarToast(activo ? 'Modo técnico activado.' : 'Modo técnico apagado.', 'info');
+        // Si estaba en una pantalla de prueba, vuelve al inicio
+        if (!activo && RUTAS_TECNICAS.includes(rutaDelHash())) navegarA('inicio');
+    }
+
+    function rutaDelHash() {
+        return (window.location.hash || '').replace(/^#\/?/, '').split('?')[0].trim();
     }
 
     /** Íconos de Bootstrap Icons que usa la app (pocos: el resto de los botones va solo con texto). */
@@ -195,9 +223,11 @@ const App = (() => {
         const hash = window.location.hash || '#/inicio';
         const ruta = hash.replace(/^#\/?/, '').split('?')[0].trim() || 'inicio';
 
-        // Una ruta que no existe (por ejemplo, la vieja #/acerca o #/aula) va al inicio sin error
-        if (!RUTAS_VALIDAS.includes(ruta)) history.replaceState(null, '', '#/inicio');
-        const destino = RUTAS_VALIDAS.includes(ruta) ? ruta : 'inicio';
+        // Una ruta que no existe (por ejemplo, la vieja #/acerca o #/aula), o una de prueba sin el modo técnico,
+        // va al inicio sin error
+        const permitida = RUTAS_VALIDAS.includes(ruta) && (modoTecnico() || !RUTAS_TECNICAS.includes(ruta));
+        if (!permitida) history.replaceState(null, '', '#/inicio');
+        const destino = permitida ? ruta : 'inicio';
 
         // 1. Salir de la cabina con el dron en el aire: confirmar y aterrizar
         if (paginaActual === 'dron' && destino !== 'dron' && typeof Dron !== 'undefined' && Dron.estaEnVuelo && Dron.estaEnVuelo()) {
@@ -462,7 +492,7 @@ const App = (() => {
         const estadoTexto = q('#seg-estado');
         const chipEstado = q('#seg-chip-estado');
         const cartel = q('#seg-cartel');
-        let objetosGuardados = [];
+        let objetosDeLaPagina = [];
         let camara = null;
         let paginaCerrada = false;
         let panelTecnico = null;
@@ -517,7 +547,12 @@ const App = (() => {
             return true;
         }
 
-        async function iniciar() {
+        /** "Seguir persona" / "Seguir objeto": elige qué seguir; si ya está andando, vuelve a empezar con eso. */
+        async function iniciar(meta) {
+            const res = await seg.elegirObjetivo(meta, objetosDeLaPagina);
+            if (paginaCerrada) return;
+            if (!res.ok) { mostrarToast(res.error, 'advertencia', 7000); return; }
+            if (seg.activo) { seg.desactivar(); seg.activar(); pantalla.setActivo(true); return; }
             pantalla.setCargando(true);
             const ok = (await abrirCamara()) && (await preparar());
             pantalla.setCargando(false);
@@ -570,19 +605,11 @@ const App = (() => {
         };
         seg.onEstado = (nuevo, anterior, info) => pantalla.cambioDeEstado(nuevo, anterior, info);
 
-        /** "¿Qué seguir?": una persona o un objeto guardado; si está andando, vuelve a empezar. */
-        const sel = pantalla.selectQueSeguir;
-        sel.addEventListener('change', async () => {
-            const objeto = objetosGuardados.find(o => o.id === sel.value) || null;
-            const res = await seg.elegirObjeto(objeto);
-            if (!res.ok) {
-                mostrarToast(res.error, 'advertencia', 7000);
-                sel.value = 'persona';
-                await seg.elegirObjeto(null);
-            }
-            if (seg.activo) { seg.desactivar(); seg.activar(); }
+        objetosGuardados().then(lista => {
+            if (paginaCerrada) return;
+            objetosDeLaPagina = lista;
+            pantalla.setObjetos(lista);
         });
-        if (typeof DronObjetos !== 'undefined') llenarQueSeguir(sel).then(lista => { objetosGuardados = lista; });
 
         q('#btn-seg-cpu')?.addEventListener('click', async (e) => {
             const btn = e.currentTarget;
@@ -778,15 +805,12 @@ const App = (() => {
     }
 
     /**
-     * Llena un selector "¿Qué seguir?" con "Una persona" y los objetos guardados.
-     * @returns {Promise<Array>} los objetos (con sus huellas)
+     * Los objetos guardados en "Mis objetos" (para la lista de "Seguir objeto").
+     * @returns {Promise<Array>} los objetos (con sus huellas); [] si no hay o no se pueden leer
      */
-    async function llenarQueSeguir(select) {
-        let objetos = [];
-        try { objetos = await DronObjetos.listar(); } catch (_) { /* sin objetos guardados */ }
-        const opciones = [new Option('Una persona', 'persona'), ...objetos.map(o => new Option(o.nombre, o.id))];
-        select.replaceChildren(...opciones);
-        return objetos;
+    async function objetosGuardados() {
+        if (typeof DronObjetos === 'undefined') return [];
+        try { return await DronObjetos.listar(); } catch (_) { return []; /* sin objetos guardados */ }
     }
 
     /**
@@ -1266,6 +1290,11 @@ const App = (() => {
             });
         });
 
+        // 5 toques seguidos en el título de la app (barra de arriba o cabina): modo técnico
+        document.addEventListener('click', (e) => {
+            if (e.target.closest?.('[data-titulo-app]')) toqueEnTitulo();
+        });
+
         // Escuchar cambios de hash
         window.addEventListener('hashchange', cargarRutaActual);
 
@@ -1293,6 +1322,6 @@ const App = (() => {
         textoConPunto,
         modoTecnico,
         cambiarModoTecnico,
-        llenarQueSeguir,
+        objetosGuardados,
     };
 })();

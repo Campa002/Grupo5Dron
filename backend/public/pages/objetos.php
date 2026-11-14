@@ -1,9 +1,10 @@
 <!-- Mis objetos — Grupo 5: Control de Sistemas y Dron -->
 <div class="objetos-pagina">
     <header class="mb-4">
-        <p class="etiqueta">Seguimiento</p>
-        <h1 class="h3 fw-bold text-uppercase">Mis objetos</h1>
-        <p class="text-body-secondary mb-0">Cargá de 3 a 15 fotos de un objeto y ponele nombre. El dron lo va a buscar y seguir.</p>
+        <p class="etiqueta">Seguir objeto</p>
+        <h1 class="h3 fw-bold text-uppercase">Objetos propios</h1>
+        <p class="text-body-secondary mb-3">Cargá de 3 a 15 fotos de un objeto y ponele nombre. Después aparece en la lista de "Seguir objeto" de la cabina.</p>
+        <a href="#/dron" class="btn btn-outline-secondary">Volver a la cabina</a>
     </header>
 
     <!-- 01 — Agregar -->
@@ -42,7 +43,7 @@
     <section class="mb-5">
         <p class="etiqueta">02 — Guardados</p>
         <h2 class="h5 fw-bold text-uppercase">Objetos guardados</h2>
-        <p class="small text-body-secondary">Para seguir uno, elegilo en "¿Qué seguir?" en la cabina o en Seguimiento.</p>
+        <p class="small text-body-secondary">Para seguir uno: en la cabina, Seguir objeto y elegilo en la lista.</p>
         <ul id="lista-objetos" class="list-group">
             <li class="list-group-item small text-body-secondary">Cargando...</li>
         </ul>

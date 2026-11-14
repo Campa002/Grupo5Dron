@@ -10,7 +10,7 @@ Si algo falla, no te trabes: anotá, copiá los datos que dice la sección "Qué
 
 ### 0.1 Bajar los APK
 
-1. Entrá al PR #5 de GitHub ("NO MERGEAR: para probar en clase") → pestaña **Checks** (o **Actions**) → la última corrida verde del workflow.
+1. Entrá a GitHub → pestaña **Actions** → la última corrida verde del workflow en la rama `interfaz-bootstrap` (PR #6). Esta guía es para esa versión. Si algo sale mal, la de respaldo es la del PR #5 ("NO MERGEAR: para probar en clase"), que tiene la interfaz anterior (sin modo técnico por toques ni "Seguir objeto").
 2. Abajo de todo, en **Artifacts**, bajá los dos:
    - `Grupo5Dron-app-debug` → la app del dron;
    - `Grupo5Aula-app-debug` → la app del aula.
@@ -21,6 +21,14 @@ Si algo falla, no te trabes: anotá, copiá los datos que dice la sección "Qué
 1. Abrí cada `.apk` desde el celular. Si Android pregunta, permití "instalar apps desconocidas" para el explorador de archivos.
 2. Si dice que no se puede instalar porque ya hay una versión con otra firma: desinstalá la versión vieja y volvé a instalar.
 3. Quedan dos íconos: "Grupo 5 — Dron" y "Grupo 5 Aula" (son apps distintas, pueden estar las dos).
+
+### 0.2b Modo técnico de la app del dron (lo vas a necesitar)
+
+Prueba Tello, Sensores, el seguimiento con la cámara del celular, Diagnosticar, el Simulador, los datos de los comandos y los registros para copiar están escondidos en el **modo técnico**.
+
+- **Prender:** tocá **5 veces seguidas** (rápido, sin pausas de más de un segundo) el título de arriba, "GRUPO 5 · DRON" (o "CABINA · …" dentro de la cabina). Aparece el aviso "Modo técnico activado" y el menú suma Prueba Tello, Sensores y Seguimiento con la cámara.
+- **Apagar:** lo mismo, otros 5 toques ("Modo técnico apagado").
+- Queda guardado en el celular. **Para la clase, prendelo al empezar** (las pruebas C y D lo usan) y apagalo al final para ver la app como la ve un usuario.
 
 ### 0.3 Preparar el servidor del aula en la notebook (XAMPP)
 
@@ -179,11 +187,13 @@ Todo con el ESP32 alimentado por USB (de la notebook o del cargador). **Sin 220 
 
 ### C1. Abrir la app del dron
 - **Hacer:** abrí "Grupo 5 — Dron".
-- **Debería:** entra directo al inicio (sin login) con tres opciones: Cabina, Prueba Tello y Seguimiento.
+- **Debería:** entra directo al inicio (sin login) con un solo botón grande, **Entrar a la cabina**; el menú tiene Inicio, Cabina y Configuración. No se ve nada de prueba.
+- **Hacer después:** 5 toques seguidos en "GRUPO 5 · DRON".
+- **Debería:** "Modo técnico activado"; en el inicio aparecen Prueba Tello, Seguimiento con la cámara del celular y Sensores, y en el menú también. Dejalo prendido para el resto de la clase.
 - **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
 
 ### C2. Seguimiento con la cámara del celular
-- **Hacer:** Inicio → **Seguimiento** → "Iniciar seguimiento". Aceptá el permiso de la cámara. Apuntá a un compañero de frente, a 1 o 2 m, que se quede quieto.
+- **Hacer:** (modo técnico) Inicio → **Seguimiento con la cámara del celular** → **Seguir persona**. Aceptá el permiso de la cámara. Apuntá a un compañero de frente, a 1 o 2 m, que se quede quieto.
 - **Debería:**
   - el video sin espejar, con un recuadro en la **cara** y la etiqueta "Persona 9x %" arriba a la derecha del recuadro (que se lea derecha, no espejada);
   - la tarjeta de Estado pasa de "Buscando objetivo..." (naranja) a "Confirmando: Persona (n/8)" y a "Siguiendo: Persona" (verde);
@@ -192,7 +202,7 @@ Todo con el ESP32 alimentado por USB (de la notebook o del cargador). **Sin 220 
 - **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
 
 ### C3. Diagnóstico (sobre todo si queda en "Buscando")
-- **Hacer:** tocá **Diagnosticar** (abajo de todo) apuntando a la persona.
+- **Hacer:** (modo técnico) tocá **Diagnosticar** (abajo de todo) apuntando a la persona.
 - **Debería:** una lista con puntos verdes o rojos (imagen, brillo, placa de video, foto de prueba, persona en la imagen, velocidad) y una conclusión en palabras. Tocá **Copiar diagnóstico** y guardalo para mandármelo, ande o no ande.
 - **Resultado:** ☐ Anduvo ☐ No anduvo — Conclusión: ______________________________
 
@@ -203,7 +213,7 @@ Todo con el ESP32 alimentado por USB (de la notebook o del cargador). **Sin 220 
 
 ### C5. Perder el objetivo
 - **Hacer:** que la persona salga de la imagen.
-- **Debería:** en menos de un segundo pasa a "Objetivo perdido" (rojo) y el comando queda en "rc 0 0 0 0". El Historial anota "Siguiendo" y "Objetivo perdido" con la hora. **Limpiar** vacía el historial.
+- **Debería:** en menos de un segundo pasa a "Objetivo perdido" (rojo) y el comando (se ve con el modo técnico) queda en "rc 0 0 0 0". El Historial anota "Siguiendo" y "Objetivo perdido" con la hora. **Limpiar** vacía el historial.
 - **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
 
 ### C6. Tocar un recuadro para elegir
@@ -211,8 +221,15 @@ Todo con el ESP32 alimentado por USB (de la notebook o del cargador). **Sin 220 
 - **Debería:** dice "Elegido: …", vuelve a confirmar (n/8) y sigue a la elegida. Los objetos muestran su nombre en español ("Botella 78 %").
 - **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
 
+### C6b. Seguir objeto
+- **Hacer:** poné una botella (o una taza, una mochila) frente a la cámara. Tocá **Seguir objeto**, elegí "Botella" en la lista ("Objetos que reconoce la app") y tocá **Seguir este objeto**.
+- **Debería:** "Buscando objetivo..." (naranja), "Confirmando: Botella (n/8)" y después "Siguiendo: Botella" (verde); el botón Seguir objeto queda marcado. Tocá **Seguir persona** y vuelve a buscar una persona.
+- **Hacer después:** Seguir objeto → **Agregar objeto propio**. Cargá de 3 a 15 fotos de un objeto (por ejemplo, una cartuchera), ponele nombre y guardalo. Volvé (Volver a la cabina o el menú) y abrí de nuevo Seguir objeto.
+- **Debería:** el objeto aparece primero en la lista, en "Mis objetos"; al elegirlo y tocar Seguir este objeto, lo busca.
+- **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
+
 ### C7. Inclinación del celular
-- **Hacer:** Menú → Sensores. Inclinate con el celular hacia adelante, atrás y a los costados.
+- **Hacer:** (modo técnico) Menú → Sensores. Inclinate con el celular hacia adelante, atrás y a los costados.
 - **Debería:** cambian los números de "Adelante / atrás" y "Costados". Si el celular no tiene giroscopio (el A06 no tiene), dice que usa el acelerómetro.
 - **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
 
@@ -223,19 +240,19 @@ Todo con el ESP32 alimentado por USB (de la notebook o del cargador). **Sin 220 
 Celular conectado al WiFi del Tello (`TELLO-…`). Los datos móviles pueden quedar prendidos.
 
 ### D1. Prueba Tello
-- **Hacer:** Inicio → Prueba Tello → "Probar conexión".
+- **Hacer:** (modo técnico) Inicio → Prueba Tello → "Probar conexión".
 - **Debería:** los cinco pasos en verde (conexión, respuesta, batería, datos y video) y "Listo para volar". Dice qué red usa.
 - Tocá **Copiar informe** y guardalo (mandámelo siempre, ande o no).
 - **Resultado:** ☐ Anduvo ☐ No anduvo — Batería: ____ % — Qué pasó: ____________________
 
 ### D2. Cabina conectada
-- **Hacer:** Inicio → Cabina. Acostá el celular.
+- **Hacer:** Inicio → Entrar a la cabina. Acostá el celular.
 - **Debería:** "Conectado (en tierra)", batería y altura sobre el video, video del Tello sin cuadros rotos, "Despegar" habilitado (si dice "Esperando datos del dron…", esperá unos segundos).
 - **Resultado:** ☐ Anduvo ☐ No anduvo — ¿Video con cuadros rotos? ☐ sí ☐ no — Qué pasó: ____________________
 
 ### D3. Seguimiento en ensayo con el video del Tello (sin volar)
-- **Hacer:** con el dron en la mano (o sobre una mesa) apuntando a una persona a 2 o 3 m, tocá "Seguimiento: OFF" (columna de la derecha) o bajá a "01 — Seguimiento" → Iniciar seguimiento.
-- **Debería:** recuadro en la cara, "Siguiendo: Persona" y el cartel "Ensayo (no mueve el dron): …". En la tarjeta: "Ensayo: no se manda nada". El interruptor "Control real" **no se deja activar en tierra** (avisa que el dron no está en vuelo).
+- **Hacer:** con el dron en la mano (o sobre una mesa) apuntando a una persona a 2 o 3 m, tocá **Seguir persona** (columna de la derecha) o bajá a "01 — Seguimiento" → Seguir persona.
+- **Debería:** recuadro en la cara, "Siguiendo: Persona" y el cartel "Ensayo (no mueve el dron): …". En la tarjeta: "Modo ensayo: no se manda nada al dron". El botón del costado pasa a decir "Detener seguimiento". El interruptor "Control real" **no se deja activar en tierra** (avisa que el dron no está en vuelo).
 - **Resultado:** ☐ Anduvo ☐ No anduvo — FPS: ____ — Qué pasó: ____________________
 
 ---
@@ -281,21 +298,21 @@ Espacio libre, protectores, alguien con el dedo en EMERGENCIA.
 Una persona se pone de frente a 2 o 3 m del dron. Otra con el dedo en EMERGENCIA. Primero ensayo, después control real.
 
 ### F1. Ensayo en vuelo
-- **Hacer:** despegá, subí a la altura de la cara (con Subir) y tocá Iniciar seguimiento.
+- **Hacer:** despegá, subí a la altura de la cara (con Subir) y tocá **Seguir persona** (columna de la derecha).
 - **Debería:** "Siguiendo: Persona" y el cartel dice qué haría el dron ("giraría a la derecha…") **sin moverlo**. Si la persona camina de costado, el texto dice que giraría hacia ella.
 - **Resultado:** ☐ Anduvo ☐ No anduvo — FPS en vuelo: ____ — Qué pasó: ____________________
 
 ### F2. Control real (experimental)
 - **Hacer:** bajá hasta "01 — Seguimiento" y activá **Control real (experimental)**. Leé la confirmación y aceptá. La persona camina despacio de costado, 1 m para cada lado.
 - **Debería:**
-  - el cartel sobre el video dice "CONTROL REAL · … · rc …" y la tarjeta "Mandando al dron: rc 0 X Y Z";
+  - el cartel sobre el video dice "CONTROL REAL · …" (con el modo técnico, además el "rc …", y la tarjeta "Mandando al dron: rc 0 X Y Z");
   - el dron gira despacio para mirar a la persona (giro hasta 20 de 100), sube o baja un poco y avanza o retrocede despacio (hasta 15) para mantener la distancia (~3 m); nunca se mueve de costado.
 - **Si no se deja activar:** anotá el motivo que dice (por ejemplo, poca batería, altura fuera de 80 a 250 cm, menos de 4 detecciones por segundo).
 - **Resultado:** ☐ Anduvo ☐ No anduvo — Motivo si no se activó: ________ — Qué pasó: ____________________
 
 ### F3. Objetivo perdido = quieto
 - **Hacer:** con el control real activo, que la persona salga de la imagen (o se tape la cara y se vaya).
-- **Debería:** "Objetivo perdido" y "rc 0 0 0 0": el dron **se queda quieto** en el aire; no aterriza ni se mueve solo.
+- **Debería:** "Objetivo perdido" (y, con el modo técnico, "rc 0 0 0 0"): el dron **se queda quieto** en el aire; no aterriza ni se mueve solo.
 - **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
 
 ### F4. Tocar un botón devuelve el mando
@@ -316,7 +333,8 @@ Copiá y guardá (en un mensaje o un archivo de notas) lo que haya, aunque todo 
 
 - [ ] Informe de **Prueba Tello** ("Copiar informe").
 - [ ] **Diagnóstico** del seguimiento (C3), con la cámara del celular y, si se pudo, en la cabina con el video del Tello.
-- [ ] Con el **modo técnico** prendido (Config. Dron → "Mostrar el modo técnico"), en la cabina: "Copiar registro de comandos" y "Copiar registro" del seguimiento.
+- [ ] Con el **modo técnico** prendido (5 toques en el título), en la cabina: "Copiar registro de comandos" y "Copiar registro" del seguimiento.
+- [ ] Al final, apagá el modo técnico (5 toques) y mirá que la app quede simple: inicio con Entrar a la cabina, menú con Inicio, Cabina y Configuración.
 - [ ] Lo que mostró el **monitor serie** del ESP32 en A4 y A5 (protocolos, bits y pulsos de los controles).
 - [ ] FPS en el celular (C2, D3, F1).
 - [ ] Si el relé es activo en alto o en bajo (A2).

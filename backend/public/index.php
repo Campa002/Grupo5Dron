@@ -35,7 +35,8 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
     <!-- Barra superior -->
     <header id="header-principal" class="navbar border-bottom px-3 py-2">
         <button id="btn-menu" class="btn btn-link text-body px-2" aria-label="Menú"><i class="bi bi-list fs-4" aria-hidden="true"></i></button>
-        <span class="navbar-brand me-auto ms-2 fs-6 fw-semibold text-uppercase">Grupo 5 · Dron</span>
+        <!-- 5 toques seguidos en el título: prende o apaga el modo técnico (app.js) -->
+        <span class="navbar-brand me-auto ms-2 fs-6 fw-semibold text-uppercase titulo-app" data-titulo-app>Grupo 5 · Dron</span>
     </header>
 
     <!-- Menú lateral (lo abre y lo cierra app.js) -->
@@ -49,11 +50,11 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
                 <div class="list-group list-group-flush">
                     <a href="#/inicio" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="inicio">Inicio</a>
                     <a href="#/dron" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="dron">Cabina</a>
-                    <a href="#/seguimiento" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="seguimiento">Seguimiento</a>
-                    <a href="#/prueba-tello" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="prueba-tello">Prueba Tello</a>
-                    <a href="#/sensores" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="sensores">Sensores</a>
-                    <a href="#/objetos" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="objetos">Mis objetos</a>
-                    <a href="#/config-dron" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="config-dron">Config. Dron</a>
+                    <a href="#/config-dron" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="config-dron">Configuración</a>
+                    <!-- Modo técnico: pantallas de prueba y diagnóstico -->
+                    <a href="#/prueba-tello" class="list-group-item list-group-item-action py-3 menu-lateral__enlace solo-tecnico" data-pagina="prueba-tello">Prueba Tello</a>
+                    <a href="#/sensores" class="list-group-item list-group-item-action py-3 menu-lateral__enlace solo-tecnico" data-pagina="sensores">Sensores</a>
+                    <a href="#/seguimiento" class="list-group-item list-group-item-action py-3 menu-lateral__enlace solo-tecnico" data-pagina="seguimiento">Seguimiento con la cámara</a>
                 </div>
             </div>
         </div>

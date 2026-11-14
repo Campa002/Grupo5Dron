@@ -177,7 +177,9 @@ test('tarjeta de estado como RAC: naranja buscando y confirmando, verde siguiend
     assert.equal(e({ estado: 'confirmando', nombre: 'Persona', confirmaciones: 5, confirmacionVentana: 8 }).titulo, 'Confirmando: Persona (5/8)');
     assert.deepEqual([e({ estado: 'siguiendo', nombre: 'Botella' }).titulo, e({ estado: 'siguiendo' }).color], ['Siguiendo: Botella', 'exito']);
     assert.deepEqual([e({ estado: 'perdido' }).titulo, e({ estado: 'perdido' }).color], ['Objetivo perdido', 'error']);
-    assert.match(e({ estado: 'perdido' }).texto, /rc 0 0 0 0/);
+    // Lenguaje simple: dice que el dron queda quieto, sin "rc" (el rc 0 0 0 0 lo prueban control-real y seguimiento)
+    assert.match(e({ estado: 'perdido' }).texto, /queda quieto/);
+    assert.doesNotMatch(e({ estado: 'perdido' }).texto, /\brc\b/);
 });
 
 // ---------------------------------------------------------------

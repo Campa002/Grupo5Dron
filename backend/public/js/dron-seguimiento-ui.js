@@ -5,8 +5,9 @@
  * Las tarjetas de la pantalla de seguimiento, iguales para las dos fuentes:
  *  - "Cámara del celular" (#/seguimiento): para probar sin dron; nunca se manda nada al dron.
  *  - "Video del dron" (cabina): con el interruptor "Control real (experimental)".
- * Tiene: Iniciar seguimiento / Detener, ¿Qué seguir?, tarjeta de Estado (con el comando), Análisis de
- * confianza, Historial de detección (últimos 20, con Limpiar) y el Diagnóstico de la detección.
+ * Tiene: Seguir persona / Seguir objeto (con la lista de objetos y "Agregar objeto propio") / Detener,
+ * tarjeta de Estado, Análisis de confianza e Historial de detección (últimos 20, con Limpiar).
+ * El comando calculado y el Diagnóstico de la detección son del modo técnico.
  * El video con los recuadros lo dibuja DronSeguimiento; acá solo se escucha el toque para elegir.
  *
  * Depende de: App (app.js) y DronSeguimiento (dron-seguimiento.js).
@@ -43,7 +44,7 @@ const DronPantallaSeguimiento = (() => {
          * @param {HTMLElement} o.cajaVideo caja que contiene el video y el lienzo de los recuadros (para tocar)
          * @param {HTMLElement} [o.chipFps] insignia de FPS sobre el video
          * @param {'camara'|'dron'} o.fuente
-         * @param {Function} o.onIniciar () => Promise|void
+         * @param {Function} o.onIniciar (meta) => Promise|void; meta: {tipo:'persona'} | {tipo:'clase', clase} | {tipo:'mio', id}
          * @param {Function} o.onDetener () => void
          * @param {Function} o.onTocar (x, y) => {ok:boolean, nombre?:string}
          * @param {Function} o.onDiagnosticar () => Promise<{items:Array, conclusion:string}>
@@ -57,7 +58,9 @@ const DronPantallaSeguimiento = (() => {
             this.historial = [];
             this._ultimo = 0;
             this._diagnostico = null;
+            this._metaPedida = null;
             this._render();
+            this.setObjetos([]);
             this._eventos();
         }
 
@@ -67,18 +70,21 @@ const DronPantallaSeguimiento = (() => {
             const dron = this.o.fuente === 'dron';
             this.o.contenedor.innerHTML = `
                 <div class="rac d-grid gap-3">
-                    <p class="small text-body-secondary mb-0">
-                        ${dron ? 'Fuente: video del dron.' : 'Fuente: cámara del celular. Con esta fuente nunca se manda nada al dron.'}
-                    </p>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-primary flex-fill" data-rac="iniciar">Iniciar seguimiento</button>
-                        <button class="btn btn-outline-secondary flex-fill" data-rac="detener" disabled>Detener</button>
+                    ${dron ? '' : '<p class="small text-body-secondary mb-0">Fuente: cámara del celular. Con esta fuente nunca se manda nada al dron.</p>'}
+                    <div class="row g-2">
+                        <div class="col-6"><button class="btn btn-primary btn-lg w-100 h-100" data-rac="seguir-persona" aria-pressed="false">Seguir persona</button></div>
+                        <div class="col-6"><button class="btn btn-primary btn-lg w-100 h-100" data-rac="seguir-objeto" aria-expanded="false">Seguir objeto</button></div>
                     </div>
-                    <div>
-                        <label class="form-label small text-body-secondary mb-1" for="rac-que-seguir-${dron ? 'dron' : 'camara'}">¿Qué seguir?</label>
-                        <select class="form-select" id="rac-que-seguir-${dron ? 'dron' : 'camara'}" data-rac="que-seguir"><option value="persona">Una persona</option></select>
-                        <div class="form-text">También podés tocar un recuadro del video para elegirlo.</div>
+                    <div class="border rounded p-3" data-rac="panel-objeto" hidden>
+                        <label class="form-label small text-body-secondary mb-1" for="rac-objeto-${dron ? 'dron' : 'camara'}">¿Qué objeto?</label>
+                        <select class="form-select" id="rac-objeto-${dron ? 'dron' : 'camara'}" data-rac="objeto"></select>
+                        <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                            <button class="btn btn-primary flex-fill" data-rac="seguir-este">Seguir este objeto</button>
+                            <a href="#/objetos" class="btn btn-sm btn-link" data-rac="agregar-objeto">Agregar objeto propio</a>
+                        </div>
                     </div>
+                    <button class="btn btn-outline-secondary" data-rac="detener" disabled>Detener</button>
+                    <p class="form-text mt-0">También podés tocar un recuadro del video para elegir qué seguir.</p>
                     ${dron ? `
                     <div class="border border-warning-subtle rounded p-3 rac-real">
                         <div class="form-check form-switch m-0">
@@ -91,9 +97,9 @@ const DronPantallaSeguimiento = (() => {
                     <div class="border rounded p-3 rac-estado" data-color="">
                         <p class="etiqueta">Estado</p>
                         <h2 class="h5 fw-bold text-uppercase mb-1 rac-estado__titulo" data-rac="estado-titulo">Seguimiento detenido</h2>
-                        <p class="small text-body-secondary mb-2" data-rac="estado-texto">Tocá Iniciar seguimiento.</p>
+                        <p class="small text-body-secondary mb-2" data-rac="estado-texto">Tocá Seguir persona o Seguir objeto.</p>
                         <p class="small fw-semibold text-primary-emphasis mb-1" data-rac="modo">${dron ? 'Modo ensayo: no se manda nada al dron.' : 'Cámara del celular: no se manda nada al dron.'}</p>
-                        <p class="small font-monospace mb-0" data-rac="comando">Comando: rc 0 0 0 0</p>
+                        <p class="small font-monospace mb-0 solo-tecnico" data-rac="comando">Comando: rc 0 0 0 0</p>
                     </div>
                     <div class="border rounded p-3">
                         <p class="etiqueta">Análisis de confianza</p>
@@ -107,7 +113,7 @@ const DronPantallaSeguimiento = (() => {
                         <ol class="list-group list-group-flush rac-historial" data-rac="historial"></ol>
                         <p class="small text-body-secondary mb-0" data-rac="historial-vacio">Todavía no hay nada.</p>
                     </div>
-                    <div class="border-top pt-3">
+                    <div class="border-top pt-3 solo-tecnico">
                         <p class="etiqueta">Diagnóstico</p>
                         <p class="small text-body-secondary">Si queda siempre "Buscando", tocá Diagnosticar: revisa la imagen, la placa de video y el detector, y dice qué falla.</p>
                         <div class="d-flex flex-wrap gap-2">
@@ -121,7 +127,15 @@ const DronPantallaSeguimiento = (() => {
         }
 
         _eventos() {
-            this._q('[data-rac="iniciar"]').addEventListener('click', () => this.o.onIniciar());
+            this._q('[data-rac="seguir-persona"]').addEventListener('click', () => this._pedir({ tipo: 'persona' }));
+            this._q('[data-rac="seguir-objeto"]').addEventListener('click', () => this._mostrarPanelObjeto(this._q('[data-rac="panel-objeto"]').hidden));
+            this._q('[data-rac="seguir-este"]').addEventListener('click', () => {
+                const v = this._q('[data-rac="objeto"]').value || '';
+                const [tipo, ...resto] = v.split(':');
+                const valor = resto.join(':');
+                if (!valor) return;
+                this._pedir(tipo === 'mio' ? { tipo: 'mio', id: valor } : { tipo: 'clase', clase: valor });
+            });
             this._q('[data-rac="detener"]').addEventListener('click', () => this.o.onDetener());
             this._q('[data-rac="limpiar"]').addEventListener('click', () => this.limpiarHistorial());
             this._q('[data-rac="diagnosticar"]').addEventListener('click', () => this._diagnosticar());
@@ -152,27 +166,71 @@ const DronPantallaSeguimiento = (() => {
             this.o.cajaVideo?.addEventListener('click', this._onToque);
         }
 
-        /** El select de "¿Qué seguir?" (lo llena quien usa la pantalla con "Mis objetos"). */
-        get selectQueSeguir() { return this._q('[data-rac="que-seguir"]'); }
+        /** Tocaron "Seguir persona" o "Seguir este objeto": se anota qué se pidió y se avisa a quien usa la pantalla. */
+        _pedir(meta) {
+            this._metaPedida = meta;
+            this.o.onIniciar(meta);
+        }
+
+        _mostrarPanelObjeto(visible) {
+            this._q('[data-rac="panel-objeto"]').hidden = !visible;
+            this._q('[data-rac="seguir-objeto"]').setAttribute('aria-expanded', visible ? 'true' : 'false');
+        }
+
+        /**
+         * Llena la lista de "Seguir objeto": primero los objetos propios ("Mis objetos") y después
+         * los que reconoce la app (COCO-SSD, en español).
+         * @param {Array<{id:string, nombre:string}>} objetos
+         */
+        setObjetos(objetos) {
+            const sel = this._q('[data-rac="objeto"]');
+            const anterior = sel.value;
+            const grupo = (etiqueta, opciones) => {
+                const g = document.createElement('optgroup');
+                g.label = etiqueta;
+                g.append(...opciones);
+                return g;
+            };
+            const grupos = [];
+            if (objetos.length) grupos.push(grupo('Mis objetos', objetos.map(o => new Option(o.nombre, `mio:${o.id}`))));
+            grupos.push(grupo('Objetos que reconoce la app', DronSeguimiento.clasesParaSeguir().map(c => new Option(c.nombre, `clase:${c.clase}`))));
+            sel.replaceChildren(...grupos);
+            if (anterior && [...sel.options].some(o => o.value === anterior)) sel.value = anterior;
+        }
+
+        /** Marca qué botón corresponde a lo que se sigue (por ejemplo, si se arrancó desde otro lado). */
+        marcarObjetivo(meta) {
+            this._metaPedida = meta;
+            this._marcarBotones();
+        }
+
+        _marcarBotones() {
+            const meta = this.activo ? this._metaPedida : null;
+            const persona = this._q('[data-rac="seguir-persona"]');
+            const objeto = this._q('[data-rac="seguir-objeto"]');
+            persona.setAttribute('aria-pressed', meta?.tipo === 'persona' ? 'true' : 'false');
+            persona.classList.toggle('active', meta?.tipo === 'persona');
+            objeto.classList.toggle('active', !!meta && meta.tipo !== 'persona');
+        }
 
         /** Iniciado o detenido: habilita los botones. */
         setActivo(activo) {
             this.activo = activo;
-            this._q('[data-rac="iniciar"]').disabled = activo;
             this._q('[data-rac="detener"]').disabled = !activo;
             if (this.o.chipFps) this.o.chipFps.hidden = !activo;
+            this._marcarBotones();
             if (!activo) {
-                this._pintarEstado({ titulo: 'Seguimiento detenido', texto: 'Tocá Iniciar seguimiento.', color: '' });
+                this._pintarEstado({ titulo: 'Seguimiento detenido', texto: 'Tocá Seguir persona o Seguir objeto.', color: '' });
                 this._q('[data-rac="barras"]').innerHTML = '<p class="small text-body-secondary mb-0">Sin detecciones todavía.</p>';
                 this._q('[data-rac="comando"]').textContent = 'Comando: rc 0 0 0 0';
             }
         }
 
-        /** Mientras carga el modelo (el botón muestra que está trabajando). */
+        /** Mientras carga el modelo: los botones de seguir quedan apagados y el estado dice que está preparando. */
         setCargando(cargando) {
-            const b = this._q('[data-rac="iniciar"]');
-            b.disabled = cargando || this.activo;
-            App.textoConIcono(b, '', cargando ? 'Preparando...' : 'Iniciar seguimiento');
+            for (const r of ['seguir-persona', 'seguir-objeto', 'seguir-este']) this._q(`[data-rac="${r}"]`).disabled = cargando;
+            if (cargando) this._pintarEstado({ titulo: 'Preparando...', texto: 'Cargando el detector (la primera vez tarda unos segundos).', color: '' });
+            else if (!this.activo) this.setActivo(false);
         }
 
         /** Sincroniza el interruptor (por ejemplo, si la cabina volvió a ensayo sola). */

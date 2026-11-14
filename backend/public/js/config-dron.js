@@ -38,9 +38,13 @@ const ConfigDron = (() => {
         },
     ];
 
-    /** El perfil elegido (si lo guardado no es uno de los dos, por ejemplo uno viejo del servidor, el Tello). */
+    /**
+     * El perfil elegido. Si lo guardado no es uno de los dos (por ejemplo, uno viejo del servidor), el Tello.
+     * El Simulador es de prueba: solo vale con el modo técnico; sin él, la cabina usa siempre el Tello.
+     */
     function perfilActivoId() {
         const id = localStorage.getItem('grupo5dron_perfil_activo');
+        if (id === 'simulador-local' && !App.modoTecnico()) return 'tello-default';
         return PERFILES.some(p => p.id === id) ? id : 'tello-default';
     }
 
@@ -77,8 +81,8 @@ const ConfigDron = (() => {
         <div class="config-dron-pagina">
             <header class="mb-4">
                 <p class="etiqueta">Configuración</p>
-                <h1 class="h3 fw-bold text-uppercase">Config. del dron</h1>
-                <p class="text-body-secondary mb-0">Elegí con qué dron vuela la cabina. Se guarda en el teléfono y funciona sin internet.</p>
+                <h1 class="h3 fw-bold text-uppercase">Configuración</h1>
+                <p class="text-body-secondary mb-0">El dron que usa la cabina y, en el modo técnico, los ajustes avanzados. Se guarda en el teléfono.</p>
             </header>
 
             <!-- 01 — Perfil -->
@@ -88,23 +92,9 @@ const ConfigDron = (() => {
                 <div id="config-dron-contenido"></div>
             </section>
 
-            <!-- 02 — Modo técnico -->
-            <section class="mb-5">
-                <p class="etiqueta">02 — Diagnóstico</p>
-                <h2 class="h5 fw-bold text-uppercase">Modo técnico</h2>
-                <p class="small text-body-secondary">
-                    Muestra herramientas para buscar problemas: registros de la conexión, el detalle del seguimiento,
-                    lo que analiza la cámara y ajustes avanzados. Arranca apagado.
-                </p>
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" role="switch" id="switch-modo-tecnico">
-                    <label class="form-check-label" for="switch-modo-tecnico">Mostrar el modo técnico</label>
-                </div>
-            </section>
-
-            <!-- 03 — Failsafe (modo técnico; el failsafe está siempre activo) -->
+            <!-- 02 — Failsafe (modo técnico; el failsafe está siempre activo) -->
             <section class="mb-5 solo-tecnico">
-                <p class="etiqueta">03 — Seguridad</p>
+                <p class="etiqueta">02 — Seguridad</p>
                 <h2 class="h5 fw-bold text-uppercase">Aterrizaje de seguridad (failsafe)</h2>
                 <p class="small text-body-secondary">
                     Siempre está activo. Si dejan de llegar los datos del dron (telemetría, por UDP 8890) durante este tiempo,
@@ -118,9 +108,9 @@ const ConfigDron = (() => {
                 <div class="form-text">De 1000 a 30000; por defecto 3500.</div>
             </section>
 
-            <!-- 04 — Sentido del avance por inclinación (modo técnico) -->
+            <!-- 03 — Sentido del avance por inclinación (modo técnico) -->
             <section class="mb-5 solo-tecnico">
-                <p class="etiqueta">04 — Inclinación</p>
+                <p class="etiqueta">03 — Inclinación</p>
                 <h2 class="h5 fw-bold text-uppercase">Sentido del avance</h2>
                 <p class="small text-body-secondary">
                     Normal: inclinar el celular hacia adelante (el borde de arriba de la pantalla hacia abajo) avanza,
@@ -133,7 +123,7 @@ const ConfigDron = (() => {
                 </div>
             </section>
 
-            <!-- 05 — Ajustes del seguimiento (modo técnico; se guardan en el teléfono) -->
+            <!-- 04 — Ajustes del seguimiento (modo técnico; se guardan en el teléfono) -->
             <section class="mb-5 solo-tecnico" id="ajustes-seguimiento"></section>
 
         </div>`;
@@ -162,14 +152,14 @@ const ConfigDron = (() => {
         const esTello = p.tipo_adaptador === 'tello';
 
         return `
-        <div class="list-group-item py-3 ${esActivo ? 'border-primary' : ''}" data-id="${_esc(perfil.id)}">
+        <div class="list-group-item py-3 ${esActivo ? 'border-primary' : ''} ${esTello ? '' : 'solo-tecnico'}" data-id="${_esc(perfil.id)}">
             <div class="d-flex justify-content-between align-items-start gap-3">
                 <div>
                     <p class="fw-semibold mb-1">${_esc(perfil.nombre)}</p>
                     <p class="small text-body-secondary mb-0">${_esc(perfil.descripcion)}</p>
                     ${esTello ? `<p class="small text-body-secondary mt-1 mb-0 solo-tecnico">IP: <code>${_esc(p.ip)}</code> · Puerto de comandos: <code>${_esc(String(p.puerto_comando))}</code></p>` : ''}
                 </div>
-                <button class="btn ${esActivo ? 'btn-outline-secondary' : 'btn-primary'} text-nowrap btn-seleccionar-perfil" data-id="${_esc(perfil.id)}" ${esActivo ? 'disabled' : ''}>
+                <button class="btn ${esActivo ? 'btn-outline-secondary' : 'btn-primary'} text-nowrap btn-seleccionar-perfil solo-tecnico" data-id="${_esc(perfil.id)}" ${esActivo ? 'disabled' : ''}>
                     ${esActivo ? 'Seleccionado' : 'Seleccionar'}
                 </button>
             </div>
@@ -199,7 +189,7 @@ const ConfigDron = (() => {
         for (const [clave, r] of Object.entries(R)) (grupos[r.grupo] = grupos[r.grupo] || []).push([clave, r]);
 
         caja.innerHTML = `
-            <p class="etiqueta">05 — Seguimiento</p>
+            <p class="etiqueta">04 — Seguimiento</p>
             <h2 class="h5 fw-bold text-uppercase">Ajustes del seguimiento</h2>
             <p class="small text-body-secondary">
                 Se guardan en este teléfono y se aplican la próxima vez que inicies el seguimiento.
@@ -252,15 +242,6 @@ const ConfigDron = (() => {
 
     function _agregarEventos(contenedor) {
         _renderizarAjustesSeguimiento(contenedor);
-
-        const sw = contenedor.querySelector('#switch-modo-tecnico');
-        if (sw) {
-            sw.checked = App.modoTecnico();
-            sw.addEventListener('change', () => {
-                App.cambiarModoTecnico(sw.checked);
-                App.mostrarToast(sw.checked ? 'Modo técnico activado.' : 'Modo técnico apagado.', 'info');
-            });
-        }
 
         const swAvance = contenedor.querySelector('#switch-invertir-avance');
         if (swAvance && typeof DronGiroscopio !== 'undefined') {

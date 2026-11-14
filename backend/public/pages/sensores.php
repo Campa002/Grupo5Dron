@@ -9,7 +9,7 @@
     <!-- 01 — Inclinación en vivo (giroscopio o, si no hay, acelerómetro) -->
     <section class="mb-5" id="panel-giro-vivo">
         <p class="etiqueta">01 — Inclinación</p>
-        <h2 class="h5 fw-bold text-uppercase">🧭 Inclinación en vivo</h2>
+        <h2 class="h5 fw-bold text-uppercase">Inclinación en vivo</h2>
         <p class="small text-body-secondary">Inclinate con el celular y mirá cómo cambian los números: así se va a mover el dron.</p>
         <div class="row text-center g-2 mb-3">
             <div class="col">
