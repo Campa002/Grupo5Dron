@@ -7,7 +7,7 @@ on:
   push:
     branches: [ "main", "master" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "prueba-en-clase" ]
   workflow_dispatch:
 
 # Acciones en versiones con Node 24 (las de Node 20 están obsoletas en GitHub).
