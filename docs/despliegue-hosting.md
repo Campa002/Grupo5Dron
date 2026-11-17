@@ -1,8 +1,74 @@
 # Subir el proyecto al servidor, paso a paso
 
-Guía para alguien que nunca subió nada. El hosting todavía no está elegido: los nombres de los menús pueden cambiar un poco según el proveedor.
+El proyecto está en **nuestro servidor con Docker** (el mismo donde está RAC). La dirección es `https://grupo5.40-160-138-65.sslip.io/`.
 
-**Qué tiene que tener el hosting:** PHP 8, MySQL (o MariaDB) y **HTTPS** (candado). Sin HTTPS, el APK del aula y el ESP32 no se conectan.
+- **Parte A:** cómo se instala y se actualiza en ese servidor. Es un solo comando.
+- **Parte B:** cómo subirlo a un hosting común (cPanel), por si algún día hace falta.
+
+En los dos casos hace falta PHP 8, MySQL (o MariaDB) y **HTTPS**: sin HTTPS, el APK del aula y el ESP32 no se conectan.
+
+# Parte A: nuestro servidor con Docker
+
+## Qué hay en el servidor
+
+En la carpeta `server/grupo5/` del servidor:
+
+| Archivo o carpeta | Qué es |
+| :--- | :--- |
+| `sitio/` | La portada, las dos webs, la API y los APK (lo que arma `scripts/armar-paquete-servidor.py`). |
+| `docker-compose.yml`, `Dockerfile` | Dos contenedores: `grupo5-web` (PHP 8.2 + Apache) y `grupo5-db` (MariaDB). |
+| `.env` | Las claves (base de datos, JWT y token del ESP32). Se crean solas, al azar, la primera vez. **Solo están ahí.** |
+| `CLAVES-INICIALES.txt` | La contraseña inicial de cada cuenta, al azar. La app obliga a cambiarla al entrar. |
+
+Los contenedores no abren ningún puerto. El proxy del servidor (Nginx Proxy Manager) pone el dominio y el HTTPS, igual que con RAC.
+
+## Instalar o actualizar
+
+Hace falta tener acceso por SSH al servidor (pedíselo a quien lo administra). En la carpeta del proyecto:
+
+```bash
+bash docker/desplegar.sh usuario@servidor grupo5.40-160-138-65.sslip.io
+```
+
+El comando arma el paquete, lo sube, prende los contenedores y prueba que todo responda. Al final muestra una línea como esta:
+
+```
+portada 200 | aula 200 | dron 200 | api sin sesión 401 | config cerrada 403
+```
+
+Para que la portada ofrezca los APK, antes copiá los dos archivos a la carpeta `apk/` (ver el paso 1 de la Parte B).
+
+## El dominio en el proxy (una sola vez)
+
+En Nginx Proxy Manager → **Proxy Hosts** → **Add Proxy Host**:
+
+| Campo | Valor |
+| :--- | :--- |
+| Domain Names | `grupo5.40-160-138-65.sslip.io` |
+| Scheme | `http` |
+| Forward Hostname | `grupo5-web` |
+| Forward Port | `80` |
+| Block Common Exploits | activado |
+| Pestaña SSL | "Request a new SSL Certificate", con **Force SSL** activado |
+
+## Las contraseñas
+
+- Las contraseñas iniciales se leen en el servidor: `cat server/grupo5/CLAVES-INICIALES.txt`. No se mandan por chat ni van al repo.
+- El token del ESP32 está en `server/grupo5/.env` (`ESP32_TOKEN`). Va igual en `config.h` del ESP32, con `API_URL` = `https://grupo5.40-160-138-65.sslip.io/api/esp32.php`.
+
+## Comandos útiles (en el servidor, dentro de `server/grupo5/`)
+
+| Para | Comando |
+| :--- | :--- |
+| Ver si está prendido | `docker compose ps` |
+| Ver los errores de PHP | `docker compose logs -f web` |
+| Reiniciar | `docker compose restart` |
+| Copia de la base | `docker exec grupo5-db sh -c 'mariadb-dump -ugrupo5 -p"$MARIADB_PASSWORD" grupo5dron_db' > copia.sql` |
+| Apagar (los datos se conservan) | `docker compose down` |
+
+# Parte B: un hosting común (cPanel)
+
+Guía para alguien que nunca subió nada. Los nombres de los menús pueden cambiar un poco según el proveedor.
 
 ## Cómo queda en el servidor
 

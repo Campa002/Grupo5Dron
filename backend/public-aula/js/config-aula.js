@@ -20,7 +20,7 @@
  * Vacía (''): el login del APK muestra "Falta configurar el servidor del aula".
  */
 // eslint-disable-next-line no-unused-vars
-const SERVIDOR_AULA = '';
+const SERVIDOR_AULA = 'https://grupo5.40-160-138-65.sslip.io/api';
 
 // eslint-disable-next-line no-unused-vars
 const Plataforma = {

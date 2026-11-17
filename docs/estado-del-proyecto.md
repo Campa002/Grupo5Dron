@@ -62,7 +62,7 @@ En esta PC `prueba-en-clase` ya se adelantó hasta `interfaz-bootstrap` (avance 
 | Punto | Estado | Detalle |
 |---|---|---|
 | Web del aula | Hecho y verificado | Completa contra la API (probada en local). |
-| APK del aula | A medias | Compila en el CI, pero `SERVIDOR_AULA` está vacío hasta tener hosting: no puede ingresar. |
+| APK del aula | Hecho sin verificar | `SERVIDOR_AULA` ya apunta al servidor. Falta compilarlo en el CI y probarlo en el celular. |
 | Web del dron con Simulador | Hecho y verificado | **Arreglado en esta rama:** antes quedaba con el perfil Tello y un error. Ahora arranca sola con el Simulador y avisa que es la versión web. |
 | APK del dron con el Tello | Hecho sin verificar | Compila en el CI. Falta probar la versión actual con el dron. |
 | Portada con accesos y descargas | Hecho y verificado | **Nueva en esta rama.** Falta subir los APK al servidor: hoy solo existen 14 días como archivos del CI. |
@@ -90,7 +90,7 @@ En esta PC `prueba-en-clase` ya se adelantó hasta `interfaz-bootstrap` (avance 
 
 | Punto | Estado | Detalle |
 |---|---|---|
-| Dos webs y dos APK en el servidor | Falta | Todavía no hay hosting. El paquete y la guía están listos. |
+| Dos webs y dos APK en el servidor | A medias | Instalado con Docker en el servidor donde está RAC y probado ahí adentro (ingreso, ESP32 simulado, carpetas cerradas). Falta agregar el dominio `grupo5.40-160-138-65.sslip.io` en el proxy y subir los dos APK. |
 | Firmware y carcasa | Hecho sin verificar | En el repo. |
 | README | A medias | No nombra Bootstrap, el modo técnico ni la portada. |
 | Manuales de usuario (dron y aula) | Hecho | Falta explicar la web del dron con el Simulador. |

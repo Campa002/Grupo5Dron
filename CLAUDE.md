@@ -113,6 +113,7 @@ capacitor/        APK del dron: capacitor.config.json, package.json, network_sec
 capacitor-aula/   APK del aula: capacitor.config.json, package.json (sin plugin propio)
 scripts/          armar-paquete-servidor.py (ZIP para el hosting, en dist/), build-apk.js (dron | aula), check_js.py, check_refs.py (las dos apps), ci_firma_debug.sh (firma de los dos APK), generar_hash.php
 posibles-implementaciones/  firmware del aula (pines del circuito soldado), carcasa del equipo del aula (aula-esp32/carcasa: OpenSCAD, para-imprimir/ y vistas), adaptadores genéricos (HTTP, UDP/TCP), herramientas viejas
+docker/           Dockerfile, docker-compose.yml, config.docker.php, desplegar.sh e instalar-en-servidor.sh (servidor con Docker)
 docs/             guía de pruebas en clase, manuales, API, plan de pruebas, limitaciones, correcciones del informe, despliegue, seguimiento
 docs/contexto/    informe, historial, reportes
 ```
@@ -204,6 +205,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 - Interfaz: un solo botón principal por pantalla (`.btn-primary`; el segundo nivel es `.btn-outline-primary` en azul institucional). Cabina: atajos Seguir persona | Seguir objeto al lado de Inclinación (se ven con el celular acostado), "Inclinación: apagada / activa". Aula: cada aparato con su estado en grande (`.aparato-estado`, `estadoAparato()` en `aula.js`; el de las luces es la última orden cumplida, la API no guarda el estado del relé) y "Aprender código" en tres pasos (`#bloque-aprender[data-paso]`).
 - Hosting: `python scripts/armar-paquete-servidor.py` deja `dist/paquete-servidor.zip` (portada, `aula/`, `dron/`, `api/`, `includes/`, `config/` sin `config.php`, `apk/`) y `dist/base-de-datos.sql`. `includes/` y `config/` llevan `.htaccess` con `Require all denied`. Guía: `docs/despliegue-hosting.md`. Los APK se copian a mano a `apk/` (ignorada por git) antes de armar el paquete.
 - Los commits se hacen solo con la cuenta Campa002 (pedido del 17/11).
+- Servidor (17/11): el mismo VPS con Docker donde está RAC, en `server/grupo5/` (contenedores `grupo5-web`, PHP 8.2 + Apache, y `grupo5-db`, MariaDB 10.11; red `proxy-network`, sin puertos publicados; el dominio y el HTTPS los pone Nginx Proxy Manager). Dirección: `https://grupo5.40-160-138-65.sslip.io/` (también en `SERVIDOR_AULA`). Se instala y se actualiza con `bash docker/desplegar.sh usuario@servidor dominio`; las claves se crean al azar en el servidor (`.env`, `CLAVES-INICIALES.txt`) y `docker/config.docker.php` las lee de variables de entorno. PHP y MariaDB usan la misma zona horaria. El usuario y la IP del servidor no van al repo.
 - Verificado: 107 pruebas, `check_refs.py`, `php -l`, Edge a 360/412/740 sin errores de consola ni scroll horizontal (dron en `/` y en `/dron/`, aula, portada), Simulador en la web, plugin simulado en el camino del APK, aula con PHP 8.2 + MariaDB. Sin verificar: CI, los dos APK, celular, dron y circuito.
 
 ## Decisiones tomadas sin consultar (13/11)
