@@ -1,8 +1,13 @@
 # Subir el proyecto al servidor, paso a paso
 
-El proyecto está en **nuestro servidor con Docker** (el mismo donde está RAC). Se entra por la IP: **http://40.160.138.65:8086/**
+El proyecto está en **nuestro servidor con Docker** (el mismo donde está RAC). Hay dos formas de entrar:
 
-Por IP no hay candado (HTTPS). Así funcionan la portada, la web del aula y la web del dron con el simulador. **No funcionan sin HTTPS:** el APK del aula (Android no lo deja conectarse por http) y la cámara del celular en el navegador. Para eso está la sección "Para tener HTTPS".
+| Dirección | Para qué |
+| :--- | :--- |
+| **https://grupo5.40-160-138-65.sslip.io/** | La de siempre: con candado (HTTPS). La usan el APK del aula, el ESP32 y la cámara del celular en el navegador. |
+| http://40.160.138.65:8086/ | Por la IP, sin candado. Sirve para mirar la portada y las webs; el APK del aula y la cámara no funcionan sin HTTPS. |
+
+No hay ningún dominio comprado: `grupo5.40-160-138-65.sslip.io` es la misma IP escrita como nombre (el servicio gratis sslip.io la traduce sola).
 
 - **Parte A:** cómo se instala y se actualiza en ese servidor. Es un solo comando.
 - **Parte B:** cómo subirlo a un hosting común (cPanel), por si algún día hace falta.
@@ -40,25 +45,23 @@ portada 200 | aula 200 | dron 200 | api sin sesión 401 | config cerrada 403
 
 Para que la portada ofrezca los APK, antes copiá los dos archivos a la carpeta `apk/` (ver el paso 1 de la Parte B).
 
-## Para tener HTTPS (opcional, una sola vez)
+## Cómo está hecho el HTTPS (ya está activado)
 
-No hace falta comprar un dominio. `grupo5.40-160-138-65.sslip.io` es la misma IP escrita como nombre (el servicio gratis sslip.io la traduce sola), y con un nombre el proxy del servidor sí puede sacar el certificado. Entrando por ese nombre, el sitio pasa solo a HTTPS.
+Se hizo una sola vez, a mano, en el proxy del servidor (Nginx Proxy Manager), igual que con control-aula:
 
-En Nginx Proxy Manager → **Proxy Hosts** → **Add Proxy Host**:
+1. **Certificado gratis de Let's Encrypt**, pedido dentro del contenedor del proxy:
+   ```bash
+   docker exec proxy-app-1 certbot certonly --non-interactive --webroot -w /data/letsencrypt-acme-challenge -d grupo5.40-160-138-65.sslip.io --cert-name grupo5-sslip --key-type ecdsa
+   ```
+2. **Configuración del sitio en el proxy:** el archivo `docker/proxy-https.conf` del repo, copiado como `proxy/data/nginx/custom/http.conf` en el servidor. Después: `docker exec proxy-app-1 nginx -t` y, si dice que está bien, `docker exec proxy-app-1 nginx -s reload`.
+3. **Renovación automática:** el certificado dura 90 días. Una tarea programada del servidor (`crontab -l`) lo renueva sola los lunes.
 
-| Campo | Valor |
-| :--- | :--- |
-| Domain Names | `grupo5.40-160-138-65.sslip.io` |
-| Scheme | `http` |
-| Forward Hostname | `grupo5-web` |
-| Forward Port | `80` |
-| Block Common Exploits | activado |
-| Pestaña SSL | "Request a new SSL Certificate", con **Force SSL** activado |
+Este sitio no aparece en la pantalla de Nginx Proxy Manager, porque no se cargó desde ahí. Para sacarlo: borrar ese `http.conf` y recargar el proxy.
 
 ## Las contraseñas
 
 - Las contraseñas iniciales se leen en el servidor: `cat server/grupo5/CLAVES-INICIALES.txt`. No se mandan por chat ni van al repo.
-- El token del ESP32 está en `server/grupo5/.env` (`ESP32_TOKEN`). Va igual en `config.h` del ESP32, con `API_URL` = `http://40.160.138.65:8086/api/esp32.php` (o la dirección con HTTPS, si se configuró).
+- El token del ESP32 está en `server/grupo5/.env` (`ESP32_TOKEN`). Va igual en `config.h` del ESP32, con `API_URL` = `https://grupo5.40-160-138-65.sslip.io/api/esp32.php`.
 
 ## Comandos útiles (en el servidor, dentro de `server/grupo5/`)
 
