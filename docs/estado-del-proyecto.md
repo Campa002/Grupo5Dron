@@ -113,6 +113,7 @@ Son de vuelo o de la lógica del aula. Están comprobados leyendo el código, no
 4. Después de un failsafe con el WiFi caído, la cabina queda trabada sin botón Reconectar.
 5. Si el dron se apaga en tierra, sigue diciendo "Conectado (en tierra)".
 6. Falta mostrar la señal WiFi: hay que agregar una pregunta periódica al Tello (`wifi?`).
+7. Si se toca "Seguir persona" en vuelo por primera vez, la carga del modelo puede trabar la app unos segundos y disparar el aterrizaje de seguridad. Visto en esta revisión con el Simulador en una PC sin placa de video (16 s trabada). Falta medirlo en el celular. Posible arreglo: cargar el modelo al entrar a la cabina.
 
 **Aula**
 
