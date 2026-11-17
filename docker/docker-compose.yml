@@ -1,8 +1,9 @@
 # Grupo 5 en el servidor con Docker, igual que RAC:
 #  - web: PHP 8.2 + Apache con la portada, las dos webs y la API (carpeta ./sitio, solo lectura)
 #  - db:  MariaDB con los datos en un volumen (sobreviven a cada actualización)
-# No publica puertos: el proxy del servidor (Nginx Proxy Manager) entra por la red "proxy-network"
-# y pone el dominio y el HTTPS. Las claves están en el archivo .env del servidor (nunca en el repo).
+# Se entra por la IP del servidor en el puerto 8086 (http, sin candado). Si algún día se le pone un
+# nombre con HTTPS, el proxy del servidor (Nginx Proxy Manager) entra por la red "proxy-network".
+# Las claves están en el archivo .env del servidor (nunca en el repo).
 services:
   web:
     build: .
@@ -11,6 +12,8 @@ services:
     env_file: .env
     environment:
       TZ: America/Argentina/Buenos_Aires
+    ports:
+      - "8086:80"
     volumes:
       - ./sitio:/var/www/html:ro
     depends_on:

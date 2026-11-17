@@ -1,11 +1,13 @@
 # Subir el proyecto al servidor, paso a paso
 
-El proyecto está en **nuestro servidor con Docker** (el mismo donde está RAC). La dirección es `https://grupo5.40-160-138-65.sslip.io/`.
+El proyecto está en **nuestro servidor con Docker** (el mismo donde está RAC). Se entra por la IP: **http://40.160.138.65:8086/**
+
+Por IP no hay candado (HTTPS). Así funcionan la portada, la web del aula y la web del dron con el simulador. **No funcionan sin HTTPS:** el APK del aula (Android no lo deja conectarse por http) y la cámara del celular en el navegador. Para eso está la sección "Para tener HTTPS".
 
 - **Parte A:** cómo se instala y se actualiza en ese servidor. Es un solo comando.
 - **Parte B:** cómo subirlo a un hosting común (cPanel), por si algún día hace falta.
 
-En los dos casos hace falta PHP 8, MySQL (o MariaDB) y **HTTPS**: sin HTTPS, el APK del aula y el ESP32 no se conectan.
+En los dos casos hace falta PHP 8 y MySQL (o MariaDB).
 
 # Parte A: nuestro servidor con Docker
 
@@ -20,7 +22,7 @@ En la carpeta `server/grupo5/` del servidor:
 | `.env` | Las claves (base de datos, JWT y token del ESP32). Se crean solas, al azar, la primera vez. **Solo están ahí.** |
 | `CLAVES-INICIALES.txt` | La contraseña inicial de cada cuenta, al azar. La app obliga a cambiarla al entrar. |
 
-Los contenedores no abren ningún puerto. El proxy del servidor (Nginx Proxy Manager) pone el dominio y el HTTPS, igual que con RAC.
+El contenedor web publica el puerto 8086 del servidor. La base de datos no abre ningún puerto.
 
 ## Instalar o actualizar
 
@@ -38,7 +40,9 @@ portada 200 | aula 200 | dron 200 | api sin sesión 401 | config cerrada 403
 
 Para que la portada ofrezca los APK, antes copiá los dos archivos a la carpeta `apk/` (ver el paso 1 de la Parte B).
 
-## El dominio en el proxy (una sola vez)
+## Para tener HTTPS (opcional, una sola vez)
+
+No hace falta comprar un dominio. `grupo5.40-160-138-65.sslip.io` es la misma IP escrita como nombre (el servicio gratis sslip.io la traduce sola), y con un nombre el proxy del servidor sí puede sacar el certificado. Entrando por ese nombre, el sitio pasa solo a HTTPS.
 
 En Nginx Proxy Manager → **Proxy Hosts** → **Add Proxy Host**:
 
@@ -54,7 +58,7 @@ En Nginx Proxy Manager → **Proxy Hosts** → **Add Proxy Host**:
 ## Las contraseñas
 
 - Las contraseñas iniciales se leen en el servidor: `cat server/grupo5/CLAVES-INICIALES.txt`. No se mandan por chat ni van al repo.
-- El token del ESP32 está en `server/grupo5/.env` (`ESP32_TOKEN`). Va igual en `config.h` del ESP32, con `API_URL` = `https://grupo5.40-160-138-65.sslip.io/api/esp32.php`.
+- El token del ESP32 está en `server/grupo5/.env` (`ESP32_TOKEN`). Va igual en `config.h` del ESP32, con `API_URL` = `http://40.160.138.65:8086/api/esp32.php` (o la dirección con HTTPS, si se configuró).
 
 ## Comandos útiles (en el servidor, dentro de `server/grupo5/`)
 
