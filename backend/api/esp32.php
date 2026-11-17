@@ -176,7 +176,7 @@ function reportarResultado(): void
 
         // Registrar en el historial
         $stmtInfo = $pdo->prepare(
-            'SELECT cc.tipo, b.nombre AS boton_nombre, d.nombre AS dispositivo_nombre, u.nombre AS usuario_nombre
+            'SELECT cc.tipo, cc.parametros, b.nombre AS boton_nombre, d.nombre AS dispositivo_nombre, u.nombre AS usuario_nombre
              FROM cola_comandos cc
              LEFT JOIN botones b ON cc.boton_id = b.id
              LEFT JOIN dispositivos d ON b.dispositivo_id = d.id
@@ -190,10 +190,20 @@ function reportarResultado(): void
             'INSERT INTO historial (comando_id, dispositivo, boton, tipo, estado, resultado, usuario_nombre)
              VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
+        // Las luces (relé) no tienen botón: se anotan como "Luces" con la acción pedida
+        $dispositivoNombre = $info['dispositivo_nombre'] ?? 'Desconocido';
+        $botonNombre = $info['boton_nombre'] ?? 'Desconocido';
+        if (($info['tipo'] ?? '') === 'rele') {
+            $param = json_decode($info['parametros'] ?? '', true) ?: [];
+            $dispositivoNombre = 'Luces';
+            $botonNombre = ($param['accion'] ?? '') === 'encender' ? 'Encender' : 'Apagar';
+        } elseif (($info['tipo'] ?? '') === 'aprendizaje') {
+            $botonNombre .= ' (aprender código)';
+        }
         $stmtHistorial->execute([
             $comandoId,
-            $info['dispositivo_nombre'] ?? 'Desconocido',
-            $info['boton_nombre'] ?? 'Desconocido',
+            $dispositivoNombre,
+            $botonNombre,
             $info['tipo'] ?? 'ir',
             $estado,
             $resultado,
@@ -220,9 +230,6 @@ function recibirCodigoIr(): void
     $datos = obtenerBodyJson();
     validarCamposRequeridos($datos, ['boton_id', 'protocolo']);
 
-    // Reutilizar la función de guardar código IR del endpoint de botones
-    require_once __DIR__ . '/botones.php';
-    // La función ya fue incluida, manejar directamente
     $botonId = (int) $datos['boton_id'];
     $protocolo = strtoupper(sanear($datos['protocolo']));
     $codigo = isset($datos['codigo']) ? sanear($datos['codigo']) : null;
@@ -230,12 +237,18 @@ function recibirCodigoIr(): void
     $rawData = isset($datos['raw_data']) ? $datos['raw_data'] : null;
     $frecuencia = (int) ($datos['frecuencia'] ?? 38000);
 
-    if (is_array($rawData)) {
-        $rawData = json_encode($rawData);
-    }
+    // La trama cruda (tiempos en microsegundos) se guarda completa: es el respaldo para los códigos largos
+    // de los aires si la librería no reconoce el protocolo
+    $rawData = is_array($rawData) ? json_encode(array_map('intval', $rawData)) : null;
 
     try {
         $pdo = obtenerConexion();
+
+        $stmt = $pdo->prepare('SELECT id FROM botones WHERE id = ?');
+        $stmt->execute([$botonId]);
+        if (!$stmt->fetch()) {
+            responderError('Acción no encontrada.', 404);
+        }
 
         $stmt = $pdo->prepare(
             'INSERT INTO codigos_ir (boton_id, protocolo, codigo, bits, raw_data, frecuencia, descripcion)
@@ -249,6 +262,7 @@ function recibirCodigoIr(): void
                 descripcion = "Capturado por ESP32"'
         );
         $stmt->execute([$botonId, $protocolo, $codigo, $bits, $rawData, $frecuencia]);
+        $pdo->exec('UPDATE estado_esp32 SET modo_aprendizaje = 0');
 
         responderExito('Código IR capturado y guardado.', [
             'protocolo' => $protocolo,

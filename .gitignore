@@ -12,6 +12,10 @@ capacitor/www/
 capacitor/android/
 capacitor/.gradle/
 capacitor/build/
+capacitor-aula/www/
+capacitor-aula/android/
+capacitor-aula/.gradle/
+capacitor-aula/build/
 *.apk
 
 # PlatformIO

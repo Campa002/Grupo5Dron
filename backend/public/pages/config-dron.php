@@ -1,10 +1,5 @@
-<!-- Vista de Configuración de Dron — Grupo 5: Control de Sistemas y Dron -->
-<!--
-    Contenedor vacío: ConfigDron.inicializar() inyecta toda la interfaz.
-    El stub garantiza que el router SPA siempre tenga algo que cargar,
-    aunque los scripts aún no estén disponibles.
--->
-<div id="config-dron-stub-cargando" class="texto-centro" style="padding: var(--espacio-2xl);">
-    <div class="cargando__spinner" style="margin: 0 auto var(--espacio-md);"></div>
-    <p class="texto-sm texto-secundario">Cargando configuración de perfiles...</p>
+<!-- Config. Dron: la arma config-dron.js (ConfigDron.inicializar). Acá solo va el aviso de carga. -->
+<div id="config-dron-stub-cargando" class="text-center py-5 text-body-secondary">
+    <div class="spinner-border mb-3" aria-hidden="true"></div>
+    <p class="small">Cargando la configuración...</p>
 </div>

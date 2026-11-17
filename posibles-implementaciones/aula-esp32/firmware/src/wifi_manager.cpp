@@ -37,7 +37,7 @@ void WifiManager::intentarConexion() {
     Serial.println();
 
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.println("[WiFi] ✓ Conexión establecida con éxito!");
+        Serial.println("[WiFi] OK: Conexión establecida con éxito!");
         Serial.printf("[WiFi] Dirección IP asignada: %s\n", WiFi.localIP().toString().c_str());
         Serial.printf("[WiFi] Intensidad de señal (RSSI): %d dBm\n", WiFi.RSSI());
         Serial.printf("[WiFi] Puerta de enlace: %s\n", WiFi.gatewayIP().toString().c_str());
@@ -59,12 +59,12 @@ void WifiManager::intentarConexion() {
             localtime_r(&now, &timeinfo);
             char bufferFecha[64];
             strftime(bufferFecha, sizeof(bufferFecha), "%d/%m/%Y %H:%M:%S", &timeinfo);
-            Serial.printf("[NTP] ✓ Hora sincronizada para HTTPS: %s (UTC-3)\n", bufferFecha);
+            Serial.printf("[NTP] OK: Hora sincronizada para HTTPS: %s (UTC-3)\n", bufferFecha);
         } else {
-            Serial.println("[NTP] ⚠️ Timeout de sincronización NTP. Si VERIFY_SSL está activo, verificar conexión a internet.");
+            Serial.println("[NTP] AVISO: Timeout de sincronización NTP. Si VERIFY_SSL está activo, verificar conexión a internet.");
         }
     } else {
-        Serial.println("[WiFi] ⚠️ Tiempo de espera agotado. Se continuará reintentando en segundo plano.");
+        Serial.println("[WiFi] AVISO: Tiempo de espera agotado. Se continuará reintentando en segundo plano.");
         estadoAnteriorConectado = false;
     }
 }
@@ -79,11 +79,11 @@ void WifiManager::verificarConexion() {
     bool conectadoActual = (WiFi.status() == WL_CONNECTED);
 
     if (!conectadoActual && estadoAnteriorConectado) {
-        Serial.println("[WiFi] ⚠️ Conexión perdida. Intentando reconectar automáticamente...");
+        Serial.println("[WiFi] AVISO: Conexión perdida. Intentando reconectar automáticamente...");
         WiFi.disconnect();
         WiFi.reconnect();
     } else if (conectadoActual && !estadoAnteriorConectado) {
-        Serial.println("[WiFi] ✓ Reconexión exitosa!");
+        Serial.println("[WiFi] OK: Reconexión exitosa!");
         Serial.printf("[WiFi] Dirección IP: %s | RSSI: %d dBm\n", 
                       WiFi.localIP().toString().c_str(), WiFi.RSSI());
     }

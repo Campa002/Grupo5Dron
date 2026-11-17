@@ -1,0 +1,9 @@
+{
+  "appId": "ar.edu.eest1vl.grupo5aula",
+  "appName": "Grupo 5 Aula",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

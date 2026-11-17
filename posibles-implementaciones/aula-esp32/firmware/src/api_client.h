@@ -7,6 +7,7 @@
 #define API_CLIENT_H
 
 #include <Arduino.h>
+#include <WiFi.h>              // WiFiClient (en el núcleo Arduino 3.x no viene con WiFiClientSecure.h)
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
@@ -25,9 +26,11 @@ public:
 
 private:
     WiFiClientSecure secureClient;
+    WiFiClient clientePlano;   // para API_URL con http:// (por ejemplo, XAMPP en la red del aula)
     HTTPClient http;
 
     void configurarSeguridad();
+    bool abrir(const String& url);
     void procesarComando(JsonObject cmd);
 };
 

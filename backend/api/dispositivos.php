@@ -1,13 +1,13 @@
 <?php
 /**
- * API de Dispositivos del Aula — Grupo 5: Control de Sistemas y Dron
- * 
+ * API de los aparatos del aula — Grupo 5: Control de Sistemas y Dron
+ *
+ * El aula controla solo dos aparatos por infrarrojo: el proyector y el aire acondicionado (las luces
+ * van por el relé). Son fijos (schema.sql): no se crean ni se borran desde la app.
+ *
  * Endpoints:
- *   GET    ?action=listar           — Listar todos los dispositivos
- *   GET    ?action=obtener&id=X     — Obtener un dispositivo con sus botones
- *   POST   ?action=crear            — Crear dispositivo (admin/docente)
- *   PUT    ?action=actualizar&id=X  — Actualizar dispositivo (admin/docente)
- *   DELETE ?action=eliminar&id=X    — Eliminar dispositivo (admin)
+ *   GET ?action=listar          — Los aparatos con sus acciones y si tienen código aprendido
+ *   GET ?action=obtener&id=X    — Un aparato con sus acciones
  */
 
 require_once __DIR__ . '/../config/database.php';
@@ -27,22 +27,32 @@ switch ($action) {
     case 'obtener':
         obtenerDispositivo();
         break;
-    case 'crear':
-        crearDispositivo();
-        break;
-    case 'actualizar':
-        actualizarDispositivo();
-        break;
-    case 'eliminar':
-        eliminarDispositivo();
-        break;
     default:
-        responderError('Acción no válida.', 400);
+        responderError('Acción no válida. Usar: listar, obtener.', 400);
 }
 
-/**
- * Lista todos los dispositivos activos con sus botones y estado de código IR.
- */
+/** Acciones de un aparato con el resumen de su código IR. */
+function accionesDe(PDO $pdo, int $dispositivoId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT b.id, b.accion, b.nombre, b.icono, b.orden,
+                CASE WHEN c.id IS NOT NULL THEN 1 ELSE 0 END AS tiene_codigo_ir,
+                c.id AS codigo_ir_id, c.protocolo, c.bits, c.actualizado_en AS codigo_actualizado_en
+         FROM botones b
+         LEFT JOIN codigos_ir c ON c.boton_id = b.id
+         WHERE b.dispositivo_id = ? AND b.activo = 1
+         ORDER BY b.orden ASC'
+    );
+    $stmt->execute([$dispositivoId]);
+    $botones = $stmt->fetchAll();
+    foreach ($botones as &$b) {
+        $b['id'] = (int) $b['id'];
+        $b['tiene_codigo_ir'] = (bool) $b['tiene_codigo_ir'];
+        $b['bits'] = $b['bits'] === null ? null : (int) $b['bits'];
+    }
+    return $botones;
+}
+
 function listarDispositivos(): void
 {
     validarMetodo(['GET']);
@@ -50,42 +60,25 @@ function listarDispositivos(): void
 
     try {
         $pdo = obtenerConexion();
-
-        // Obtener dispositivos ordenados
         $stmt = $pdo->query(
-            'SELECT id, nombre, tipo, icono, orden, activo, creado_en 
-             FROM dispositivos 
+            'SELECT id, nombre, tipo, icono, orden
+             FROM dispositivos
+             WHERE activo = 1
              ORDER BY orden ASC, nombre ASC'
         );
         $dispositivos = $stmt->fetchAll();
-
-        // Para cada dispositivo, obtener sus botones con estado de código IR
         foreach ($dispositivos as &$disp) {
-            $stmtBotones = $pdo->prepare(
-                'SELECT b.id, b.nombre, b.icono, b.orden, b.activo,
-                        CASE WHEN c.id IS NOT NULL THEN 1 ELSE 0 END AS tiene_codigo_ir,
-                        c.protocolo
-                 FROM botones b
-                 LEFT JOIN codigos_ir c ON c.boton_id = b.id
-                 WHERE b.dispositivo_id = ?
-                 ORDER BY b.orden ASC'
-            );
-            $stmtBotones->execute([$disp['id']]);
-            $disp['botones'] = $stmtBotones->fetchAll();
             $disp['id'] = (int) $disp['id'];
-            $disp['activo'] = (bool) $disp['activo'];
+            $disp['botones'] = accionesDe($pdo, $disp['id']);
         }
 
         responderJson(['error' => false, 'dispositivos' => $dispositivos]);
     } catch (Exception $e) {
         registrarLog('Error listando dispositivos: ' . $e->getMessage(), 'ERROR');
-        responderError('Error al obtener dispositivos.', 500);
+        responderError('Error al obtener los aparatos.', 500);
     }
 }
 
-/**
- * Obtiene un dispositivo específico con sus botones y códigos IR.
- */
 function obtenerDispositivo(): void
 {
     validarMetodo(['GET']);
@@ -93,158 +86,23 @@ function obtenerDispositivo(): void
 
     $id = (int) obtenerParam('id', 0);
     if ($id <= 0) {
-        responderError('ID de dispositivo requerido.', 400);
+        responderError('ID de aparato requerido.', 400);
     }
 
     try {
         $pdo = obtenerConexion();
-
-        $stmt = $pdo->prepare('SELECT * FROM dispositivos WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT id, nombre, tipo, icono, orden FROM dispositivos WHERE id = ? AND activo = 1');
         $stmt->execute([$id]);
         $dispositivo = $stmt->fetch();
-
         if (!$dispositivo) {
-            responderError('Dispositivo no encontrado.', 404);
+            responderError('Aparato no encontrado.', 404);
         }
-
-        // Obtener botones con códigos IR completos
-        $stmtBotones = $pdo->prepare(
-            'SELECT b.*, c.id AS codigo_ir_id, c.protocolo, c.codigo, c.bits, 
-                    c.raw_data, c.frecuencia, c.descripcion AS codigo_descripcion
-             FROM botones b
-             LEFT JOIN codigos_ir c ON c.boton_id = b.id
-             WHERE b.dispositivo_id = ?
-             ORDER BY b.orden ASC'
-        );
-        $stmtBotones->execute([$id]);
-        $dispositivo['botones'] = $stmtBotones->fetchAll();
+        $dispositivo['id'] = (int) $dispositivo['id'];
+        $dispositivo['botones'] = accionesDe($pdo, $dispositivo['id']);
 
         responderJson(['error' => false, 'dispositivo' => $dispositivo]);
     } catch (Exception $e) {
         registrarLog('Error obteniendo dispositivo: ' . $e->getMessage(), 'ERROR');
-        responderError('Error al obtener el dispositivo.', 500);
-    }
-}
-
-/**
- * Crea un nuevo dispositivo (solo admin/docente).
- */
-function crearDispositivo(): void
-{
-    validarMetodo(['POST']);
-    verificarDocente();
-
-    $datos = obtenerBodyJson();
-    validarCamposRequeridos($datos, ['nombre', 'tipo']);
-
-    $nombre = sanear($datos['nombre']);
-    $tipo = sanear($datos['tipo']);
-    $icono = sanear($datos['icono'] ?? 'dispositivo');
-    $orden = (int) ($datos['orden'] ?? 0);
-
-    // Validar tipo
-    $tiposValidos = ['luz', 'ventilador', 'aire', 'proyector', 'otro'];
-    if (!in_array($tipo, $tiposValidos, true)) {
-        responderError('Tipo no válido. Usar: ' . implode(', ', $tiposValidos), 400);
-    }
-
-    try {
-        $pdo = obtenerConexion();
-        $stmt = $pdo->prepare(
-            'INSERT INTO dispositivos (nombre, tipo, icono, orden) VALUES (?, ?, ?, ?)'
-        );
-        $stmt->execute([$nombre, $tipo, $icono, $orden]);
-
-        responderExito('Dispositivo creado exitosamente.', [
-            'dispositivo_id' => (int) $pdo->lastInsertId(),
-        ], 201);
-    } catch (Exception $e) {
-        registrarLog('Error creando dispositivo: ' . $e->getMessage(), 'ERROR');
-        responderError('Error al crear el dispositivo.', 500);
-    }
-}
-
-/**
- * Actualiza un dispositivo existente (solo admin/docente).
- */
-function actualizarDispositivo(): void
-{
-    validarMetodo(['PUT']);
-    verificarDocente();
-
-    $id = (int) obtenerParam('id', 0);
-    if ($id <= 0) {
-        responderError('ID de dispositivo requerido.', 400);
-    }
-
-    $datos = obtenerBodyJson();
-    if (empty($datos)) {
-        responderError('No se proporcionaron datos para actualizar.', 400);
-    }
-
-    try {
-        $pdo = obtenerConexion();
-
-        // Verificar que existe
-        $stmt = $pdo->prepare('SELECT id FROM dispositivos WHERE id = ?');
-        $stmt->execute([$id]);
-        if (!$stmt->fetch()) {
-            responderError('Dispositivo no encontrado.', 404);
-        }
-
-        // Construir UPDATE dinámico
-        $campos = [];
-        $valores = [];
-        $permitidos = ['nombre', 'tipo', 'icono', 'orden', 'activo'];
-
-        foreach ($permitidos as $campo) {
-            if (isset($datos[$campo])) {
-                $campos[] = "$campo = ?";
-                $valores[] = $campo === 'activo' ? (int) $datos[$campo] : sanear((string) $datos[$campo]);
-            }
-        }
-
-        if (empty($campos)) {
-            responderError('No se proporcionaron campos válidos.', 400);
-        }
-
-        $valores[] = $id;
-        $sql = 'UPDATE dispositivos SET ' . implode(', ', $campos) . ' WHERE id = ?';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($valores);
-
-        responderExito('Dispositivo actualizado exitosamente.');
-    } catch (Exception $e) {
-        registrarLog('Error actualizando dispositivo: ' . $e->getMessage(), 'ERROR');
-        responderError('Error al actualizar el dispositivo.', 500);
-    }
-}
-
-/**
- * Elimina un dispositivo (solo admin). Elimina en cascada botones y códigos IR.
- */
-function eliminarDispositivo(): void
-{
-    validarMetodo(['DELETE']);
-    verificarAdmin();
-
-    $id = (int) obtenerParam('id', 0);
-    if ($id <= 0) {
-        responderError('ID de dispositivo requerido.', 400);
-    }
-
-    try {
-        $pdo = obtenerConexion();
-        $stmt = $pdo->prepare('DELETE FROM dispositivos WHERE id = ?');
-        $stmt->execute([$id]);
-
-        if ($stmt->rowCount() === 0) {
-            responderError('Dispositivo no encontrado.', 404);
-        }
-
-        responderExito('Dispositivo eliminado exitosamente.');
-    } catch (Exception $e) {
-        registrarLog('Error eliminando dispositivo: ' . $e->getMessage(), 'ERROR');
-        responderError('Error al eliminar el dispositivo.', 500);
+        responderError('Error al obtener el aparato.', 500);
     }
 }

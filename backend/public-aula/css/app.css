@@ -1,0 +1,136 @@
+/* ============================================================
+   Grupo 5 — App del aula. Bootstrap 5.3 (libs/bootstrap, local) con data-bs-theme="dark".
+   Acá va solo el tema (azul institucional, el mismo que la app del dron) y lo que
+   Bootstrap no resuelve: el menú, los avisos, los puntos de estado y las ventanas.
+   ============================================================ */
+
+/* El atributo hidden gana siempre (las utilidades d-flex de Bootstrap usan !important) */
+[hidden] { display: none !important; }
+
+/* ---------- Tema ---------- */
+[data-bs-theme="dark"] {
+    --bs-body-bg: #0b1220;
+    --bs-body-bg-rgb: 11, 18, 32;
+    --bs-body-color: #e2e8f0;
+    --bs-body-color-rgb: 226, 232, 240;
+    --bs-secondary-color: rgba(226, 232, 240, 0.7);
+    --bs-secondary-bg: #16233b;
+    --bs-tertiary-bg: #111b2e;
+    --bs-tertiary-bg-rgb: 17, 27, 46;
+    --bs-border-color: #24344f;
+    --bs-primary: #3b82f6;
+    --bs-primary-rgb: 59, 130, 246;
+    --bs-primary-text-emphasis: #93c5fd;
+    --bs-link-color: #60a5fa;
+    --bs-link-color-rgb: 96, 165, 250;
+    --bs-link-hover-color: #93c5fd;
+    --bs-link-hover-color-rgb: 147, 197, 253;
+    --bs-code-color: #93c5fd;
+}
+.btn-primary {
+    --bs-btn-bg: #2563eb;
+    --bs-btn-border-color: #2563eb;
+    --bs-btn-hover-bg: #1d4ed8;
+    --bs-btn-hover-border-color: #1d4ed8;
+    --bs-btn-active-bg: #1e40af;
+    --bs-btn-active-border-color: #1e40af;
+    --bs-btn-disabled-bg: #2563eb;
+    --bs-btn-disabled-border-color: #2563eb;
+}
+.form-check-input:checked { background-color: #2563eb; border-color: #2563eb; }
+
+/* Tamaño táctil mínimo (44 px) */
+.btn, .form-control, .form-select { min-height: 2.75rem; }
+#header-principal .btn { min-width: 2.75rem; }
+.form-check-input { width: 1.25em; height: 1.25em; }
+.form-switch { display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; padding-left: 0; }
+.form-switch .form-check-input { width: 2.5em; margin: 0; float: none; flex-shrink: 0; }
+/* Botones secundarios legibles sobre el fondo oscuro (el gris de Bootstrap parece deshabilitado) */
+.btn-outline-secondary {
+    --bs-btn-color: #cbd5e1;
+    --bs-btn-border-color: #475569;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #1e293b;
+    --bs-btn-hover-border-color: #64748b;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #334155;
+    --bs-btn-active-border-color: #64748b;
+    --bs-btn-disabled-color: #64748b;
+    --bs-btn-disabled-border-color: #334155;
+}
+
+/* Etiqueta chica arriba de los títulos (estilo racvision) */
+.etiqueta {
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--bs-primary-text-emphasis);
+}
+
+/* ---------- Menú lateral (lo abre y lo cierra app.js con la clase "abierto") ---------- */
+.menu-lateral .offcanvas { visibility: hidden; transform: translateX(-100%); transition: transform 0.2s ease; }
+.menu-lateral.abierto .offcanvas { visibility: visible; transform: none; }
+.menu-lateral .offcanvas-backdrop { display: none; }
+.menu-lateral.abierto .offcanvas-backdrop { display: block; opacity: 0.5; }
+.menu-lateral__enlace.activo { color: var(--bs-primary-text-emphasis); font-weight: 600; }
+
+/* ---------- Avisos (app.js) ---------- */
+.toast-contenedor {
+    position: fixed;
+    left: 50%;
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    z-index: 3000;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: min(26rem, calc(100% - 2rem));
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+.toast-contenedor .toast {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    width: auto;
+    padding: 0.75rem 1rem;
+    border-left: 4px solid var(--bs-info);
+    background: var(--bs-secondary-bg);
+    transition: opacity 0.3s ease;
+}
+.toast-contenedor .toast--exito { border-left-color: var(--bs-success); }
+.toast-contenedor .toast--error { border-left-color: var(--bs-danger); }
+.toast-contenedor .toast--advertencia { border-left-color: var(--bs-warning); }
+.toast-contenedor .toast.saliendo { opacity: 0; }
+
+/* ---------- Punto de estado (App.textoConPunto) ---------- */
+.punto {
+    display: inline-block;
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-right: 0.4rem;
+    border-radius: 50%;
+    background: var(--bs-secondary-color);
+    vertical-align: 0.1em;
+}
+.punto--exito { background: var(--bs-success); }
+.punto--error { background: var(--bs-danger); }
+.punto--advertencia { background: var(--bs-warning); }
+.punto--acento { background: var(--bs-primary); }
+.punto--alerta { background: #f97316; }
+
+/* ---------- Solo para administradores (app.js pone "rol-admin" en el body) ---------- */
+body:not(.rol-admin) .solo-admin { display: none !important; }
+
+/* ---------- Ventanas (app.js y admin.js las crean y las sacan; sin el JS de Bootstrap) ---------- */
+.modal-overlay.modal { display: block; background: rgba(0, 0, 0, 0.6); }
+
+/* ---------- Pestañas de administración (admin.js marca la activa con "activo") ---------- */
+.nav-pills { --bs-nav-pills-link-active-bg: #2563eb; }
+.admin-tab { min-height: 2.75rem; }
+.admin-tab.activo { color: var(--bs-nav-pills-link-active-color); background: var(--bs-nav-pills-link-active-bg); }
+
+/* ---------- Login y cambio de contraseña ---------- */
+.login-contenedor { max-width: 26rem; margin: 1rem auto; }

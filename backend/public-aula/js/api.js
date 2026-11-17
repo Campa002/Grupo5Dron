@@ -1,5 +1,5 @@
 /**
- * Cliente API — Grupo 5: Control de Sistemas y Dron
+ * Cliente API — Grupo 5: Control de Sistemas y Dron (app del aula)
  * 
  * Módulo para comunicarse con la API REST del backend.
  * Maneja autenticación JWT, peticiones y errores.
@@ -10,16 +10,13 @@ const API = (() => {
     'use strict';
 
     // ============================================================
-    // URL base de la API
+    // URL base de la API (no se le pide al usuario)
     // ============================================================
     //
-    // En el navegador web: usa window.location.origin + '/api' (sin cambios).
-    // En el APK Capacitor: el origen es capacitor://localhost, por lo que
-    //   se lee la URL del hosting desde localStorage (clave 'grupo5dron_api_url').
-    //   Si no está configurada, se usa HOSTING_URL_DEFECTO como fallback.
-    //
-    // Para configurar la URL desde la app, llamar:
-    //   API.setBaseUrl('https://tuhosting.com/api')
+    // Desde la web (hosting o XAMPP): la API del mismo servidor de donde se cargó la app,
+    //   en la carpeta api/ al lado de aula/ (https://dominio/aula/ → https://dominio/api).
+    // En el APK (la página es https://localhost): la constante SERVIDOR_AULA de js/config-aula.js.
+    //   Vacía → no hay servidor: el login muestra "Falta configurar el servidor del aula".
     //
     function esNativo() {
         return !!(window.Capacitor?.isNativePlatform?.());
@@ -27,25 +24,20 @@ const API = (() => {
 
     function _resolverBaseUrl() {
         if (esNativo()) {
-            return localStorage.getItem('grupo5dron_api_url') || '';
+            const fija = typeof SERVIDOR_AULA === 'string' ? SERVIDOR_AULA : '';
+            return fija.trim().replace(/\/+$/, '');
         }
-        return window.location.origin + '/api';
+        return new URL('../api', window.location.href).href.replace(/\/+$/, '');
     }
 
-    let _baseUrl = _resolverBaseUrl();
+    const _baseUrl = _resolverBaseUrl();
 
-    function setBaseUrl(nuevaUrl) {
-        _baseUrl = (nuevaUrl || '').trim().replace(/\/+$/, '');
-        if (_baseUrl) {
-            localStorage.setItem('grupo5dron_api_url', _baseUrl);
-        } else {
-            localStorage.removeItem('grupo5dron_api_url');
-        }
+    /** true si la app sabe a qué servidor hablarle (en el APK, si SERVIDOR_AULA está completa). */
+    function servidorConfigurado() {
+        return !!_baseUrl;
     }
 
-    function getBaseUrl() {
-        return _baseUrl;
-    }
+    const MENSAJE_SIN_SERVIDOR = 'Falta configurar el servidor del aula.';
 
     /**
      * Obtiene el token JWT almacenado.
@@ -95,7 +87,7 @@ const API = (() => {
      */
     async function peticion(endpoint, opciones = {}) {
         if (!_baseUrl) {
-            throw new Error('URL del servidor no configurada. Por favor, ingresá la URL del servidor.');
+            throw new Error(MENSAJE_SIN_SERVIDOR);
         }
         const { timeoutMs = TIMEOUT_POR_DEFECTO_MS, signal: signalExterno, sinAvisoSesion = false, ...opcionesFetch } = opciones;
         const url = `${_baseUrl}/${endpoint.replace(/^\/+/, '')}`;
@@ -221,20 +213,11 @@ const API = (() => {
     // --- Dispositivos ---
     const dispositivos = {
         listar: () => get('dispositivos.php?action=listar'),
-        obtener: (id) => get(`dispositivos.php?action=obtener&id=${id}`),
-        crear: (datos) => post('dispositivos.php?action=crear', datos),
-        actualizar: (id, datos) => put(`dispositivos.php?action=actualizar&id=${id}`, datos),
-        eliminar: (id) => eliminar(`dispositivos.php?action=eliminar&id=${id}`),
     };
 
     // --- Botones ---
     const botones = {
         listar: (dispositivoId) => get(`botones.php?action=listar&dispositivo_id=${dispositivoId}`),
-        crear: (datos) => post('botones.php?action=crear', datos),
-        actualizar: (id, datos) => put(`botones.php?action=actualizar&id=${id}`, datos),
-        eliminar: (id) => eliminar(`botones.php?action=eliminar&id=${id}`),
-        guardarCodigoIr: (datos) => post('botones.php?action=guardar_codigo_ir', datos),
-        eliminarCodigoIr: (id) => eliminar(`botones.php?action=eliminar_codigo_ir&id=${id}`),
     };
 
     // --- Comandos ---
@@ -242,7 +225,6 @@ const API = (() => {
         enviar: (datos) => post('comandos.php?action=enviar', datos),
         estado: (id) => get(`comandos.php?action=estado&id=${id}`),
         historial: (limite) => get(`comandos.php?action=historial&limite=${limite || 50}`),
-        pendientes: () => get('comandos.php?action=pendientes'),
     };
 
     // --- ESP32 ---
@@ -250,29 +232,16 @@ const API = (() => {
         estado: () => get('esp32.php?action=estado'),
     };
 
-    // --- Perfiles de Dron ---
-    const perfilesDron = {
-        listar: () => get('dron-perfiles.php?action=listar'),
-        obtener: (id) => get(`dron-perfiles.php?action=obtener&id=${id}`),
-        crear: (datos) => post('dron-perfiles.php?action=crear', datos),
-        actualizar: (id, datos) => put(`dron-perfiles.php?action=actualizar&id=${id}`, datos),
-        eliminar: (id) => eliminar(`dron-perfiles.php?action=eliminar&id=${id}`),
-    };
-
     // --- Configuración ---
     const configuracion = {
         obtener: () => get('config.php?action=obtener'),
-        obtenerClave: (clave) => get(`config.php?action=obtener&clave=${clave}`),
         actualizar: (datos) => put('config.php?action=actualizar', datos),
     };
 
     // --- Usuarios ---
     const usuarios = {
         listar: () => get('usuarios.php?action=listar'),
-        obtener: (id) => get(`usuarios.php?action=obtener&id=${id}`),
-        actualizar: (id, datos) => put(`usuarios.php?action=actualizar&id=${id}`, datos),
         eliminar: (id) => eliminar(`usuarios.php?action=eliminar&id=${id}`),
-        cambiarPassword: (id, password) => put(`usuarios.php?action=cambiar_password&id=${id}`, { password }),
     };
 
     // API pública del módulo
@@ -281,21 +250,15 @@ const API = (() => {
         guardarToken,
         eliminarToken,
         estaAutenticado,
-        get,
-        post,
-        put,
-        eliminar,
         auth,
         dispositivos,
         botones,
         comandos,
         esp32,
-        perfilesDron,
         configuracion,
         usuarios,
-        setBaseUrl,
-        getBaseUrl,
-        esNativo,
+        servidorConfigurado,
+        MENSAJE_SIN_SERVIDOR,
         EVENTO_SESION_VENCIDA,
     };
 })();

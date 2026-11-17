@@ -1,7 +1,7 @@
 /**
  * Módulo de Autenticación — Grupo 5: Control de Sistemas y Dron
  * 
- * Maneja login, sesión, datos del usuario y cierre de sesión.
+ * Maneja login, sesión, datos del usuario y cierre de sesión (app del aula).
  */
 
 // eslint-disable-next-line no-unused-vars
@@ -20,19 +20,9 @@ const Auth = (() => {
     }
 
     // ------------------------------------------------------------
-    // Sin cuenta: la app abre en el inicio y el módulo del dron (cabina,
-    // Prueba Tello, Sensores y Config. Dron) se usa sin iniciar sesión.
-    // El aula y la administración piden iniciar sesión recién al entrar,
-    // y después del login se vuelve a la pantalla pedida.
+    // La app del aula pide iniciar sesión para todo. Si se entra a una
+    // pantalla sin sesión, después del login se vuelve a esa pantalla.
     // ------------------------------------------------------------
-
-    // Bandera del modo sin cuenta de versiones anteriores: ya no se usa
-    try { localStorage.removeItem('grupo5dron_modo_invitado'); } catch (_) { /* nada */ }
-
-    /** true si no hay ninguna sesión (ni token ni usuario guardado): se usa el dron sin cuenta. */
-    function sinCuenta() {
-        return !API.estaAutenticado() && !obtenerUsuario();
-    }
 
     // Pantalla que se pidió antes del login (solo las que exigen sesión)
     const CLAVE_DESTINO = 'grupo5dron_destino_login';
@@ -45,14 +35,14 @@ const Auth = (() => {
         } catch (_) { /* sin almacenamiento: vuelve al inicio */ }
     }
 
-    /** Devuelve (y olvida) la pantalla a la que hay que volver; si no hay, el inicio. */
+    /** Devuelve (y olvida) la pantalla a la que hay que volver; si no hay, el aula. */
     function tomarDestino() {
         let ruta = null;
         try {
             ruta = sessionStorage.getItem(CLAVE_DESTINO);
             sessionStorage.removeItem(CLAVE_DESTINO);
         } catch (_) { /* nada */ }
-        return DESTINOS_CON_SESION.includes(ruta) ? ruta : 'inicio';
+        return DESTINOS_CON_SESION.includes(ruta) ? ruta : 'aula';
     }
 
     /**
@@ -81,10 +71,6 @@ const Auth = (() => {
     function guardarUsuario(usuario) {
         usuarioActual = usuario;
         localStorage.setItem('grupo5dron_usuario', JSON.stringify(usuario));
-
-        // Aplicar clase de rol al body
-        document.body.classList.remove('rol-admin', 'rol-docente', 'rol-usuario');
-        document.body.classList.add(`rol-${usuario.rol}`);
     }
 
     /**
@@ -111,7 +97,6 @@ const Auth = (() => {
         localStorage.removeItem('grupo5dron_usuario');
         usuarioActual = null;
         modoSinConexion = false;
-        document.body.classList.remove('rol-admin', 'rol-docente', 'rol-usuario');
     }
 
     /**
@@ -141,7 +126,7 @@ const Auth = (() => {
         }
 
         try {
-            // 3 s como máximo: en el WiFi del Tello no hay internet. El 401 se maneja acá (sin aviso global).
+            // 3 s como máximo, para no trabar el arranque sin internet. El 401 se maneja acá (sin aviso global).
             const respuesta = await API.auth.sesion({ timeoutMs: 3000, sinAvisoSesion: true });
             guardarUsuario(respuesta.usuario);
             modoSinConexion = false;
@@ -156,7 +141,7 @@ const Auth = (() => {
                 return false;
             }
 
-            // Error de red, timeout o sin conexión (ej: conectados al Wi-Fi del dron Tello)
+            // Error de red, timeout o sin conexión
             console.warn('[Auth] No se pudo verificar sesión con el servidor (modo offline):', e.message);
             modoSinConexion = true;
             const usuarioCacheado = obtenerUsuario();
@@ -199,24 +184,17 @@ const Auth = (() => {
         const form = document.getElementById('form-login');
         if (!form) return;
 
-        const contApiUrl = document.getElementById('contenedor-api-url');
-        const inputApiUrl = document.getElementById('login-api-url');
         const avisoOffline = document.getElementById('aviso-offline-login');
+        const avisoSinServidor = document.getElementById('aviso-sin-servidor');
+        const btnIngresar = form.querySelector('button[type="submit"]');
 
-        // En APK o si no hay baseUrl configurada, mostrar campo de URL del servidor
-        const esNativo = API.esNativo && API.esNativo();
-        if (contApiUrl && (esNativo || !API.getBaseUrl())) {
-            contApiUrl.style.display = 'block';
-            if (inputApiUrl) {
-                inputApiUrl.value = API.getBaseUrl() || '';
-                inputApiUrl.addEventListener('change', () => {
-                    API.setBaseUrl(inputApiUrl.value);
-                });
-            }
-        }
+        // APK sin SERVIDOR_AULA (js/config-aula.js): no hay a quién pedirle el login; no se le pide nada al usuario
+        const sinServidor = !API.servidorConfigurado();
+        if (avisoSinServidor) avisoSinServidor.hidden = !sinServidor;
+        if (sinServidor && btnIngresar) btnIngresar.disabled = true;
 
         // Si no hay usuario cacheado y no hay conexión con el servidor
-        if (avisoOffline) {
+        if (avisoOffline && !sinServidor) {
             if (!obtenerUsuario() && (!navigator.onLine || modoSinConexion)) {
                 avisoOffline.style.display = 'block';
             } else {
@@ -227,13 +205,8 @@ const Auth = (() => {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            if (inputApiUrl && inputApiUrl.value.trim()) {
-                API.setBaseUrl(inputApiUrl.value.trim());
-            }
-
-            if (esNativo && !API.getBaseUrl()) {
-                App.mostrarToast('Ingresá la URL del servidor antes de iniciar sesión.', 'advertencia');
-                inputApiUrl?.focus();
+            if (sinServidor) {
+                App.mostrarToast(API.MENSAJE_SIN_SERVIDOR, 'advertencia');
                 return;
             }
 
@@ -322,7 +295,6 @@ const Auth = (() => {
         inicializarPaginaLogin,
         esModoSinConexion,
         setModoSinConexion,
-        sinCuenta,
         recordarDestino,
         tomarDestino,
         cerrarSesionLocal,

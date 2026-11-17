@@ -12,6 +12,13 @@
 #include <IRrecv.h>
 #include <IRutils.h>
 
+// Captura de códigos largos (aires acondicionados): los controles de aire mandan el estado completo
+// (temperatura, modo, ventilador...) en 200 a 600 pulsos. El buffer por defecto de la librería (100)
+// los cortaba. 1024 pulsos y 50 ms de silencio para dar la trama por terminada, como el ejemplo
+// IRrecvDumpV2 de IRremoteESP8266 para aires.
+const uint16_t IR_TAMANO_CAPTURA = 1024;
+const uint8_t IR_FIN_TRAMA_MS = 50;
+
 class IrManager {
 public:
     IrManager();
@@ -37,6 +44,7 @@ private:
     unsigned long tiempoInicioAprendizaje;
 
     uint64_t parsearHex(const String& hexStr);
+    bool hexABytes(const String& hexStr, uint8_t* bytes, uint16_t cantidad);
 };
 
 extern IrManager irManager;

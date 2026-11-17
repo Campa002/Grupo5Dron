@@ -57,17 +57,18 @@ test('recuadro más grande de las detecciones (o ninguno)', () => {
 // ---------------------------------------------------------------
 
 test('buscando: compara como mucho 3 candidatos por cuadro (los de más confianza)', () => {
-    const s = new Seguimiento.SelectorObjeto(A, 'taza');
+    const s = new Seguimiento.Selector(A, { tipo: 'mio', nombre: 'taza' });
     const cands = [0.6, 0.9, 0.7, 0.95, 0.55].map((score, i) => cand(0.1 + i * 0.2, 0.5, 0.3, undefined, 'cup', score));
     cands.push(cand(0.5, 0.5, 0.3, undefined, 'cup', 0.3)); // debajo de la confianza mínima: nunca
     assert.deepEqual(s.aVerificar(cands, 0).sort(), [1, 2, 3]);
 });
 
 test('se fija recién con 8 detecciones seguidas parecidas (75 %)', () => {
-    const s = new Seguimiento.SelectorObjeto(A, 'taza');
+    const s = new Seguimiento.Selector(A, { tipo: 'mio', nombre: 'taza' });
     for (let i = 0; i < 7; i++) {
         s.actualizar([cand(0.5, 0.5, 0.3, 0.8)], i * 200);
-        assert.equal(s.estado, 'buscando', `detección ${i + 1}`);
+        assert.equal(s.estado, 'confirmando', `detección ${i + 1}`);
+        assert.equal(s.confirmaciones, i + 1);
     }
     s.actualizar([cand(0.5, 0.5, 0.3, 0.8)], 7 * 200);
     assert.equal(s.estado, 'siguiendo');
@@ -75,17 +76,18 @@ test('se fija recién con 8 detecciones seguidas parecidas (75 %)', () => {
 });
 
 test('un candidato poco parecido (menos de 75 %) no cuenta y corta la confirmación', () => {
-    const s = new Seguimiento.SelectorObjeto(A, 'taza');
+    const s = new Seguimiento.Selector(A, { tipo: 'mio', nombre: 'taza' });
     for (let i = 0; i < 6; i++) s.actualizar([cand(0.5, 0.5, 0.3, 0.8)], i * 200);
     s.actualizar([cand(0.5, 0.5, 0.3, 0.7)], 1200);   // 70 %: no alcanza
+    assert.equal(s.confirmaciones, 0, 'vuelve a contar desde cero');
     for (let i = 0; i < 7; i++) s.actualizar([cand(0.5, 0.5, 0.3, 0.8)], 1400 + i * 200);
-    assert.equal(s.estado, 'buscando', 'vuelve a contar desde cero');
+    assert.equal(s.estado, 'confirmando', 'todavía 7 de 8');
     s.actualizar([cand(0.5, 0.5, 0.3, 0.8)], 3000);
     assert.equal(s.estado, 'siguiendo');
 });
 
 test('entre dos objetos parecidos sigue al más parecido', () => {
-    const s = new Seguimiento.SelectorObjeto(A, 'taza');
+    const s = new Seguimiento.Selector(A, { tipo: 'mio', nombre: 'taza' });
     for (let i = 0; i < 8; i++) s.actualizar([cand(0.2, 0.5, 0.3, 0.78), cand(0.8, 0.5, 0.3, 0.9)], i * 200);
     assert.equal(s.estado, 'siguiendo');
     assert.ok(Math.abs(s.objetivo.cx - 0.8) < 1e-9);
@@ -93,7 +95,7 @@ test('entre dos objetos parecidos sigue al más parecido', () => {
 
 /** Selector ya siguiendo un objeto en (0.5, 0.5), en t = 1400 ms. */
 function siguiendo() {
-    const s = new Seguimiento.SelectorObjeto(A, 'taza');
+    const s = new Seguimiento.Selector(A, { tipo: 'mio', nombre: 'taza' });
     for (let i = 0; i < 8; i++) s.actualizar([cand(0.5, 0.5, 0.3, 0.8)], i * 200);
     assert.equal(s.estado, 'siguiendo');
     return s;
@@ -141,7 +143,7 @@ test('después de perderlo, lo vuelve a buscar por parecido en cualquier lugar (
 });
 
 test('"No encuentro": sin nada parecido durante 3 s', () => {
-    const s = new Seguimiento.SelectorObjeto(A, 'taza');
+    const s = new Seguimiento.Selector(A, { tipo: 'mio', nombre: 'taza' });
     s.actualizar([cand(0.5, 0.5, 0.3, 0.2, 'person')], 0);
     assert.equal(s.noEncuentra, false);
     s.actualizar([], 2900);
@@ -157,7 +159,7 @@ test('"No encuentro": sin nada parecido durante 3 s', () => {
 });
 
 test('con un objeto, el seguidor calcula el mismo control que con una persona (en ensayo)', () => {
-    const seg = new Seguimiento.Seguidor(A, new Seguimiento.SelectorObjeto(A, 'taza'));
+    const seg = new Seguimiento.Seguidor(A, new Seguimiento.Selector(A, { tipo: 'mio', nombre: 'taza' }));
     // Detecciones cada ~200 ms y control a 15 Hz. Se compara lo que pide el selector, como en la app
     let comparados = 0;
     for (let t = 0; t <= 3000; t += 66) {
