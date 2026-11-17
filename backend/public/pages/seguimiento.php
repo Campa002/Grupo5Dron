@@ -56,5 +56,5 @@
     </div>
 
     <!-- La foto de prueba del diagnóstico (dominio público: NASA) -->
-    <img id="seg-foto-prueba" src="/img/prueba-persona.jpg" alt="" hidden>
+    <img id="seg-foto-prueba" src="img/prueba-persona.jpg" alt="" hidden>
 </div>

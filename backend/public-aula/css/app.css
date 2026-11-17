@@ -45,6 +45,19 @@
 .form-check-input { width: 1.25em; height: 1.25em; }
 .form-switch { display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; padding-left: 0; }
 .form-switch .form-check-input { width: 2.5em; margin: 0; float: none; flex-shrink: 0; }
+/* Botón de segundo nivel en azul institucional (el principal de cada pantalla es .btn-primary) */
+.btn-outline-primary {
+    --bs-btn-color: #93c5fd;
+    --bs-btn-border-color: #2563eb;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #1d4ed8;
+    --bs-btn-hover-border-color: #1d4ed8;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #1e40af;
+    --bs-btn-active-border-color: #1e40af;
+    --bs-btn-disabled-color: #64748b;
+    --bs-btn-disabled-border-color: #334155;
+}
 /* Botones secundarios legibles sobre el fondo oscuro (el gris de Bootstrap parece deshabilitado) */
 .btn-outline-secondary {
     --bs-btn-color: #cbd5e1;
@@ -134,3 +147,17 @@ body:not(.rol-admin) .solo-admin { display: none !important; }
 
 /* ---------- Login y cambio de contraseña ---------- */
 .login-contenedor { max-width: 26rem; margin: 1rem auto; }
+
+/* ---------- Aula: estado del equipo, estado de cada aparato y pasos de "Aprender código" ---------- */
+.estado-equipo { display: inline-block; padding: 0.375rem 0.75rem; border: 1px solid var(--bs-border-color); border-radius: var(--bs-border-radius); }
+.aparato-estado { font-size: 1.25rem; font-weight: 700; text-transform: uppercase; margin-bottom: 0.75rem; }
+.aparato-estado .punto:not([class*="punto--"]) { background: var(--bs-secondary-color); }
+.pasos { counter-reset: paso; }
+.paso { counter-increment: paso; position: relative; padding: 0.75rem 0 0.75rem 2.75rem; border-top: 1px solid var(--bs-border-color); }
+.paso::before {
+    content: counter(paso); position: absolute; left: 0; top: 0.75rem; width: 2rem; height: 2rem; line-height: 2rem;
+    text-align: center; font-weight: 700; border: 1px solid var(--bs-border-color); border-radius: 50%; color: var(--bs-secondary-color);
+}
+[data-paso="1"] .paso[data-n="1"]::before, [data-paso="2"] .paso[data-n="2"]::before, [data-paso="3"] .paso[data-n="3"]::before {
+    background: #2563eb; border-color: #2563eb; color: #fff;
+}

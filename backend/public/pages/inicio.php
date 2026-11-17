@@ -2,9 +2,11 @@
     <header class="mb-4">
         <p class="etiqueta">Grupo 5 · EEST N° 1 Vicente López</p>
         <h1 class="h3 fw-bold text-uppercase">Control del dron</h1>
-        <p class="text-body-secondary mb-0">Conectá el celular al WiFi del Tello y entrá a la cabina. No hace falta internet ni cuenta.</p>
+        <p class="text-body-secondary mb-0 solo-apk">Conectá el celular al WiFi del Tello y entrá a la cabina. No hace falta internet ni cuenta.</p>
+        <p class="text-body-secondary mb-0 solo-web">Acá practicás con un dron simulado: la cabina es la misma que la de la app.</p>
     </header>
 
+    <p class="alert alert-info small solo-web" data-aviso-web></p>
     <a href="#/dron" class="btn btn-primary btn-lg w-100 py-3 mb-3">Entrar a la cabina</a>
     <p class="small text-body-secondary mb-5">Video, botones de mando, inclinación del celular y seguimiento de personas u objetos.</p>
 

@@ -35,11 +35,11 @@ const DronAdaptadores = (() => {
         EVENTO_RESPUESTA: 'respuestaUdp',
 
         disponible() {
-            return !!(window.Capacitor?.Plugins?.DronNative);
+            return !!Plataforma.pluginDron();
         },
 
         _plugin() {
-            const p = window.Capacitor?.Plugins?.DronNative;
+            const p = Plataforma.pluginDron();
             if (!p) throw new Error('Hace falta la app instalada en el celular para hablar con el dron.');
             return p;
         },

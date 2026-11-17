@@ -34,7 +34,8 @@ App del AULA ── HTTPS + sesión ──> Servidor PHP + MySQL <── consult
 | [Seguimiento: diagnóstico y modelos](docs/seguimiento-diagnostico-y-modelos.md) | IA del Tello, YOLO o COCO-SSD, por qué el A06 quedaba "buscando" |
 | [Limitaciones y mejoras futuras](docs/limitaciones-y-mejoras.md) | Lo que falta o se puede mejorar |
 | [Correcciones del informe](docs/correcciones-informe.md) | Lo que el informe dice distinto a lo que se hizo |
-| [Despliegue en el hosting](docs/despliegue-hosting.md) | Subir el servidor (cPanel) |
+| [Despliegue en el hosting](docs/despliegue-hosting.md) | Subir el servidor paso a paso (portada, dos webs, API y los APK) |
+| [Estado del proyecto](docs/estado-del-proyecto.md) | Qué está hecho, qué falta probar y qué falta |
 | [Firmware del ESP32](posibles-implementaciones/aula-esp32/firmware/README.md) | Circuito, alimentación y primer arranque |
 | [Carcasa del equipo del aula](posibles-implementaciones/aula-esp32/carcasa/README.md) | Piezas impresas, armado y lista de compras |
 
@@ -58,7 +59,7 @@ docs/            documentación
 
 ## Cómo compilar
 
-Los APK se compilan solos en **GitHub Actions** en cada push a `main` y en cada pull request. Al terminar, en la corrida del workflow (pestaña Actions, o Checks del PR) quedan dos artefactos:
+Los APK se compilan solos en **GitHub Actions** en cada push a `main` y en cada pull request hacia `main` o `prueba-en-clase`. Al terminar, en la corrida del workflow (pestaña Actions, o Checks del PR) quedan dos artefactos:
 
 - `Grupo5Dron-app-debug` → APK del dron;
 - `Grupo5Aula-app-debug` → APK del aula.
@@ -95,7 +96,7 @@ node --test tests/seguimiento.test.js tests/rac.test.js tests/control-real.test.
 php -S 127.0.0.1:8088 -t backend/public
 ```
 
-(La segunda sirve la app del dron en `http://127.0.0.1:8088`; sin el plugin nativo se puede usar el perfil "Simulador".)
+(La segunda sirve la app del dron en `http://127.0.0.1:8088`; en el navegador usa sola el Simulador y avisa que es la versión web.)
 
 ## Usuarios iniciales (seed)
 

@@ -93,6 +93,7 @@ const App = (() => {
         alerta: 'bi-exclamation-triangle',
         info: 'bi-info-circle',
         borrar: 'bi-trash',
+        recargar: 'bi-arrow-repeat',
     });
 
     /**
@@ -193,7 +194,7 @@ const App = (() => {
 
         try {
             // Sin parámetros en la URL (no llena la caché) y revalidando con el servidor: siempre la versión actual
-            const respuesta = await fetch(`/pages/${nombre}.php`, { cache: 'no-cache' });
+            const respuesta = await fetch(`pages/${nombre}.php`, { cache: 'no-cache' });
             if (!respuesta.ok) {
                 throw new Error(`No se pudo cargar la vista "${nombre}" (HTTP ${respuesta.status})`);
             }
@@ -260,6 +261,7 @@ const App = (() => {
         const html = await cargarPlantilla(destino);
         if (miNavegacion !== navegacionActual) return;
         contenedor.innerHTML = html;
+        contenedor.querySelectorAll('[data-aviso-web]').forEach(el => { el.textContent = Plataforma.AVISO_WEB; });
         paginaActual = destino;
 
         // 4. Actualizar enlaces activos en menú lateral
@@ -1271,6 +1273,7 @@ const App = (() => {
      */
     async function iniciar() {
         document.body.classList.toggle('modo-tecnico', modoTecnico());
+        document.body.classList.toggle('es-web', !Plataforma.esApk);
 
         // Enlazar eventos del menú lateral
         const btnMenu = document.getElementById('btn-menu');

@@ -1,0 +1,48 @@
+# Grupo 5 en el servidor con Docker, igual que RAC:
+#  - web: PHP 8.2 + Apache con la portada, las dos webs y la API (carpeta ./sitio, solo lectura)
+#  - db:  MariaDB con los datos en un volumen (sobreviven a cada actualización)
+# Se entra por la IP del servidor en el puerto 8086 (http, sin candado). Si algún día se le pone un
+# nombre con HTTPS, el proxy del servidor (Nginx Proxy Manager) entra por la red "proxy-network".
+# Las claves están en el archivo .env del servidor (nunca en el repo).
+services:
+  web:
+    build: .
+    container_name: grupo5-web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+    ports:
+      - "8086:80"
+    volumes:
+      - ./sitio:/var/www/html:ro
+    depends_on:
+      - db
+    networks:
+      - proxy-network
+      - interna
+
+  db:
+    image: mariadb:10.11
+    container_name: grupo5-db
+    restart: unless-stopped
+    environment:
+      TZ: America/Argentina/Buenos_Aires   # misma hora que PHP: el estado "en línea" del ESP32 compara las dos
+      MARIADB_DATABASE: grupo5dron_db
+      MARIADB_USER: grupo5
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    volumes:
+      - datos-db:/var/lib/mysql
+      # Solo se importa la primera vez (con la base vacía)
+      - ./base-de-datos.sql:/docker-entrypoint-initdb.d/base-de-datos.sql:ro
+    networks:
+      - interna
+
+networks:
+  proxy-network:
+    external: true
+  interna:
+
+volumes:
+  datos-db:

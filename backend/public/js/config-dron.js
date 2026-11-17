@@ -41,8 +41,10 @@ const ConfigDron = (() => {
     /**
      * El perfil elegido. Si lo guardado no es uno de los dos (por ejemplo, uno viejo del servidor), el Tello.
      * El Simulador es de prueba: solo vale con el modo técnico; sin él, la cabina usa siempre el Tello.
+     * En la versión web no hay Tello posible (Plataforma): siempre el Simulador.
      */
     function perfilActivoId() {
+        if (!Plataforma.esApk) return 'simulador-local';
         const id = localStorage.getItem('grupo5dron_perfil_activo');
         if (id === 'simulador-local' && !App.modoTecnico()) return 'tello-default';
         return PERFILES.some(p => p.id === id) ? id : 'tello-default';
@@ -132,6 +134,10 @@ const ConfigDron = (() => {
     function _renderizarListaPerfiles(contenedor) {
         const div = contenedor.querySelector('#config-dron-contenido');
         if (!div) return;
+        if (!Plataforma.esApk) {
+            div.innerHTML = `<p class="alert alert-info small mb-0">${_esc(Plataforma.AVISO_WEB)} Acá se usa el Simulador.</p>`;
+            return;
+        }
         const activoId = perfilActivoId();
         div.innerHTML = `<div class="list-group">
             ${PERFILES.map(p => _tarjetaPerfil(p, activoId)).join('')}

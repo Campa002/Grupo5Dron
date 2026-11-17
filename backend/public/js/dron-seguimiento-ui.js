@@ -72,14 +72,14 @@ const DronPantallaSeguimiento = (() => {
                 <div class="rac d-grid gap-3">
                     ${dron ? '' : '<p class="small text-body-secondary mb-0">Fuente: cámara del celular. Con esta fuente nunca se manda nada al dron.</p>'}
                     <div class="row g-2">
-                        <div class="col-6"><button class="btn btn-primary btn-lg w-100 h-100" data-rac="seguir-persona" aria-pressed="false">Seguir persona</button></div>
-                        <div class="col-6"><button class="btn btn-primary btn-lg w-100 h-100" data-rac="seguir-objeto" aria-expanded="false">Seguir objeto</button></div>
+                        <div class="col-6"><button class="btn btn-outline-primary btn-lg w-100 h-100" data-rac="seguir-persona" aria-pressed="false">Seguir persona</button></div>
+                        <div class="col-6"><button class="btn btn-outline-primary btn-lg w-100 h-100" data-rac="seguir-objeto" aria-expanded="false">Seguir objeto</button></div>
                     </div>
                     <div class="border rounded p-3" data-rac="panel-objeto" hidden>
                         <label class="form-label small text-body-secondary mb-1" for="rac-objeto-${dron ? 'dron' : 'camara'}">¿Qué objeto?</label>
                         <select class="form-select" id="rac-objeto-${dron ? 'dron' : 'camara'}" data-rac="objeto"></select>
                         <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-                            <button class="btn btn-primary flex-fill" data-rac="seguir-este">Seguir este objeto</button>
+                            <button class="btn btn-outline-primary flex-fill" data-rac="seguir-este">Seguir este objeto</button>
                             <a href="#/objetos" class="btn btn-sm btn-link" data-rac="agregar-objeto">Agregar objeto propio</a>
                         </div>
                     </div>
