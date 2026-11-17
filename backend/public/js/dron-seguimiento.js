@@ -783,7 +783,7 @@ const DronSeguimiento = (() => {
         if (!d.imagenOk) conclusion = 'No llega imagen: revisá el permiso de la cámara o la conexión del video del dron.';
         else if (d.congelada) conclusion = 'El video está congelado: el detector analiza siempre la misma imagen.';
         else if (d.brillo !== null && d.brillo !== undefined && d.brillo < 15) conclusion = 'Al detector le llega una imagen negra: revisá la cámara o la luz.';
-        else if (!modeloOk && d.pruebaPersonaCpu >= a.umbralConfianza) conclusion = 'La placa de video de este celular calcula mal: con el procesador la foto de prueba sí da bien. Pasale este diagnóstico a Claude.';
+        else if (!modeloOk && d.pruebaPersonaCpu >= a.umbralConfianza) conclusion = 'La placa de video de este celular calcula mal: con el procesador la foto de prueba sí da bien. Copiá este diagnóstico y mandalo al grupo.';
         else if (!modeloOk) conclusion = 'El detector no reconoce ni la foto de prueba: el modelo no cargó bien.';
         else if (!(Math.max(d.personaCuadro || 0, d.caraCuadro || 0) > 0)) conclusion = 'El detector anda (reconoce la foto de prueba), pero no ve a nadie en la imagen: apuntá a una persona de frente, con buena luz.';
         else if (Math.max(d.personaCuadro || 0, d.caraCuadro || 0) < a.confirmacionUmbral) conclusion = `Ve una persona, pero con poca confianza (hace falta ${pc(a.confirmacionUmbral)}): acercate, mirá a la cámara o mejorá la luz.`;

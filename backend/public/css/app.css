@@ -46,6 +46,19 @@
 .form-check-input { width: 1.25em; height: 1.25em; }
 .form-switch { display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; padding-left: 0; }
 .form-switch .form-check-input { width: 2.5em; margin: 0; float: none; flex-shrink: 0; }
+/* Botón de segundo nivel en azul institucional (el principal de cada pantalla es .btn-primary) */
+.btn-outline-primary {
+    --bs-btn-color: #93c5fd;
+    --bs-btn-border-color: #2563eb;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #1d4ed8;
+    --bs-btn-hover-border-color: #1d4ed8;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #1e40af;
+    --bs-btn-active-border-color: #1e40af;
+    --bs-btn-disabled-color: #64748b;
+    --bs-btn-disabled-border-color: #334155;
+}
 /* Botones secundarios legibles sobre el fondo oscuro (el gris de Bootstrap parece deshabilitado) */
 .btn-outline-secondary {
     --bs-btn-color: #cbd5e1;
@@ -79,6 +92,8 @@
 
 /* Modo técnico: lo que sirve para probar y diagnosticar (se prende con 5 toques en el título) */
 body:not(.modo-tecnico) .solo-tecnico { display: none !important; }
+/* Versión web (navegador) o app instalada: la clase es-web la pone app.js según Plataforma */
+body:not(.es-web) .solo-web, body.es-web .solo-apk { display: none !important; }
 
 /* ---------- Menú lateral (lo abre y lo cierra app.js con la clase "abierto") ---------- */
 .menu-lateral .offcanvas { visibility: hidden; transform: translateX(-100%); transition: transform 0.2s ease; }
@@ -279,6 +294,9 @@ body.en-cabina .toast-contenedor .toast { pointer-events: none; }
 .cab-lado--der { grid-area: der; }
 .cab-lado { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
 .cab-velocidad { grid-area: vel; text-align: center; }
+/* Atajos Seguir persona | Seguir objeto: dos mitades; al seguir queda uno solo (Detener) */
+.cab-seguir { display: flex; gap: 0.375rem; }
+.cab-seguir .btn { flex: 1 1 0; min-width: 0; padding: 0.25rem 0.375rem; font-size: 0.875rem; line-height: 1.15; }
 .cab-mando, .cab-joystick { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; min-width: 0; }
 
 /* Cruz de botones: 3 × 3 */

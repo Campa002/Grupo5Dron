@@ -21,15 +21,15 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
 
     <title>Grupo 5 — Dron</title>
 
-    <link rel="manifest" href="/manifest.json">
-    <link rel="icon" type="image/png" sizes="192x192" href="/img/icon-192.png">
-    <link rel="apple-touch-icon" href="/img/icon-192.png">
-    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="img/icon-192.png">
+    <link rel="apple-touch-icon" href="img/icon-192.png">
+    <link rel="shortcut icon" href="favicon.ico">
 
     <!-- Bootstrap 5.3 y Bootstrap Icons, locales (en el WiFi del Tello no hay internet) -->
-    <link rel="stylesheet" href="/libs/bootstrap/bootstrap.min.css">
-    <link rel="stylesheet" href="/libs/bootstrap/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="/css/app.css">
+    <link rel="stylesheet" href="libs/bootstrap/bootstrap.min.css">
+    <link rel="stylesheet" href="libs/bootstrap/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
     <!-- Barra superior -->
@@ -72,33 +72,35 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
     <div id="toast-contenedor" class="toast-contenedor"></div>
 
     <!-- Módulo del dron, sensores y configuración -->
-    <script src="/js/dron-adaptadores.js"></script>
-    <script src="/js/dron-joystick.js"></script>
-    <script src="/js/dron-giroscopio.js"></script>
+    <!-- Diferencia entre la web y el APK: solo en este archivo -->
+    <script src="js/plataforma.js"></script>
+    <script src="js/dron-adaptadores.js"></script>
+    <script src="js/dron-joystick.js"></script>
+    <script src="js/dron-giroscopio.js"></script>
     <!-- ML Local para Seguimiento Visual Autónomo (COCO-SSD) -->
-    <script src="/libs/tfjs/tf.min.js"></script>
-    <script src="/libs/coco-ssd/coco-ssd.min.js"></script>
-    <script src="/js/dron-caras.js"></script>
-    <script src="/js/dron-seguimiento.js"></script>
-    <script src="/js/dron-seguimiento-ui.js"></script>
-    <script src="/js/dron-objetos.js"></script>
-    <script src="/js/dron-video.js"></script>
-    <script src="/js/config-dron.js"></script>
-    <script src="/js/sensores.js"></script>
-    <script src="/js/dron.js"></script>
-    <script src="/js/app.js"></script>
+    <script src="libs/tfjs/tf.min.js"></script>
+    <script src="libs/coco-ssd/coco-ssd.min.js"></script>
+    <script src="js/dron-caras.js"></script>
+    <script src="js/dron-seguimiento.js"></script>
+    <script src="js/dron-seguimiento-ui.js"></script>
+    <script src="js/dron-objetos.js"></script>
+    <script src="js/dron-video.js"></script>
+    <script src="js/config-dron.js"></script>
+    <script src="js/sensores.js"></script>
+    <script src="js/dron.js"></script>
+    <script src="js/app.js"></script>
 
     <!-- Service Worker: solo en el navegador. En el APK los archivos ya son locales. -->
     <script>
         if ('serviceWorker' in navigator) {
-            const enApk = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+            const enApk = Plataforma.esApk;
             if (enApk) {
                 // Por si quedó registrado uno de una versión anterior
                 navigator.serviceWorker.getRegistrations()
                     .then(registros => registros.forEach(r => r.unregister()))
                     .catch(() => {});
             } else {
-                navigator.serviceWorker.register('/sw.js')
+                navigator.serviceWorker.register('sw.js')
                     .catch(err => console.warn('No se pudo registrar el service worker:', err));
             }
         }

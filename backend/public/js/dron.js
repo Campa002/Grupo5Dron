@@ -252,7 +252,7 @@ const Dron = (() => {
     async function _iniciarVideo() {
         const a = _adaptador;
         if (!a) return;
-        if (!a.tieneVideo()) { _textoVideo('Simulador: no tiene cámara'); return; }
+        if (!a.tieneVideo()) { _textoVideo(Plataforma.esApk ? 'Simulador: no tiene cámara' : Plataforma.AVISO_WEB); return; }
         if (typeof DronVideoDecoder === 'undefined') { _textoVideo('No se puede mostrar el video'); return; }
 
         _video = new DronVideoDecoder({
@@ -402,6 +402,12 @@ const Dron = (() => {
         on('#btn-emergencia', () => _emergencia('Parada de emergencia manual'));
         on('#btn-toggle-giro', _toggleGiroscopio);
         on('#btn-toggle-seguimiento', _toggleSeguimiento);
+        // Atajo: abre la lista de objetos de la sección Seguimiento y la trae a la vista
+        on('#btn-atajo-objeto', () => {
+            const lista = _q('[data-rac="panel-objeto"]');
+            if (lista?.hidden) _q('[data-rac="seguir-objeto"]')?.click();
+            _q('#cab-seguimiento')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
         on('#btn-copiar-registro-seg', _copiarRegistroSeguimiento);
         on('#btn-copiar-registro-udp', _copiarRegistroComandos);
         on('#btn-cambiar-mando', _cambiarMando);
@@ -794,7 +800,7 @@ const Dron = (() => {
     function _actualizarBotonGiro() {
         const btn = _q('#btn-toggle-giro');
         if (!btn) return;
-        btn.textContent = _modoGiro ? 'Inclinación: ON' : 'Inclinación: OFF';
+        btn.textContent = _modoGiro ? 'Inclinación: activa' : 'Inclinación: apagada';
         btn.classList.toggle('cab-activo', _modoGiro);
     }
 
@@ -1004,6 +1010,8 @@ const Dron = (() => {
         const btn = _q('#btn-toggle-seguimiento');
         if (!btn) return;
         btn.textContent = _modoSeguimiento ? 'Detener seguimiento' : 'Seguir persona';
+        const objeto = _q('#btn-atajo-objeto');
+        if (objeto) objeto.hidden = _modoSeguimiento;
         btn.classList.toggle('cab-activo', _modoSeguimiento);
     }
 
@@ -1226,7 +1234,7 @@ const Dron = (() => {
             <p class="etiqueta">Cabina</p>
             <h1 class="h3 fw-bold text-uppercase">Error</h1>
             <div class="alert alert-danger">${_esc(mensaje)}</div>
-            <a href="#/config-dron" class="btn btn-primary">Ir a Config. Dron</a>
+            <a href="#/config-dron" class="btn btn-primary">Ir a Configuración</a>
         </div>`;
     }
 
@@ -1314,8 +1322,11 @@ const Dron = (() => {
 
                 <div class="cab-lado cab-lado--der">
                     <div class="d-grid gap-2">
-                        <button id="btn-toggle-giro" class="btn btn-outline-secondary">Inclinación: OFF</button>
-                        <button id="btn-toggle-seguimiento" class="btn btn-outline-secondary">Seguir persona</button>
+                        <button id="btn-toggle-giro" class="btn btn-outline-secondary">Inclinación: apagada</button>
+                        <div class="cab-seguir">
+                            <button id="btn-toggle-seguimiento" class="btn btn-outline-primary">Seguir persona</button>
+                            <button id="btn-atajo-objeto" class="btn btn-outline-primary">Seguir objeto</button>
+                        </div>
                     </div>
                     <div class="cab-mando">
                         <span class="small text-body-secondary">Avanzar · De costado</span>
@@ -1342,7 +1353,7 @@ const Dron = (() => {
                 <p class="etiqueta">01 — Seguimiento</p>
                 <p class="small text-body-secondary">Elegí qué seguir: una persona (la cara o, si no se ve, el cuerpo) o un objeto. Arranca en ensayo: muestra qué haría el dron, pero no lo mueve.</p>
                 <div id="cab-seguimiento"></div>
-                <img id="cab-foto-prueba" src="/img/prueba-persona.jpg" alt="" hidden>
+                <img id="cab-foto-prueba" src="img/prueba-persona.jpg" alt="" hidden>
             </section>
 
             <!-- Modo técnico: detalle del seguimiento, lo que ve el modelo, prueba en CPU y registro -->
@@ -1439,7 +1450,7 @@ const Dron = (() => {
                 <p class="small text-body-secondary">Una lista de pasos que el dron hace solo. Elegí una y tocá Iniciar; Cancelar la frena.</p>
                 <div class="d-flex flex-wrap gap-2">
                     <select id="sel-mision-activa" class="form-select flex-grow-1 w-auto" aria-label="Misión"></select>
-                    <button id="btn-ejecutar-mision" class="btn btn-primary">Iniciar</button>
+                    <button id="btn-ejecutar-mision" class="btn btn-outline-primary">Iniciar</button>
                     <button id="btn-cancelar-mision" class="btn btn-danger" hidden>Cancelar misión</button>
                     <button id="btn-nueva-mision" class="btn btn-outline-secondary solo-tecnico">Nueva</button>
                 </div>

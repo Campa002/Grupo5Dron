@@ -32,6 +32,12 @@ const Aula = (() => {
         el.replaceChildren(p, texto);
     }
 
+    /** Estado en grande de un aparato (luces, proyector o aire): punto de color y texto corto. */
+    function estadoAparato(tipo, color, texto) {
+        const el = $(`[data-estado="${tipo}"]`);
+        if (el) textoConPunto(el, color, texto);
+    }
+
     async function inicializar() {
         destruido = false;
         document.querySelectorAll('.aula-pagina [data-luces]').forEach(b => {
@@ -58,9 +64,10 @@ const Aula = (() => {
             document.querySelectorAll('.aula-pagina [data-aparato]').forEach(c => {
                 const p = document.createElement('p');
                 p.className = 'small text-danger mb-0';
-                p.textContent = `No se pudieron cargar los aparatos: ${error.message}`;
+                p.textContent = `No se pudieron cargar los botones. ${error.message}`;
                 c.replaceChildren(p);
             });
+            for (const tipo of ['proyector', 'aire']) estadoAparato(tipo, 'error', 'Sin datos');
         }
     }
 
@@ -73,8 +80,9 @@ const Aula = (() => {
             if (!disp) {
                 const p = document.createElement('p');
                 p.className = 'small text-body-secondary mb-0';
-                p.textContent = 'Este aparato no está en la base de datos (revisá schema.sql).';
+                p.textContent = 'Este aparato no está cargado en el sistema. Avisale al administrador.';
                 caja.replaceChildren(p);
+                estadoAparato(tipo, 'error', 'No disponible');
                 continue;
             }
             const sinCodigo = [];
@@ -84,7 +92,7 @@ const Aula = (() => {
                 // Subir y bajar la temperatura aparecen solo cuando tienen su código
                 if (ES_TEMPERATURA(b.accion) && !b.tiene_codigo_ir) continue;
                 const btn = document.createElement('button');
-                btn.className = `btn flex-fill ${b.accion === 'encender' ? 'btn-success' : 'btn-outline-secondary'}`;
+                btn.className = `btn flex-fill ${b.accion === 'encender' ? 'btn-primary' : 'btn-outline-secondary'}`;
                 btn.disabled = !b.tiene_codigo_ir;
                 btn.title = b.tiene_codigo_ir ? `Código ${b.protocolo || ''}`.trim() : 'Sin código: hay que aprenderlo';
                 btn.textContent = b.nombre;
@@ -92,10 +100,12 @@ const Aula = (() => {
                 botones.push(btn);
             }
             caja.replaceChildren(...botones);
+            const faltanBasicos = (disp.botones || []).some(b => !ES_TEMPERATURA(b.accion) && !b.tiene_codigo_ir);
+            estadoAparato(tipo, faltanBasicos ? 'advertencia' : 'exito', faltanBasicos ? 'Falta aprender' : 'Listo');
             if (falta) {
                 falta.hidden = sinCodigo.length === 0;
                 falta.textContent = sinCodigo.length
-                    ? `Falta aprender: ${sinCodigo.join(', ')}. ${Auth.esDocente() ? 'Usá "04 — Aprender código".' : 'Lo hace un docente.'}`
+                    ? `Falta aprender: ${sinCodigo.join(', ')}. ${Auth.esDocente() ? 'Guardalo abajo, en "Aprender código".' : 'Lo hace un docente.'}`
                     : '';
             }
         }
@@ -107,7 +117,8 @@ const Aula = (() => {
         try {
             const r = await API.comandos.enviar({ tipo: 'ir', boton_id: boton.id });
             App.mostrarToast(`${disp.nombre}: ${boton.nombre.toLowerCase()}...`, 'info');
-            seguirEstadoComando(r.comando_id, `${disp.nombre}: ${boton.nombre.toLowerCase()}`);
+            estadoAparato(disp.tipo, 'advertencia', 'Enviando...');
+            seguirEstadoComando(r.comando_id, `${disp.nombre}: ${boton.nombre.toLowerCase()}`, disp.tipo, `${boton.nombre}: enviado`);
         } catch (error) {
             App.mostrarToast(error.message, 'error', 6000);
         } finally {
@@ -122,7 +133,8 @@ const Aula = (() => {
             const r = await API.comandos.enviar({ tipo: 'rele', parametros: { accion } });
             const texto = accion === 'encender' ? 'Luces: encender' : 'Luces: apagar';
             App.mostrarToast(`${texto}...`, 'info');
-            seguirEstadoComando(r.comando_id, texto);
+            estadoAparato('luces', 'advertencia', 'Enviando...');
+            seguirEstadoComando(r.comando_id, texto, 'luces', accion === 'encender' ? 'Encendidas' : 'Apagadas');
         } catch (error) {
             App.mostrarToast(error.message, 'error', 7000);
         } finally {
@@ -147,9 +159,10 @@ const Aula = (() => {
         return { estado: 'sin_respuesta' };
     }
 
-    async function seguirEstadoComando(comandoId, texto) {
+    async function seguirEstadoComando(comandoId, texto, tipo, textoListo) {
         const r = await esperarComando(comandoId);
         if (destruido) return;
+        estadoAparato(tipo, r.estado === 'ejecutado' ? 'exito' : 'error', r.estado === 'ejecutado' ? textoListo : 'Sin respuesta');
         if (r.estado === 'ejecutado') App.mostrarToast(`${texto}: listo.`, 'exito');
         else if (r.estado === 'error') App.mostrarToast(`${texto}: el equipo avisó un error (${r.resultado || 'sin detalle'}).`, 'error', 7000);
         else App.mostrarToast(`${texto}: el equipo del aula no respondió. ¿Está prendido y con internet?`, 'advertencia', 7000);
@@ -175,7 +188,9 @@ const Aula = (() => {
         if (actual && [...sel.options].some(o => o.value === actual)) sel.value = actual;
     }
 
-    function estadoAprender(color, texto) {
+    function estadoAprender(color, texto, paso = 1) {
+        const bloque = $('#bloque-aprender');
+        if (bloque) bloque.dataset.paso = String(paso);
         const el = $('#aprender-estado');
         if (!el) return;
         el.hidden = false;
@@ -194,7 +209,7 @@ const Aula = (() => {
         try {
             // 1. Pedirle al equipo que prenda el receptor
             const r = await API.comandos.enviar({ tipo: 'aprendizaje', boton_id: boton.id });
-            estadoAprender('advertencia', 'Esperando que el equipo del aula prenda el receptor...');
+            estadoAprender('advertencia', 'Esperando que el equipo del aula prenda el receptor...', 2);
             const cmd = await esperarComando(r.comando_id);
             if (destruido) return;
             if (cmd.estado !== 'ejecutado') {
@@ -202,7 +217,7 @@ const Aula = (() => {
                 return;
             }
             // 2. Esperar el código
-            estadoAprender('exito', `Escuchando: apuntá el control del ${disp.nombre.toLowerCase()} al receptor y apretá "${boton.nombre}" (tenés 15 segundos).`);
+            estadoAprender('exito', `Escuchando: apuntá el control del ${disp.nombre.toLowerCase()} al receptor y apretá "${boton.nombre}" (tenés 15 segundos).`, 3);
             const fin = Date.now() + ESPERA_CODIGO_MS;
             while (Date.now() < fin && !destruido) {
                 await esperar(1500);
@@ -243,7 +258,7 @@ const Aula = (() => {
             if (estado.en_linea) {
                 textoConPunto(info, 'exito', `Equipo del aula en línea${estado.modo_aprendizaje ? ' · escuchando un código' : ''}`);
             } else {
-                textoConPunto(info, 'error', `Equipo del aula desconectado${estado.ultimo_heartbeat ? ` (último aviso: ${estado.ultimo_heartbeat})` : ''}`);
+                textoConPunto(info, 'error', `Equipo del aula sin conexión: revisá que esté enchufado y con WiFi${estado.ultimo_heartbeat ? ` (último aviso: ${estado.ultimo_heartbeat})` : ''}`);
             }
         } catch (_) {
             // Sin datos: se reintenta en el próximo ciclo
