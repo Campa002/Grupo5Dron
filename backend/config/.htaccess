@@ -1,0 +1,2 @@
+# Carpeta interna: nadie la abre desde el navegador (la usa solo la API).
+Require all denied

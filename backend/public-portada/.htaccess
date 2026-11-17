@@ -1,0 +1,21 @@
+# Raíz del servidor — Grupo 5: Control de Sistemas y Dron
+Options -Indexes
+AddDefaultCharset UTF-8
+DirectoryIndex index.php
+
+# Siempre por HTTPS (el APK y el ESP32 no se conectan por http). En la PC (localhost) no se fuerza.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https
+    RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1)(:\d+)?$
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# Los APK se descargan como archivo
+AddType application/vnd.android.package-archive .apk
+
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
