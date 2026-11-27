@@ -224,7 +224,7 @@ Gran parte del código lo generó otro agente con poca revisión. No asumas que 
 ## Decisiones tomadas sin consultar (13/11 y 26/11)
 
 Del 26/11 (cabina simple):
-- Despegar detiene el seguimiento: para que el dron siga a alguien hay que tocar Seguir ya en el aire. Así nunca arranca a moverse solo después de despegar (reemplaza a la confirmación del control real, que se sacó). Por eso el cartel del piso dice "Despegá y tocá Seguir para que el dron lo siga" en vez del texto propuesto "Despegá para que el dron siga al objetivo". Se cambia en una línea si Luciano prefiere que siga solo al despegar.
+- Despegar detiene el seguimiento: para que el dron siga a alguien hay que tocar Seguir ya en el aire (así nunca arranca a moverse solo después de despegar). **Confirmado por Luciano el 26/11** ("Tocar Seguir en el aire"): no cambiarlo sin preguntarle.
 - Si dejan de cumplirse las condiciones mientras lo movía, el seguimiento se detiene con freno (no queda quieto esperando para retomar solo): la misma seguridad que antes, cuando había que reactivar el control real.
 - La inclinación y el seguimiento no andan juntos: prender uno apaga el otro.
 - Configuración pasa al modo técnico.
