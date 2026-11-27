@@ -10,7 +10,7 @@ Dos apps para Android hechas con HTML, CSS y JavaScript y empaquetadas con Capac
 
 | App | Para qué | Cómo se conecta |
 | :--- | :--- | :--- |
-| **Grupo 5 — Dron** | Volar un DJI Ryze Tello desde el celular: video, botones de mando, inclinación del celular, pasos, misiones y **seguimiento** de una persona u objeto (estilo RAC: recuadro en la cara, con el cuerpo de respaldo). | Directo al WiFi del Tello, sin internet y sin cuenta. |
+| **Grupo 5 — Dron** | Volar un DJI Ryze Tello desde el celular: video, botones de mando de mantener apretado, inclinación del celular y **seguimiento** de una persona u objeto (estilo RAC: recuadro en la cara, con el cuerpo de respaldo). En el piso solo marca el objetivo; el dron lo sigue cuando se toca Seguir ya en el aire. | Directo al WiFi del Tello, sin internet y sin cuenta. |
 | **Grupo 5 Aula** | Manejar las **luces** (relé), el **proyector** y el **aire acondicionado** (infrarrojo) de un aula, y **aprender** los códigos de sus controles remotos. | Con internet, contra un servidor PHP + MySQL; el ESP32 del aula consulta ese servidor. |
 
 ```
@@ -104,5 +104,5 @@ php -S 127.0.0.1:8088 -t backend/public
 
 ## Seguridad
 
-- Dron: botón de EMERGENCIA siempre visible, confirmación antes de despegar, aterrizaje automático si se corta la conexión y seguimiento en ensayo por defecto (el control real es experimental y pide confirmación). Volar con protectores y espacio libre.
+- Dron: botón de EMERGENCIA siempre visible, confirmación antes de despegar, aterrizaje automático si se corta la conexión y seguimiento que solo mueve el dron si se toca Seguir en el aire y se cumplen las condiciones (altura, batería, datos del dron y detección rápida); si pierde el objetivo, queda quieto. Volar con supervisión, protectores y 3 × 3 m libres de personas.
 - Aula: el relé de 220 V se habilita solo desde la administración y el armado se hace con supervisión docente.

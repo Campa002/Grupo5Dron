@@ -21,16 +21,16 @@
 | :--- | :--- |
 | `index.php` | Esqueleto: menú, scripts (en orden de dependencia) |
 | `js/app.js` | Router (`RUTAS_DRON`), Prueba Tello, Sensores, Seguimiento con la cámara, Mis objetos, avisos (`mostrarToast`), íconos |
-| `js/dron.js` | Cabina: conexión, despegue, aterrizaje, emergencia, failsafe, botones, inclinación, pasos, misiones, seguimiento y control real |
+| `js/dron.js` | Cabina: conexión, despegue, aterrizaje, emergencia, failsafe, botones, inclinación y seguimiento (en vuelo, con condiciones) |
 | `js/dron-adaptadores.js` | `DronNativo` (contrato del plugin), `TelloAdapter` (protocolo del Tello) y `SimulatorDroneAdapter` |
 | `js/dron-joystick.js` | Botones de mantener apretado y joysticks |
 | `js/dron-giroscopio.js` | Inclinación (giroscopio o acelerómetro) |
 | `js/dron-video.js` | Decodificador H.264 |
 | `js/dron-caras.js` | BlazeFace: anclas, decodificación y NMS (puros) y detección |
-| `js/dron-seguimiento.js` | Tubería del seguimiento: visión, candidatos (cara/cuerpo), `Selector` con reglas de RAC, `Seguidor`, `Controlador`, límites del control real, diagnóstico |
-| `js/dron-seguimiento-ui.js` | Tarjetas estilo RAC (estado, confianza, historial, diagnóstico, interruptor de control real) |
+| `js/dron-seguimiento.js` | Tubería del seguimiento: visión, candidatos (cara/cuerpo), `Selector` con reglas de RAC, `Seguidor`, `Controlador`, `decidirSeguimiento`, límites del seguimiento en vuelo (`LIMITES_CONTROL_REAL`), diagnóstico |
+| `js/dron-seguimiento-ui.js` | Tarjetas estilo RAC (estado, confianza, historial, diagnóstico) |
 | `js/dron-objetos.js` | Mis objetos: huellas con MobileNet e IndexedDB |
-| `js/config-dron.js` | Perfiles fijos, modo técnico, ajustes |
+| `js/config-dron.js` | Perfiles fijos, modo técnico, ajustes (la pantalla Config. Dron solo aparece con el modo técnico) |
 | `pages/*.php` | Vistas parciales (HTML sin PHP: en el APK se copian tal cual) |
 | `sw.js` | Service worker (solo en el navegador) |
 
@@ -60,24 +60,27 @@ Aprender: tipo `aprendizaje` → el ESP32 prende el receptor 15 s → `POST esp3
 ```
 imagen → COCO-SSD + BlazeFace (5-10 FPS) → combinarPersonas (cara o cuerpo) → Selector (75 %, 8, 3 de 5)
       → Controlador (yaw, altura, distancia; tamaño ideal según cara o cuerpo) → bucle a 15 Hz
-      → ensayo: se muestra | control real: comandoControlReal (límites) → ejes del rc
+      → en el piso: solo se muestra (recuadro y etiqueta), no manda nada
+      → en vuelo, con Seguir tocado en el aire: decidirSeguimiento (condiciones) → comandoControlReal (límites) → ejes del rc
 ```
 
-Las partes puras (`Selector`, `Seguidor`, `Controlador`, `combinarPersonas`, `comandoControlReal`, `conclusionDiagnostico`, decodificación de BlazeFace) no usan el DOM: se prueban en `tests/`.
+`decidirSeguimiento` decide cada paso: si no se cumplen las condiciones (altura 80-250 cm, batería 30 % o más, datos del dron, WebGL, 4 o más detecciones por segundo) no mueve el dron; si dejan de cumplirse mientras lo movía, frena y detiene el seguimiento. Sin objetivo manda `rc 0 0 0 0` (queda quieto). `comandoControlReal` limita giro a 20, altura y avance a 15, roll siempre 0 y zona muerta 4. Despegar, Aterrizar, EMERGENCIA, el failsafe, cualquier botón de movimiento, prender la inclinación, pasar a segundo plano o salir de la cabina detienen el seguimiento.
+
+Las partes puras (`Selector`, `Seguidor`, `Controlador`, `combinarPersonas`, `comandoControlReal`, `decidirSeguimiento`, `conclusionDiagnostico`, decodificación de BlazeFace) no usan el DOM: se prueban en `tests/`.
 
 ## Cómo agregar algo
 
 - **Una pantalla nueva en la app del dron:** crear `pages/nombre.php` (solo HTML), agregar `'nombre'` a `RUTAS_DRON` en `app.js` y su `case` en `inicializarControladorPagina`, el enlace en el menú de `index.php` y el archivo en `RECURSOS_ESTATICOS` de `sw.js` (subí `CACHE_NAME`). Corré `python scripts/check_refs.py`.
 - **Un archivo JS nuevo:** `<script>` en `index.php` (antes de quien lo usa), en `sw.js`, y que tenga extensión (en el APK, una ruta sin "." devuelve `index.html`).
 - **Un ajuste del seguimiento:** valor en `AJUSTES_POR_DEFECTO` y, si se edita en pantalla, su rango en `RANGOS` (aparece solo en Config. Dron, modo técnico).
-- **Cambiar los límites del control real:** `LIMITES_CONTROL_REAL` en `dron-seguimiento.js` (y actualizá `tests/control-real.test.js`).
+- **Cambiar los límites del seguimiento en vuelo:** `LIMITES_CONTROL_REAL` en `dron-seguimiento.js` (y actualizá `tests/control-real.test.js`).
 - **Un endpoint:** `case` en el `switch` del archivo de `api/`, con `validarMetodo`, `verificarAutenticacion`/`verificarDocente`/`verificarAdmin` y respuestas con `responderJson`/`responderError`. Documentalo en `api.md`.
 - **Una acción del aula:** fila en `botones` (con `accion`) en `schema.sql`; la pantalla la muestra sola. Si es de un aparato nuevo, también una fila en `dispositivos` y su bloque en `pages/aula.php`.
 - **Un comando del Tello:** método en `TelloAdapter` usando `enviarComando` (espera "ok") o `enviarSinRespuesta` (para `rc`). Si cambia el contrato con el plugin, cambiá los dos lados.
 
 ## Reglas que no hay que romper
 
-- Seguridad de vuelo: EMERGENCIA siempre visible; confirmación y telemetría para despegar; failsafe (freno + aterrizaje y, si no se confirma, ningún comando automático); modos automáticos desactivados al entrar; aterrizar al salir de la cabina en vuelo; control real apagado por defecto y con confirmación.
+- Seguridad de vuelo: EMERGENCIA siempre visible; confirmación y telemetría para despegar; failsafe (freno + aterrizaje y, si no se confirma, ningún comando automático); modos automáticos desactivados al entrar; aterrizar al salir de la cabina en vuelo; el seguimiento solo mueve el dron si se toca Seguir en el aire y se cumplen las condiciones de `decidirSeguimiento`; perdido, queda quieto (`rc 0 0 0 0`).
 - Nada externo (CDN, fuentes): el APK anda sin internet.
 - Las páginas son `.php` pero sin PHP adentro.
 - Sin credenciales en el repo (`config.php`, `config.h` y los keystores están en `.gitignore`).

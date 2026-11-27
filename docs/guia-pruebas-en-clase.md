@@ -90,7 +90,7 @@ En clase no hace falta el hosting: el aula se prueba con la notebook como servid
 | 25 a 35 | C. App del dron sin dron (cámara del celular) | Solo el celular |
 | 35 a 45 | D. Dron en el piso, sin volar | Tello prendido, celular en su WiFi |
 | 45 a 60 | E. Vuelo con botones | Espacio libre, alguien en EMERGENCIA |
-| 60 a 75 | F. Seguimiento en vuelo (ensayo y control real) | Una persona que se deje seguir |
+| 60 a 75 | F. Seguimiento en vuelo | Una persona que se deje seguir |
 | 75 a 80 | G. Copiar registros y anotar | — |
 
 Si sobra tiempo, al final: H. Luces con 220 V (solo con el profe).
@@ -187,9 +187,9 @@ Todo con el ESP32 alimentado por USB (de la notebook o del cargador). **Sin 220 
 
 ### C1. Abrir la app del dron
 - **Hacer:** abrí "Grupo 5 — Dron".
-- **Debería:** entra directo al inicio (sin login) con un solo botón grande, **Entrar a la cabina**; el menú tiene Inicio, Cabina y Configuración. No se ve nada de prueba.
+- **Debería:** entra directo al inicio (sin login) con un solo botón grande, **Entrar a la cabina**; el menú tiene Inicio y Cabina. No se ve nada de prueba.
 - **Hacer después:** 5 toques seguidos en "GRUPO 5 · DRON".
-- **Debería:** "Modo técnico activado"; en el inicio aparecen Prueba Tello, Seguimiento con la cámara del celular y Sensores, y en el menú también. Dejalo prendido para el resto de la clase.
+- **Debería:** "Modo técnico activado"; en el inicio aparecen Prueba Tello, Seguimiento con la cámara del celular y Sensores, y en el menú también (más Configuración). Dejalo prendido para el resto de la clase.
 - **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
 
 ### C2. Seguimiento con la cámara del celular
@@ -250,9 +250,11 @@ Celular conectado al WiFi del Tello (`TELLO-…`). Los datos móviles pueden que
 - **Debería:** "Conectado (en tierra)", batería y altura sobre el video, video del Tello sin cuadros rotos, "Despegar" habilitado (si dice "Esperando datos del dron…", esperá unos segundos).
 - **Resultado:** ☐ Anduvo ☐ No anduvo — ¿Video con cuadros rotos? ☐ sí ☐ no — Qué pasó: ____________________
 
-### D3. Seguimiento en ensayo con el video del Tello (sin volar)
-- **Hacer:** con el dron en la mano (o sobre una mesa) apuntando a una persona a 2 o 3 m, tocá **Seguir persona** (columna de la derecha) o bajá a "01 — Seguimiento" → Seguir persona.
-- **Debería:** recuadro en la cara, "Siguiendo: Persona" y el cartel "Ensayo (no mueve el dron): …". En la tarjeta: "Modo ensayo: no se manda nada al dron". El botón del costado pasa a decir "Detener seguimiento". El interruptor "Control real" **no se deja activar en tierra** (avisa que el dron no está en vuelo).
+### D3. Seguimiento en el piso: solo marca, no manda nada
+- **Hacer:** con el dron en la mano (o sobre una mesa) apuntando a una persona a 2 o 3 m, tocá **Seguir persona** (fila de arriba).
+- **Debería:** recuadro en la cara con la etiqueta "Persona 9x %", "Siguiendo: Persona" y el cartel "En el piso solo marca el objetivo. Despegá y tocá Seguir para que el dron lo siga." Los motores no arrancan y el dron no hace nada. El botón pasa a decir "Detener seguimiento" y "Seguir objeto" se oculta.
+- **Hacer después:** tocá **Detener seguimiento**.
+- **Debería:** "Seguimiento detenido." y el botón vuelve a decir "Seguir persona". (Si en vez de eso despegás con el seguimiento andando, se detiene solo con el aviso "Seguimiento detenido para despegar. En el aire, tocá Seguir…": se ve en F1.)
 - **Resultado:** ☐ Anduvo ☐ No anduvo — FPS: ____ — Qué pasó: ____________________
 
 ---
@@ -271,10 +273,17 @@ Espacio libre, protectores, alguien con el dedo en EMERGENCIA.
 - **Debería:** se mueve mientras está apretado y **frena al soltar**. Con dos dedos se combinan.
 - **Resultado:** ☐ Anduvo ☐ No anduvo — ¿Lenta es manejable? ☐ sí ☐ muy rápido ☐ muy lento — Qué pasó: ____________________
 
-### E3. Paso y freno
-- **Hacer:** "03 — Por pasos": Adelante 30 cm. Después un Girar 90°. Mientras hace un paso, tocá el botón rojo del centro (freno).
-- **Debería:** hace el paso y queda quieto; el freno lo para.
-- **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
+### E3. Freno al soltar los botones
+- **Hacer:** en vuelo, velocidad **Normal**: mantené apretado Adelante 2 segundos y soltá de golpe. Lo mismo con un giro.
+- **Debería:** al soltar, el dron frena y queda quieto en el aire (puede deslizar un poco). No hay botón de freno aparte: el freno es soltar. Si hace falta más, están **Aterrizar** y **EMERGENCIA**.
+- **Resultado:** ☐ Anduvo ☐ No anduvo — ¿Cuánto se desliza al soltar? ______ — Qué pasó: ____________________
+
+### E3b. Inclinación: calibración automática
+- **Hacer:** en vuelo, sostené el celular como lo vas a usar para volar y tocá **Inclinación: apagada** (fila de arriba). Quedate quieto unos segundos. Después inclinalo un poco hacia adelante y volvé a la posición del principio.
+- **Debería:** aviso "Inclinación prendida: esta posición es quieto." y el botón dice "Inclinación: activa". Mientras no lo inclinás, el dron **no se mueve**; al inclinarlo hacia adelante avanza, y al volver a la posición del principio frena. Los botones de avanzar y de costado quedan bloqueados (subir, bajar y girar siguen andando).
+- **Hacer después:** girá la pantalla (de acostado a parado o al revés).
+- **Debería:** "Cambió la orientación de la pantalla: se apagó el control por inclinación…". Para usarla de nuevo, hay que volver a prenderla en la posición nueva. Tocá el botón otra vez para apagarla ("Inclinación apagada.").
+- **Resultado:** ☐ Anduvo ☐ No anduvo — ¿Se movió solo al prenderla? ☐ sí ☐ no — Qué pasó: ____________________
 
 ### E4. EMERGENCIA (a poca altura)
 - **Hacer:** con el dron a menos de 50 cm de altura y sobre algo blando, tocá EMERGENCIA.
@@ -295,35 +304,35 @@ Espacio libre, protectores, alguien con el dedo en EMERGENCIA.
 
 ## F. Seguimiento en vuelo
 
-Una persona se pone de frente a 2 o 3 m del dron. Otra con el dedo en EMERGENCIA. Primero ensayo, después control real.
+Una persona se pone de frente a 2 o 3 m del dron. Otra con el dedo en EMERGENCIA. Acá el dron **sí se mueve solo**, despacio.
 
-### F1. Ensayo en vuelo
-- **Hacer:** despegá, subí a la altura de la cara (con Subir) y tocá **Seguir persona** (columna de la derecha).
-- **Debería:** "Siguiendo: Persona" y el cartel dice qué haría el dron ("giraría a la derecha…") **sin moverlo**. Si la persona camina de costado, el texto dice que giraría hacia ella.
-- **Resultado:** ☐ Anduvo ☐ No anduvo — FPS en vuelo: ____ — Qué pasó: ____________________
+Para que lo mueva tienen que cumplirse todas estas condiciones: altura entre 80 y 250 cm, batería de 30 % o más, que lleguen datos del dron, que el celular analice la imagen con la placa de video y que haga 4 detecciones por segundo o más.
 
-### F2. Control real (experimental)
-- **Hacer:** bajá hasta "01 — Seguimiento" y activá **Control real (experimental)**. Leé la confirmación y aceptá. La persona camina despacio de costado, 1 m para cada lado.
+### F1. Seguir persona en vuelo
+- **Hacer:** en el piso, tocá **Seguir persona** y después **Despegar** → confirmar.
+- **Debería:** al despegar, el seguimiento se detiene con el aviso "Seguimiento detenido para despegar. En el aire, tocá Seguir…". El dron no sigue a nadie todavía.
+- **Hacer después:** subí a la altura de la cara (con Subir, unos 120 cm) y recién ahí tocá **Seguir persona** (fila de arriba). La persona camina despacio de costado, 1 m para cada lado, y da un paso hacia adelante y otro hacia atrás.
 - **Debería:**
-  - el cartel sobre el video dice "CONTROL REAL · …" (con el modo técnico, además el "rc …", y la tarjeta "Mandando al dron: rc 0 X Y Z");
-  - el dron gira despacio para mirar a la persona (giro hasta 20 de 100), sube o baja un poco y avanza o retrocede despacio (hasta 15) para mantener la distancia (~3 m); nunca se mueve de costado.
-- **Si no se deja activar:** anotá el motivo que dice (por ejemplo, poca batería, altura fuera de 80 a 250 cm, menos de 4 detecciones por segundo).
-- **Resultado:** ☐ Anduvo ☐ No anduvo — Motivo si no se activó: ________ — Qué pasó: ____________________
+  - "Confirmando: Persona (n/8)" y después "Siguiendo: Persona" (necesita 8 detecciones seguidas de 75 % o más);
+  - el dron gira despacio para mirar a la persona (giro hasta 20 de 100), sube o baja un poco y avanza o retrocede despacio (hasta 15) para mantener la distancia (~3 m); **nunca se mueve de costado**;
+  - con el modo técnico, el comando "rc 0 X Y Z" a la vista (el primer número, el de costado, siempre 0).
+- **Si no lo mueve:** el cartel dice "Todavía no sigue: …" con el motivo (por ejemplo, altura menor a 80 cm, batería menor a 30 %, la imagen se analiza muy lento). Anotalo. Si era la altura, subí con Subir: cuando se cumple, empieza solo.
+- **Si deja de cumplirse algo mientras lo movía:** frena, avisa "El seguimiento se detuvo: …" con el motivo, y hay que volver a tocar Seguir persona.
+- **Resultado:** ☐ Anduvo ☐ No anduvo — FPS en vuelo: ____ — Motivo si no lo movió: ________ — Qué pasó: ____________________
 
-### F3. Objetivo perdido = quieto
-- **Hacer:** con el control real activo, que la persona salga de la imagen (o se tape la cara y se vaya).
-- **Debería:** "Objetivo perdido" (y, con el modo técnico, "rc 0 0 0 0"): el dron **se queda quieto** en el aire; no aterriza ni se mueve solo.
+### F2. Objetivo perdido = quieto
+- **Hacer:** con el dron siguiendo, que la persona salga de la imagen (o se tape la cara y se vaya). Después, antes de 5 segundos, que vuelva al mismo lugar.
+- **Debería:** aviso "Objetivo perdido: el dron queda quieto." (y, con el modo técnico, "rc 0 0 0 0"): el dron **se queda quieto** en el aire; no aterriza ni se mueve solo. Si la persona vuelve cerca antes de 5 s, la retoma y sigue.
 - **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
 
-### F4. Tocar un botón devuelve el mando
-- **Hacer:** con el control real activo, tocá cualquier botón de movimiento.
-- **Debería:** avisa "Tocaste un botón de movimiento: el seguimiento volvió a ensayo", el interruptor se apaga y el dron responde al botón.
-- **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
-
-### F5. Aterrizar con el seguimiento activo
-- **Hacer:** con el control real activo, tocá Aterrizar.
-- **Debería:** aterriza normalmente y el seguimiento se apaga.
-- **Resultado:** ☐ Anduvo ☐ No anduvo — Qué pasó: ____________________
+### F3. Qué detiene el seguimiento
+Probá de a uno; después de cada uno, volvé a tocar **Seguir persona** (en el aire) para el siguiente.
+- **Botón:** tocá cualquier botón de movimiento. **Debería:** "Tocaste un botón de movimiento: el seguimiento se detuvo." y el dron responde al botón.
+- **Inclinación:** tocá **Inclinación: apagada**. **Debería:** "Prendiste la inclinación: el seguimiento se detuvo." y queda prendida la inclinación (apagala después). Al revés también: tocar Seguir persona apaga la inclinación.
+- **Detener:** tocá **Detener seguimiento**. **Debería:** "Seguimiento detenido." y el dron queda quieto.
+- **Aterrizar:** tocá **Aterrizar**. **Debería:** aterriza normalmente y el seguimiento se apaga (el botón vuelve a decir "Seguir persona").
+- **EMERGENCIA:** también lo apaga. No hace falta repetirlo si ya anduvo E4; si lo probás, que sea a poca altura y sobre algo blando.
+- **Resultado:** ☐ Anduvo ☐ No anduvo — ¿Cuál falló? ________ — Qué pasó: ____________________
 
 ---
 
@@ -334,7 +343,7 @@ Copiá y guardá (en un mensaje o un archivo de notas) lo que haya, aunque todo 
 - [ ] Informe de **Prueba Tello** ("Copiar informe").
 - [ ] **Diagnóstico** del seguimiento (C3), con la cámara del celular y, si se pudo, en la cabina con el video del Tello.
 - [ ] Con el **modo técnico** prendido (5 toques en el título), en la cabina: "Copiar registro de comandos" y "Copiar registro" del seguimiento.
-- [ ] Al final, apagá el modo técnico (5 toques) y mirá que la app quede simple: inicio con Entrar a la cabina, menú con Inicio, Cabina y Configuración.
+- [ ] Al final, apagá el modo técnico (5 toques) y mirá que la app quede simple: inicio con Entrar a la cabina, menú con Inicio y Cabina.
 - [ ] Lo que mostró el **monitor serie** del ESP32 en A4 y A5 (protocolos, bits y pulsos de los controles).
 - [ ] FPS en el celular (C2, D3, F1).
 - [ ] Si el relé es activo en alto o en bajo (A2).
@@ -361,7 +370,7 @@ Copiá y guardá (en un mensaje o un archivo de notas) lo que haya, aunque todo 
 | La conexión con el Tello | "Copiar informe" de Prueba Tello, y si los datos móviles estaban prendidos o apagados |
 | El despegue, los botones o el aterrizaje | Modo técnico → cabina → "Copiar registro de comandos" |
 | El seguimiento ("Buscando" siempre, recuadros raros) | "Copiar diagnóstico" y, en modo técnico, "Copiar registro" del seguimiento; una captura de pantalla |
-| El control real | El motivo que muestra, el texto "Mandando al dron: rc …" y "Copiar registro" del seguimiento |
+| El seguimiento en vuelo (no lo mueve o se detiene) | El motivo que muestra ("Todavía no sigue: …" o "El seguimiento se detuvo: …"), el "rc …" con el modo técnico y "Copiar registro" del seguimiento |
 | El ESP32 (no se conecta, no aprende, no emite) | Todo lo que sale en el monitor serie |
 | La app del aula | El mensaje que aparece (toast) y una captura |
 | Cualquier cosa | Qué tocaste, qué esperabas y qué pasó (aunque sea en una línea) |

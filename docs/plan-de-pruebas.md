@@ -2,7 +2,7 @@
 
 La columna **Resultado** se completa en clase (la guía paso a paso está en [guia-pruebas-en-clase.md](guia-pruebas-en-clase.md), con los mismos códigos). La columna **Antes de la clase** dice qué ya se verificó sin el hardware real.
 
-Referencias: **Auto** = pruebas automáticas (`node --test`, 107 pruebas, también en el CI). **Navegador** = Playwright con Chromium. **Mock** = Tello simulado (plugin falso que respeta el contrato). **API local** = PHP + MariaDB con el ESP32 simulado por HTTP. **OpenSCAD** = modelo 3D.
+Referencias: **Auto** = pruebas automáticas (`node --test`, 108 pruebas, también en el CI). **Navegador** = Playwright con Chromium. **Mock** = Tello simulado (plugin falso que respeta el contrato). **Edge + mock** = la cabina en Edge con el Tello simulado y la foto de prueba dibujada en el video. **API local** = PHP + MariaDB con el ESP32 simulado por HTTP. **OpenSCAD** = modelo 3D.
 
 ## Circuito del aula y firmware
 
@@ -51,19 +51,21 @@ Referencias: **Auto** = pruebas automáticas (`node --test`, 107 pruebas, tambi�
 | :--- | :--- | :--- | :--- | :--- |
 | D1 | Prueba Tello | Cinco pasos en verde | Mock | |
 | D2 | Cabina conectada | Datos, video, Despegar habilitado | Mock | |
-| D3 | Seguimiento en ensayo con el video del Tello | Sigue y no manda nada; control real bloqueado en tierra | Mock con la foto dibujada en el video | |
+| D3 | Seguimiento en el piso con el video del Tello | Solo marca el objetivo (recuadro y etiqueta); no manda nada al dron; cartel "En el piso solo marca el objetivo…" | Edge + mock: en el piso no sale ningún rc y aparece el cartel | |
 | E1 | Despegar y aterrizar | Confirmación; "En vuelo"; no aterriza solo | Mock (plugin 2.2.0) | |
 | E2 | Botones de mantener apretado | Mueve mientras apretás, frena al soltar | Auto + mock | |
-| E3 | Paso y freno | Hace el paso; el freno lo para | Simulador | |
+| E3 | Freno al soltar los botones | Al soltar frena y queda quieto; no hay botón de freno aparte | Auto + mock (lo mismo que E2) | |
+| E3b | Inclinación: calibración automática | "Inclinación prendida: esta posición es quieto"; no se mueve hasta inclinarlo; se apaga al girar la pantalla | — | |
 | E4 | EMERGENCIA | Motores apagados en el acto | Mock | |
 | E5 | Salir de la cabina en vuelo | Aterriza antes | Simulador | |
 | E6 | Pérdida de conexión | Freno y aterrizaje | Mock | |
-| F1 | Seguimiento en ensayo en vuelo | Muestra qué haría, no lo mueve | Mock: en vuelo, sale solo rc 0 0 0 0 | |
-| F2 | Control real | Confirmación; se mueve despacio; comando a la vista | Mock: confirmación, todos los rc dentro de 20/15/15 y sin roll | |
-| F3 | Objetivo perdido con control real | Queda quieto | Auto + mock: solo rc 0 0 0 0 | |
-| F4 | Botón de movimiento con control real | Vuelve a ensayo | Mock | |
-| F5 | Aterrizar con el seguimiento activo | Aterriza y lo apaga | — | |
-| — | Sin datos del dron con control real | Vuelve a ensayo y después el failsafe aterriza | Mock | |
+| F1 | Seguir persona en vuelo | Despegar detiene el seguimiento; en el aire, Seguir lo confirma (8 de 75 %) y lo sigue despacio (giro hasta 20, altura y avance hasta 15, nunca de costado); si falta algo, "Todavía no sigue: motivo" | Edge + mock: despegar lo detiene con aviso; en vuelo confirma y manda rc dentro de los límites (roll 0, avance y altura hasta 15, giro hasta 20). PC lenta: no mueve el dron y dice "Todavía no sigue: la imagen se analiza muy lento" (*) | |
+| F2 | Objetivo perdido | "Objetivo perdido: el dron queda quieto"; rc 0 0 0 0; lo retoma si vuelve cerca en 5 s | Auto + Edge + mock: aviso y rc 0 0 0 0 | |
+| F3 | Qué detiene el seguimiento | Botón de movimiento, inclinación, Detener seguimiento, Aterrizar y EMERGENCIA lo detienen (con aviso cuando corresponde) | Edge + mock: un botón de movimiento y Aterrizar lo detienen | |
+| — | Dejan de cumplirse las condiciones mientras sigue (por ejemplo, sin datos del dron) | Se detiene con freno y avisa el motivo; hay que volver a tocar Seguir; si se corta la conexión, el failsafe aterriza | Auto (`decidirSeguimiento`) | |
+| — | Cabina a 360, 412 y 740 px parado y a 740×360 y 915×412 acostado, sin conexión y en vuelo | Ningún botón se pisa ni baja de 44 px; EMERGENCIA no tapa lo último; sin scroll horizontal | Edge + mock: sin errores de consola | |
+
+(*) En esa PC, sin placa de video, el camino que mueve el dron se probó bajando solo el mínimo de detecciones por segundo en el navegador de prueba. Los límites no se tocaron.
 
 ## Carcasa
 

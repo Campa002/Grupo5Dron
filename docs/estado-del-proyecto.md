@@ -40,9 +40,9 @@ En esta PC `prueba-en-clase` ya se adelantó hasta `interfaz-bootstrap` (avance 
 |---|---|---|
 | A1 Conexión y estado | A medias | Conecta por los tres puertos y muestra conectado, en vuelo, batería y altura. **Falta la señal WiFi**: no se le pregunta al Tello. Si el dron se apaga estando en tierra, sigue diciendo "Conectado" (ver "Para consultar"). |
 | A2 Mando | Hecho sin verificar | Despegar, aterrizar, EMERGENCIA fija y botones de mantener apretado con Lenta, Normal y Rápida. Verificado con 12 pruebas y con el Simulador. Falta probar la versión actual con el dron (la última prueba real fue el 6/11). |
-| A3 Inclinación | Hecho sin verificar | Giroscopio o acelerómetro, calibración y zona muerta de 3°. Verificado con 18 pruebas con sensores simulados. Falta probar el sentido en el Galaxy A06. |
+| A3 Inclinación | Hecho sin verificar | Giroscopio o acelerómetro y zona muerta de 3°. Se prende con el botón "Inclinación": la posición del celular en ese momento es "quieto" (ya no hay botón Calibrar). Si gira la pantalla se apaga. Verificado con 18 pruebas con sensores simulados. Falta probar el sentido en el Galaxy A06. |
 | A4 Video en vivo | Hecho sin verificar | El plugin recibe el video y la app lo decodifica. No tiene prueba automática. Falta el dron. |
-| A5 Seguimiento estilo RAC | Hecho sin verificar | Cara con BlazeFace y cuerpo de respaldo, objetos de COCO-SSD en español, objetos propios con fotos, etiqueta con nombre y porcentaje, estado, confianza e historial, reglas 75 % / 8 / 3 de 5 y control real con límites bajos. Verificado con 75 pruebas. Falta el celular (detección en el A06) y el dron. |
+| A5 Seguimiento estilo RAC | Hecho sin verificar | Cara con BlazeFace y cuerpo de respaldo, objetos de COCO-SSD en español, objetos propios con fotos, etiqueta con nombre y porcentaje, estado, confianza e historial, reglas 75 % / 8 / 3 de 5. En el piso solo marca el objetivo; en vuelo lo sigue despacio si se toca Seguir en el aire y se cumplen las condiciones (perdido, queda quieto). Verificado con 108 pruebas automáticas (son de toda la app). Falta el celular (detección en el A06) y el dron. |
 | A6 Seguridad de vuelo | A medias | Failsafe, confirmación de despegue y freno están. Hay cinco casos donde la seguridad queda floja (ver "Para consultar"). No se tocaron. |
 | A7 Sin login | Hecho y verificado | La app del dron no tiene ingreso ni llama al servidor (revisado en el código y en el navegador: ningún pedido a `/api`). |
 
@@ -108,7 +108,7 @@ Son de vuelo o de la lógica del aula. Están comprobados leyendo el código, no
 **Vuelo**
 
 1. EMERGENCIA no responde mientras el dron aterriza al salir de la cabina (hasta 20 s).
-2. Las preguntas de confirmación en vuelo (misión, control real, salir) tapan EMERGENCIA y frenan los envíos mientras están abiertas.
+2. Las preguntas de confirmación (despegar y salir de la cabina en vuelo) tapan EMERGENCIA y frenan los envíos mientras están abiertas.
 3. Con la inclinación activa, si la app pasa a segundo plano los ejes no vuelven a cero.
 4. Después de un failsafe con el WiFi caído, la cabina queda trabada sin botón Reconectar.
 5. Si el dron se apaga en tierra, sigue diciendo "Conectado (en tierra)".
@@ -126,7 +126,7 @@ Son de vuelo o de la lógica del aula. Están comprobados leyendo el código, no
 
 ## Sobra
 
-- **En la app del dron:** "Por pasos" y "Automático" (misiones), los joysticks, 29 ajustes del seguimiento y las pantallas técnicas de sensores y seguimiento con la cámara. Nada de eso está en la lista, pero se usa para probar.
+- **En la app del dron:** "Por pasos" y "Automático" (misiones) ya se sacaron de la cabina (guardados en `posibles-implementaciones/pasos-y-misiones/`). Quedan los joysticks, 29 ajustes del seguimiento y las pantallas técnicas de sensores y seguimiento con la cámara. Nada de eso está en la lista, pero se usa para probar.
 - **En el servidor:** `dron-perfiles.php` y la tabla `perfiles_dron` (sin uso), el código de CSRF que nadie llama y cuatro acciones de la API que la app no usa.
 - **Archivos viejos:** `docs/contexto/ultimo-reporte-antigravity.md`, `capacitor/README.md` (describe otro proyecto), `posibles-implementaciones/herramientas/` (roto), `posibles-implementaciones/adaptadores-genericos/` (nadie lo carga), `scripts/check_js.py` (repite lo que hace `node --check`).
 - **Carcasa:** la versión anterior con fuente HLK (1,6 MB). Se guardó a propósito como mejora futura.
