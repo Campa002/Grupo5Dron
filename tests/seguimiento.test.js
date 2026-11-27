@@ -219,8 +219,8 @@ test('condiciones para seguir en vuelo', () => {
         [{ bateria: 20 }, 'batería menor'],
         [{ bateria: null }, 'batería menor'],
         [{ telemetriaOk: false }, 'datos del dron'],
-        [{ backend: 'cpu' }, 'placa de video'],
-        [{ fps: 2 }, 'detecciones por segundo'],
+        [{ backend: 'cpu' }, 'analizar la imagen rápido'],
+        [{ fps: 2 }, 'muy lento'],
     ];
     for (const [cambio, texto] of casos) {
         const r = Seguimiento.condicionesControlReal({ ...ok, ...cambio }, A);

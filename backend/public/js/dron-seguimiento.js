@@ -732,8 +732,9 @@ const DronSeguimiento = (() => {
         else if (e.alturaCm > a.alturaMaxCm) motivos.push(`altura mayor a ${a.alturaMaxCm} cm`);
         if (e.bateria === null || e.bateria === undefined || e.bateria < a.bateriaMin) motivos.push(`batería menor a ${a.bateriaMin} %`);
         if (!e.telemetriaOk) motivos.push('no llegan datos del dron');
-        if (e.backend !== 'webgl') motivos.push(`el celular no puede usar la placa de video para analizar la imagen (usa ${e.backend || 'nada'})`);
-        if (!(e.fps >= a.fpsMinReal)) motivos.push(`la imagen se analiza muy lento (menos de ${a.fpsMinReal} detecciones por segundo)`);
+        // Sin tecnicismos (se muestran en la cabina): el detalle (backend, FPS) está en el panel del modo técnico
+        if (e.backend !== 'webgl') motivos.push('este celular no puede analizar la imagen rápido');
+        if (!(e.fps >= a.fpsMinReal)) motivos.push('la imagen se analiza muy lento');
         return { ok: motivos.length === 0, motivos };
     }
 
@@ -1107,7 +1108,7 @@ const DronSeguimiento = (() => {
                 const { backend, conCaras } = await this.vision.cargar();
                 this.modeloCargado = true;
                 const avisos = [];
-                if (backend !== 'webgl') avisos.push(`El seguimiento va a andar lento en este celular: en vuelo, el dron no va a poder seguir al objetivo (detección en "${backend}").`);
+                if (backend !== 'webgl') avisos.push('El seguimiento va a andar lento en este celular: en vuelo, el dron no va a poder seguir al objetivo.');
                 if (!conCaras) avisos.push('Va a seguir el cuerpo de la persona, no la cara.');
                 return { ok: true, backend, aviso: avisos.join(' ') || null };
             } catch (e) {

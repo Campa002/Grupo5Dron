@@ -50,6 +50,9 @@ const Dron = (() => {
     let _modoGiro = false;
     let _modoSeguimiento = false;
     let _controlReal = false;      // el seguimiento ya está moviendo el dron (en vuelo, con las condiciones)
+    let _pedidoSeguimiento = 0;    // cambia con todo lo que detiene el seguimiento: un "Seguir" que estaba cargando no se activa solo
+    let _preparando = false;       // un "Seguir" está cargando el detector o el objeto
+    let _esperandoDesde = 0;       // desde cuándo no puede mover el dron (el motivo se muestra si dura más de 2 s)
     let _onVisibilidad = null;
     let _accionVuelo = false;      // despegue o aterrizaje en curso
     let _estadoUI = 'desconectado';
@@ -344,7 +347,7 @@ const Dron = (() => {
         // "Seguir objeto": abre la lista de objetos de la sección Seguimiento y la trae a la vista
         on('#btn-atajo-objeto', () => {
             _pantallaSeg?.abrirPanelObjeto();
-            _q('#cab-seguimiento')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            _q('[data-rac="panel-objeto"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         });
         on('#btn-copiar-registro-seg', _copiarRegistroSeguimiento);
         on('#btn-copiar-registro-udp', _copiarRegistroComandos);
@@ -374,11 +377,10 @@ const Dron = (() => {
             '• El dron despegará al confirmar.\n' +
             '• Usá el botón EMERGENCIA si algo sale mal.'
         )) return;
-        // Al despegar se detiene el seguimiento: para que el dron siga a alguien hay que pedirlo ya en el aire
-        if (_modoSeguimiento) {
-            _apagarSeguimiento(false);
-            App.mostrarToast('Seguimiento detenido para despegar. En el aire, tocá Seguir para que el dron siga al objetivo.', 'info', 7000);
-        }
+        // Al despegar se detiene el seguimiento (y uno que estaba cargando no se activa): hay que pedirlo ya en el aire
+        const seguia = _modoSeguimiento;
+        _apagarSeguimiento(false);
+        if (seguia) App.mostrarToast('Seguimiento detenido para despegar. En el aire, tocá Seguir para que el dron siga al objetivo.', 'info', 7000);
 
         _accionVuelo = true;
         _actualizarEstadoUI('despegando');
@@ -470,6 +472,7 @@ const Dron = (() => {
      *   ellos ya se ocupan de lo que se manda.
      */
     function _apagarSeguimiento(mandarFreno = true) {
+        _pedidoSeguimiento++;
         _dejarDeMandar(mandarFreno);
         if (!_modoSeguimiento) return;
         _modoSeguimiento = false;
@@ -485,9 +488,9 @@ const Dron = (() => {
 
     /** Apaga el seguimiento con freno y avisa por qué (solo si estaba andando). */
     function _detenerSeguimiento(motivo) {
-        if (!_modoSeguimiento) return;
-        _apagarSeguimiento();
-        App.mostrarToast(`${motivo}: el seguimiento se detuvo.`, 'advertencia', 6000);
+        const estaba = _modoSeguimiento;
+        _apagarSeguimiento(); // también cancela un "Seguir" que estaba cargando
+        if (estaba) App.mostrarToast(`${motivo}: el seguimiento se detuvo.`, 'advertencia', 6000);
     }
 
     function _apagarModosAutomaticos() {
@@ -588,9 +591,26 @@ const Dron = (() => {
      */
     async function _seguirObjetivo(meta) {
         if (!_seguimiento) { App.mostrarToast('El seguimiento no está disponible.', 'advertencia'); return; }
-        const res = await _seguimiento.elegirObjetivo(meta, _objetosGuardados);
-        if (!_seguimiento) return; // salió de la cabina mientras cargaba
-        if (!res.ok) { App.mostrarToast(res.error, 'advertencia', 7000); return; }
+        if (_preparando) { App.mostrarToast('Todavía se está preparando el seguimiento.', 'info'); return; }
+        // Mientras carga se puede despegar, aterrizar, tocar EMERGENCIA o pasar a segundo plano: si pasó algo de eso,
+        // el pedido ya no vale (así el dron nunca empieza a seguir sin que se toque Seguir en el estado actual)
+        const pedido = _pedidoSeguimiento;
+        const enVueloAlPedir = !!_adaptador?.enVuelo;
+        const vigente = () => !!_seguimiento && pedido === _pedidoSeguimiento && enVueloAlPedir === !!_adaptador?.enVuelo
+            && !_maniobraEnCurso() && !_adaptador?.enviosSuspendidos;
+        _preparando = true;
+        try {
+            const res = await _seguimiento.elegirObjetivo(meta, _objetosGuardados);
+            if (!_seguimiento) return; // salió de la cabina mientras cargaba
+            if (!vigente()) { App.mostrarToast('Cambió el estado del dron mientras se preparaba: volvé a tocar Seguir.', 'info'); return; }
+            if (!res.ok) { App.mostrarToast(res.error, 'advertencia', 7000); return; }
+            await _cambiarOActivar(vigente);
+        } finally {
+            _preparando = false;
+        }
+    }
+
+    async function _cambiarOActivar(vigente) {
         if (_modoSeguimiento) {
             // Antes de reactivar: activar() pone los FPS en 0 y, si siguiera mandando, se cortaría por las condiciones
             _dejarDeMandar(true);
@@ -600,10 +620,10 @@ const Dron = (() => {
             App.mostrarToast('Ahora sigue lo que elegiste.', 'info');
             return;
         }
-        await _activarSeguimiento();
+        await _activarSeguimiento(vigente);
     }
 
-    async function _activarSeguimiento() {
+    async function _activarSeguimiento(vigente) {
         if (!_seguimiento) { App.mostrarToast('El seguimiento no está disponible.', 'advertencia'); return; }
         if (_modoSeguimiento) return;
         if (_failsafeBloquea()) return;
@@ -615,6 +635,7 @@ const Dron = (() => {
             _pantallaSeg?.setCargando(false);
             if (!_seguimiento) return; // salió de la cabina mientras cargaba
             if (!res.ok) { App.mostrarToast(`No se pudo preparar el seguimiento: ${res.error}`, 'advertencia', 7000); return; }
+            if (!vigente()) { App.mostrarToast('Cambió el estado del dron mientras se preparaba: volvé a tocar Seguir.', 'info'); return; }
             if (res.aviso) App.mostrarToast(res.aviso, 'advertencia', 8000);
         }
         // La inclinación y el seguimiento mueven los mismos ejes: no andan juntos
@@ -624,6 +645,7 @@ const Dron = (() => {
         }
         _modoSeguimiento = true;
         _controlReal = false;
+        _esperandoDesde = 0;
         _seguimiento.controlReal = false;
         _seguimiento.onComando = _onSeguimientoComando;
         _panelSeguimiento?.destruir();
@@ -658,7 +680,8 @@ const Dron = (() => {
 
     /** Cada paso de control (15 Hz): en el piso solo muestra; en vuelo y con las condiciones, mueve el dron. */
     function _onSeguimientoComando(cmd, info) {
-        if (!_modoSeguimiento) return;
+        // 'apagado' lo manda desactivar(): quien apaga ya puso los ejes en 0 (si no, al cambiar de objetivo volvería a mandar)
+        if (!_modoSeguimiento || info.estado === 'apagado') return;
         const a = _adaptador;
         const decision = DronSeguimiento.decidirSeguimiento({
             enVuelo: !!a?.enVuelo,
@@ -674,19 +697,26 @@ const Dron = (() => {
             return;
         }
         let textoComando;
+        if (decision.accion !== 'esperar') _esperandoDesde = 0;
         if (decision.accion === 'mandar') {
+            if (!_controlReal) _soltarMandos(); // empieza a mover el dron: ningún botón ni joystick queda apretado
             _controlReal = true;
             _seguimiento.controlReal = true;
             const ejes = DronSeguimiento.comandoControlReal(cmd, info.estado);
             a.actualizarEjes(ejes);
             textoComando = `Mandando al dron: ${DronSeguimiento.textoRc(ejes)}`;
-            _pantallaSeg?.setModo('El dron sigue al objetivo, despacio.', true);
+            const sigue = info.estado === 'siguiendo' || info.estado === 'perdiendo';
+            _pantallaSeg?.setModo(sigue ? 'El dron sigue al objetivo, despacio.'
+                : info.estado === 'perdido' ? 'El dron queda quieto.' : 'El dron queda quieto hasta confirmar el objetivo.', sigue);
             // El estado ya está en la etiqueta de arriba del video: el cartel solo hace falta en el modo técnico (con el rc)
             _mostrarCartel(App.modoTecnico() ? `${DronSeguimiento.estadoCorto(info).texto} · ${DronSeguimiento.textoRc(ejes)}` : '');
         } else if (decision.accion === 'esperar') {
-            textoComando = `Todavía no sigue: ${decision.motivo}.`;
-            _pantallaSeg?.setModo(`Todavía no sigue: ${decision.motivo}.`, false);
-            _mostrarCartel(`Todavía no sigue: ${decision.motivo}`);
+            // Al tocar Seguir, los primeros instantes todavía no hay medida de velocidad: el motivo solo si dura
+            if (!_esperandoDesde) _esperandoDesde = performance.now();
+            const texto = performance.now() - _esperandoDesde > 2000 ? `Todavía no sigue: ${decision.motivo}` : 'Preparando para seguir...';
+            textoComando = `${texto}.`;
+            _pantallaSeg?.setModo(textoComando, false);
+            _mostrarCartel(texto);
         } else {
             textoComando = 'En el piso: no se manda nada.';
             _pantallaSeg?.setModo(TEXTO_EN_EL_PISO, false);
