@@ -1,0 +1,47 @@
+CARCASA DEL EQUIPO DEL AULA - Grupo 5 (EEST N° 1 Vicente López)
+Piezas para imprimir - versión 2 (sin fuente: el ESP32 se alimenta por USB-C)
+
+Todas las piezas entran en una cama redonda de 170 mm (la más grande mide 137 mm).
+Ya vienen centradas y apoyadas como se imprimen: no hace falta girarlas.
+Ninguna pieza necesita soportes.
+
+PIEZA          ARCHIVO        CANTIDAD   MEDIDAS (mm)          TIEMPO (*)
+Cuerpo         cuerpo.stl     1          137 x 72 x 60 alto    3 h 39 min
+Bandeja        bandeja.stl    1          118 x 63 x 33 alto    1 h 14 min
+Tapa           tapa.stl       1          137 x 69 x 23 alto    1 h 16 min
+Cápsula LED    capsula.stl    2          20 x 20 x 15          9 min cada una
+Tapón          tapon.stl      2 (**)     20 x 20 x 15          9 min cada uno
+Soporte        soporte.stl    0 a 2 (**) 48 x 26 x 24          27 min cada uno
+
+TOTAL: unas 6 h 45 min (cuerpo, bandeja, tapa, 2 cápsulas y 2 tapones).
+Sin los tapones (si las dos cápsulas van en la tapa): unas 6 h 27 min.
+
+(*) Estimado con PrusaSlicer 2.7 con la configuración rápida de abajo y velocidades
+    moderadas (perímetros externos a 30 mm/s, internos a 40, relleno a 60).
+    Con esas mismas velocidades, el cuerpo de la versión anterior daba 10 h 21 min,
+    parecido a lo que tardó de verdad: la estimación es razonable para esta impresora.
+(**) El tapón solo hace falta si una rótula queda sin cápsula. El soporte, solo si una
+    cápsula se pone lejos de la caja (con su cable más largo).
+
+LA PIEZA MÁS ALTA ES EL CUERPO: 60 mm.
+
+MATERIAL: PETG (o ASA). PLA no: se ablanda cerca de los 55 °C y adentro hay un relé de 220 V.
+
+CONFIGURACIÓN RÁPIDA (la de los tiempos de arriba)
+- Altura de capa: 0,28 mm (primera capa también 0,28).
+- Perímetros: 2.
+- Capas arriba: 4. Capas abajo: 3.
+- Relleno: 15 % (rejilla o giroide). En las cápsulas y tapones, si querés, 100 %: tardan lo mismo.
+- Soportes: NO.
+- Adhesión: si el cuerpo se despega en las puntas, borde (brim) de 5 mm.
+
+CÓMO VAN EN LA CAMA
+- Cuerpo: apoyado en el piso, abierto para arriba.
+- Bandeja: plana, con las columnas y los tacos para arriba.
+- Tapa: plana, con las dos rótulas (los cilindros) para arriba.
+- Cápsula y tapón: sobre la cara plana más grande (el agujero del LED queda arriba).
+- Soporte: plano, con la rótula para arriba.
+
+Después de imprimir: probá que la bola (cápsula) entre a presión en una rótula y que gire
+y quede apuntando. Si queda muy dura o muy floja, avisá: se ajusta en el diseño
+(variable rotula_apriete de carcasa_aula.scad).

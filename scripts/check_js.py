@@ -124,7 +124,7 @@ def check_brackets(content):
 
 if __name__ == '__main__':
     errores = 0
-    for f in sorted(glob.glob('backend/public/js/*.js')):
+    for f in sorted(glob.glob('backend/public/js/*.js') + glob.glob('backend/public-aula/js/*.js')):
         with open(f, 'r', encoding='utf-8') as js:
             res = check_brackets(js.read())
             print(f'{f}: {res}')

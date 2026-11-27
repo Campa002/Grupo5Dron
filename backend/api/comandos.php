@@ -47,14 +47,45 @@ function enviarComando(): void
     $datos = obtenerBodyJson();
     validarCamposRequeridos($datos, ['tipo']);
 
-    $tipo = $datos['tipo']; // ir, rele, aprendizaje, config
+    $tipo = $datos['tipo']; // ir (proyector o aire), rele (luces) o aprendizaje (aprender un código)
     $botonId = isset($datos['boton_id']) ? (int) $datos['boton_id'] : null;
     $parametros = $datos['parametros'] ?? null;
 
     // Validar tipo
-    $tiposValidos = ['ir', 'rele', 'aprendizaje', 'config'];
+    $tiposValidos = ['ir', 'rele', 'aprendizaje'];
     if (!in_array($tipo, $tiposValidos, true)) {
         responderError('Tipo de comando no válido. Usar: ' . implode(', ', $tiposValidos), 400);
+    }
+
+    // Luces: un solo relé (canal 1). Solo "encender" o "apagar".
+    if ($tipo === 'rele') {
+        $accion = is_array($parametros) ? ($parametros['accion'] ?? '') : '';
+        if (!in_array($accion, ['encender', 'apagar'], true)) {
+            responderError('Para las luces, la acción es "encender" o "apagar".', 400);
+        }
+        $parametros = ['accion' => $accion, 'canal' => 1];
+        $botonId = null;
+    }
+
+    // Aprender un código: solo docentes y administradores, y para una acción que exista
+    if ($tipo === 'aprendizaje') {
+        if (!in_array($usuario['rol'] ?? '', ['admin', 'docente'], true)) {
+            responderError('Solo docentes y administradores pueden aprender códigos.', 403);
+        }
+        if (!$botonId) {
+            responderError('Se requiere boton_id para aprender un código.', 400);
+        }
+        try {
+            $stmt = obtenerConexion()->prepare('SELECT id FROM botones WHERE id = ? AND activo = 1');
+            $stmt->execute([$botonId]);
+            if (!$stmt->fetch()) {
+                responderError('Acción no encontrada.', 404);
+            }
+        } catch (Exception $e) {
+            registrarLog('Error verificando botón: ' . $e->getMessage(), 'ERROR');
+            responderError('Error interno.', 500);
+        }
+        $parametros = ['boton_id' => $botonId];
     }
 
     // Si es comando IR, verificar que el botón tenga código IR
@@ -70,7 +101,7 @@ function enviarComando(): void
             );
             $stmt->execute([$botonId]);
             if (!$stmt->fetch()) {
-                responderError('El botón no tiene un código IR asignado. Usá el modo aprendizaje primero.', 400);
+                responderError('Esa acción todavía no tiene un código aprendido. Usá "Aprender código" primero.', 400);
             }
         } catch (Exception $e) {
             registrarLog('Error verificando código IR: ' . $e->getMessage(), 'ERROR');

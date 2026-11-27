@@ -108,28 +108,25 @@ const Sensores = (() => {
 
     /**
      * Resumen para la interfaz. El ícono es HTML (ícono propio de app.css); el giroscopio conserva su brújula.
-     * @returns {Array<{ nombre: string, icono: string, estado: string, detalle: string, ok: boolean }>}
+     * @returns {Array<{ nombre: string, estado: string, detalle: string, ok: boolean }>}
      */
     function obtenerResumen() {
         const disp = d => (d === true ? 'Disponible' : d === false ? 'No disponible' : 'Desconocido');
         return [
             {
                 nombre: 'Giroscopio',
-                icono: '🧭',
                 ok: estado.giroscopio.disponible === true,
                 estado: disp(estado.giroscopio.disponible),
                 detalle: estado.giroscopio.detalle,
             },
             {
                 nombre: 'Acelerómetro',
-                icono: '<span class="ico ico--sensores" aria-hidden="true"></span>',
                 ok: estado.acelerometro.disponible === true,
                 estado: disp(estado.acelerometro.disponible),
                 detalle: estado.acelerometro.detalle,
             },
             {
                 nombre: 'Cámara',
-                icono: '<span class="ico ico--camara" aria-hidden="true"></span>',
                 ok: estado.camara.disponible === true,
                 estado: disp(estado.camara.disponible),
                 detalle: estado.camara.disponible

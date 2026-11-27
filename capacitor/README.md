@@ -141,7 +141,7 @@ enviar paquetes UDP** desde JavaScript sin un plugin nativo.
 2. Plugin Capacitor propio (requiere Java/Kotlin).
 3. Usar el `HttpDroneAdapter` si el dron soporta HTTP (no el Tello estándar).
 
-> ⚠ **REQUIERE VALIDACIÓN CON EL DRON REAL** antes de publicar en Google Play.
+> AVISO: **REQUIERE VALIDACIÓN CON EL DRON REAL** antes de publicar en Google Play.
 
 ---
 

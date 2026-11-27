@@ -25,13 +25,22 @@ void ApiClient::configurarSeguridad() {
     String url = API_URL;
     if (url.startsWith("https://")) {
         #if CLIENT_INSECURE_MODE
-            Serial.println("[API] ⚠️ Modo HTTPS configurado en INSECURE (sin validación de certificado SSL).");
+            Serial.println("[API] AVISO: Modo HTTPS configurado en INSECURE (sin validación de certificado SSL).");
             secureClient.setInsecure();
         #else
             Serial.println("[API] Modo HTTPS configurado con certificado raíz CA.");
             secureClient.setCACert(ROOT_CA_CERT);
         #endif
     }
+}
+
+/**
+ * Abre la conexión. El cliente (seguro o plano) es un miembro de la clase: antes el plano era una variable
+ * local que se destruía antes de usarse, y con una API por http:// (XAMPP) fallaba.
+ */
+bool ApiClient::abrir(const String& url) {
+    if (url.startsWith("https://")) return http.begin(secureClient, url);
+    return http.begin(clientePlano, url);
 }
 
 void ApiClient::pollComandos() {
@@ -41,16 +50,10 @@ void ApiClient::pollComandos() {
 
     String url = String(API_URL) + "?action=poll";
 
-    bool iniciada = false;
-    if (url.startsWith("https://")) {
-        iniciada = http.begin(secureClient, url);
-    } else {
-        WiFiClient plainClient;
-        iniciada = http.begin(plainClient, url);
-    }
+    bool iniciada = abrir(url);
 
     if (!iniciada) {
-        Serial.println("[API] ⚠️ Error al inicializar conexión HTTP para polling.");
+        Serial.println("[API] AVISO: Error al inicializar conexión HTTP para polling.");
         return;
     }
 
@@ -62,12 +65,14 @@ void ApiClient::pollComandos() {
     if (httpCode == HTTP_CODE_OK) {
         String payload = http.getString();
 
-        // Reservar memoria para documento JSON
-        DynamicJsonDocument doc(4096);
+        // Memoria para el JSON según lo que llegó: los códigos de aire traen tramas crudas de cientos de
+        // números (cada número ocupa ~16 bytes en ArduinoJson y ~4 en el texto)
+        const size_t capacidad = min((size_t)98304, (size_t)(payload.length() * 5 + 1024));
+        DynamicJsonDocument doc(capacidad);
         DeserializationError err = deserializeJson(doc, payload);
 
         if (err) {
-            Serial.printf("[API] ⚠️ Error parseando respuesta JSON de poll: %s\n", err.c_str());
+            Serial.printf("[API] AVISO: Error parseando respuesta JSON de poll: %s\n", err.c_str());
             http.end();
             return;
         }
@@ -75,7 +80,7 @@ void ApiClient::pollComandos() {
         if (doc["error"] == false) {
             int cantidad = doc["cantidad"] | 0;
             if (cantidad > 0) {
-                Serial.printf("\n[API] 📥 Recibidos %d comandos pendientes para ejecutar:\n", cantidad);
+                Serial.printf("\n[API] Recibidos %d comandos pendientes para ejecutar:\n", cantidad);
                 JsonArray comandos = doc["comandos"].as<JsonArray>();
                 for (JsonObject cmd : comandos) {
                     procesarComando(cmd);
@@ -87,7 +92,7 @@ void ApiClient::pollComandos() {
             Serial.printf("[API] Polling respondió con código HTTP: %d\n", httpCode);
         }
     } else {
-        Serial.printf("[API] ⚠️ Fallo en polling HTTPS: %s\n", http.errorToString(httpCode).c_str());
+        Serial.printf("[API] AVISO: Fallo en polling HTTPS: %s\n", http.errorToString(httpCode).c_str());
     }
 
     http.end();
@@ -134,7 +139,7 @@ void ApiClient::procesarComando(JsonObject cmd) {
         }
 
     } else if (tipo == "rele") {
-        // Parametros: {"accion": "encender"|"apagar", "canal": 1|2}
+        // Parámetros: {"accion": "encender"|"apagar", "canal": 1} (hay un solo relé: el canal 1, luces)
         JsonObject params = cmd["parametros"];
         String accion = params["accion"] | "apagar";
         int canal = params["canal"] | 1;
@@ -158,7 +163,7 @@ void ApiClient::procesarComando(JsonObject cmd) {
         reportarResultado(comandoId, "ejecutado", "Modo aprendizaje activado en el ESP32 para botón ID " + String(botonId));
 
     } else {
-        Serial.printf("[API] ⚠️ Tipo de comando desconocido: %s\n", tipo.c_str());
+        Serial.printf("[API] AVISO: Tipo de comando desconocido: %s\n", tipo.c_str());
         reportarResultado(comandoId, "error", "Tipo de comando no soportado: " + tipo);
     }
 }
@@ -170,13 +175,7 @@ bool ApiClient::enviarHeartbeat() {
 
     String url = String(API_URL) + "?action=heartbeat";
 
-    bool iniciada = false;
-    if (url.startsWith("https://")) {
-        iniciada = http.begin(secureClient, url);
-    } else {
-        WiFiClient plainClient;
-        iniciada = http.begin(plainClient, url);
-    }
+    bool iniciada = abrir(url);
 
     if (!iniciada) return false;
 
@@ -197,10 +196,10 @@ bool ApiClient::enviarHeartbeat() {
     bool exito = (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_CREATED);
 
     if (exito) {
-        Serial.printf("[API] 💓 Heartbeat enviado correctamente (IP: %s | RSSI: %d dBm)\n",
+        Serial.printf("[API] Heartbeat enviado correctamente (IP: %s | RSSI: %d dBm)\n",
                       wifiManager.obtenerIP().c_str(), wifiManager.obtenerRSSI());
     } else {
-        Serial.printf("[API] ⚠️ Error enviando heartbeat: HTTP %d (%s)\n", 
+        Serial.printf("[API] AVISO: Error enviando heartbeat: HTTP %d (%s)\n", 
                       httpCode, http.errorToString(httpCode).c_str());
     }
 
@@ -215,13 +214,7 @@ bool ApiClient::reportarResultado(int comandoId, const String& estado, const Str
 
     String url = String(API_URL) + "?action=resultado";
 
-    bool iniciada = false;
-    if (url.startsWith("https://")) {
-        iniciada = http.begin(secureClient, url);
-    } else {
-        WiFiClient plainClient;
-        iniciada = http.begin(plainClient, url);
-    }
+    bool iniciada = abrir(url);
 
     if (!iniciada) return false;
 
@@ -240,9 +233,9 @@ bool ApiClient::reportarResultado(int comandoId, const String& estado, const Str
     bool ok = (httpCode == HTTP_CODE_OK);
 
     if (ok) {
-        Serial.printf("[API] ✓ Resultado de comando ID %d reportado como '%s'\n", comandoId, estado.c_str());
+        Serial.printf("[API] OK: Resultado de comando ID %d reportado como '%s'\n", comandoId, estado.c_str());
     } else {
-        Serial.printf("[API] ⚠️ Error reportando resultado: HTTP %d\n", httpCode);
+        Serial.printf("[API] AVISO: Error reportando resultado: HTTP %d\n", httpCode);
     }
 
     http.end();
@@ -252,26 +245,21 @@ bool ApiClient::reportarResultado(int comandoId, const String& estado, const Str
 bool ApiClient::enviarCodigoIr(int botonId, const String& protocolo, const String& codigo, 
                                int bits, const uint16_t* rawData, size_t rawLen, int frecuencia) {
     if (!wifiManager.estaConectado()) {
-        Serial.println("[API] ⚠️ No se puede subir código IR: WiFi desconectado.");
+        Serial.println("[API] AVISO: No se puede subir código IR: WiFi desconectado.");
         return false;
     }
 
     String url = String(API_URL) + "?action=codigo_ir";
 
-    bool iniciada = false;
-    if (url.startsWith("https://")) {
-        iniciada = http.begin(secureClient, url);
-    } else {
-        WiFiClient plainClient;
-        iniciada = http.begin(plainClient, url);
-    }
+    bool iniciada = abrir(url);
 
     if (!iniciada) return false;
 
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-ESP32-Token", ESP32_TOKEN);
 
-    DynamicJsonDocument doc(4096);
+    // Memoria según el largo de la trama cruda (un aire puede tener 600 tiempos o más)
+    DynamicJsonDocument doc(JSON_ARRAY_SIZE(rawLen) + JSON_OBJECT_SIZE(8) + 512);
     doc["boton_id"] = botonId;
     doc["protocolo"] = protocolo;
     doc["codigo"] = codigo;
@@ -288,15 +276,15 @@ bool ApiClient::enviarCodigoIr(int botonId, const String& protocolo, const Strin
     String body;
     serializeJson(doc, body);
 
-    Serial.printf("[API] 📤 Subiendo código capturado para botón ID %d (%u bytes JSON)...\n", botonId, body.length());
+    Serial.printf("[API] Subiendo código capturado para botón ID %d (%u bytes JSON)...\n", botonId, body.length());
 
     int httpCode = http.POST(body);
     bool ok = (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_CREATED);
 
     if (ok) {
-        Serial.println("[API] ✓ ¡Código IR guardado en el servidor exitosamente!");
+        Serial.println("[API] OK: ¡Código IR guardado en el servidor exitosamente!");
     } else {
-        Serial.printf("[API] ⚠️ Error al guardar código IR: HTTP %d\n", httpCode);
+        Serial.printf("[API] AVISO: Error al guardar código IR: HTTP %d\n", httpCode);
     }
 
     http.end();

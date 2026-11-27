@@ -1,6 +1,9 @@
 /**
- * Script de Build para empaquetado del frontend estático en capacitor/www/
- * Grupo 5: Control de Sistemas y Dron
+ * Arma la carpeta www/ que empaqueta Capacitor — Grupo 5: Control de Sistemas y Dron
+ *
+ * Uso:
+ *   node scripts/build-apk.js        app del DRON: backend/public      -> capacitor/www/
+ *   node scripts/build-apk.js aula   app del AULA: backend/public-aula -> capacitor-aula/www/
  *
  * En el APK no hay PHP: Capacitor solo sirve archivos. Por eso:
  *  - index.php se convierte en index.html sin sus bloques PHP;
@@ -11,8 +14,17 @@ const fs = require('fs');
 const path = require('path');
 
 const baseDir = path.resolve(__dirname, '..');
-const pubDir = path.join(baseDir, 'backend', 'public');
-const wwwDir = path.join(baseDir, 'capacitor', 'www');
+const APPS = {
+    dron: { origen: path.join('backend', 'public'), destino: path.join('capacitor', 'www') },
+    aula: { origen: path.join('backend', 'public-aula'), destino: path.join('capacitor-aula', 'www') },
+};
+const nombreApp = process.argv[2] || 'dron';
+if (!APPS[nombreApp]) {
+    console.error(`ERROR: app desconocida "${nombreApp}" (usá "dron" o "aula").`);
+    process.exit(1);
+}
+const pubDir = path.join(baseDir, APPS[nombreApp].origen);
+const wwwDir = path.join(baseDir, APPS[nombreApp].destino);
 
 // <?php ... ?> y <?= ... ?>; un bloque sin cerrar (permitido al final de un archivo PHP) llega hasta el final
 const BLOQUE_PHP = /<\?(?:php|=)[\s\S]*?(?:\?>|$)/g;
@@ -35,7 +47,7 @@ function copiarDirectorioRecursivo(origen, destino) {
     }
 }
 
-console.log('Generando www/ estático para Capacitor...');
+console.log(`Generando ${APPS[nombreApp].destino} (app del ${nombreApp}) para Capacitor...`);
 if (fs.existsSync(wwwDir)) {
     fs.rmSync(wwwDir, { recursive: true, force: true });
 }
@@ -77,4 +89,4 @@ if (conPhp.length) {
     process.exit(1);
 }
 
-console.log(`capacitor/www/ generado con éxito (index.html y ${paginas.length} páginas .php sin PHP).`);
+console.log(`${APPS[nombreApp].destino} generado con éxito (index.html y ${paginas.length} páginas .php sin PHP).`);

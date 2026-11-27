@@ -12,6 +12,10 @@ capacitor/www/
 capacitor/android/
 capacitor/.gradle/
 capacitor/build/
+capacitor-aula/www/
+capacitor-aula/android/
+capacitor-aula/.gradle/
+capacitor-aula/build/
 *.apk
 
 # PlatformIO
@@ -41,3 +45,7 @@ backend/public/api
 *.jks
 *.keystore.b64
 *.keystore.txt
+
+# Paquete para el servidor (lo genera scripts/armar-paquete-servidor.py) y APK bajados del CI
+dist/
+apk/
