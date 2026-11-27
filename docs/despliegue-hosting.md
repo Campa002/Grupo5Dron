@@ -4,10 +4,11 @@ El proyecto está en **nuestro servidor con Docker** (el mismo donde está RAC).
 
 | Dirección | Para qué |
 | :--- | :--- |
-| **https://grupo5.40-160-138-65.sslip.io/** | La de siempre: con candado (HTTPS). La usan el APK del aula, el ESP32 y la cámara del celular en el navegador. |
+| **https://40.160.138.65/** | La principal: la IP con candado (HTTPS). La usan el APK del aula, el ESP32 y la cámara del celular en el navegador. Anda en cualquier red, porque no necesita ningún DNS. |
+| https://grupo5.40-160-138-65.sslip.io/ | La misma, escrita como nombre. Algunas redes (sus DNS) bloquean sslip.io y dicen "No se puede acceder a este sitio web" (DNS_PROBE_FINISHED_NXDOMAIN): ahí usá la IP. |
 | http://40.160.138.65:8086/ | Por la IP, sin candado. Sirve para mirar la portada y las webs; el APK del aula y la cámara no funcionan sin HTTPS. |
 
-No hay ningún dominio comprado: `grupo5.40-160-138-65.sslip.io` es la misma IP escrita como nombre (el servicio gratis sslip.io la traduce sola).
+No hay ningún dominio comprado. El certificado de la IP es de Let's Encrypt (perfil "shortlived": dura unos 6 días y se renueva solo cada 3). `grupo5.40-160-138-65.sslip.io` es la misma IP escrita como nombre (el servicio gratis sslip.io la traduce sola), con su propio certificado.
 
 - **Parte A:** cómo se instala y se actualiza en ese servidor. Es un solo comando.
 - **Parte B:** cómo subirlo a un hosting común (cPanel), por si algún día hace falta.
@@ -53,15 +54,17 @@ Se hizo una sola vez, a mano, en el proxy del servidor (Nginx Proxy Manager), ig
    ```bash
    docker exec proxy-app-1 certbot certonly --non-interactive --webroot -w /data/letsencrypt-acme-challenge -d grupo5.40-160-138-65.sslip.io --cert-name grupo5-sslip --key-type ecdsa
    ```
-2. **Configuración del sitio en el proxy:** el archivo `docker/proxy-https.conf` del repo, copiado como `proxy/data/nginx/custom/http.conf` en el servidor. Después: `docker exec proxy-app-1 nginx -t` y, si dice que está bien, `docker exec proxy-app-1 nginx -s reload`.
+   Para la IP: `docker exec proxy-app-1 certbot certonly --non-interactive --webroot -w /data/letsencrypt-acme-challenge --ip-address 40.160.138.65 --required-profile shortlived --cert-name grupo5-ip` y, en `proxy/letsencrypt/renewal/grupo5-ip.conf`, la línea `renew_before_expiry = 3 days` (si no, intentaría renovarlo todos los días y Let's Encrypt lo frenaría).
+2. **Configuración del sitio en el proxy:** los bloques de `docker/proxy-https.conf` del repo van adentro de `proxy/data/nginx/custom/http.conf` en el servidor. **Ese archivo tiene también el bloque de otro proyecto (control-aula): editá solo los bloques de Grupo 5, nunca lo reemplaces entero** (guardá una copia antes). Después: `docker exec proxy-app-1 nginx -t` y, si dice que está bien, `docker exec proxy-app-1 nginx -s reload`.
+   El bloque de la IP es el `default_server` del puerto 443: por la IP el navegador no manda nombre (SNI) y, sin eso, el proxy cortaría la conexión. Solo atiende pedidos a la IP; cualquier otro nombre desconocido recibe 444, como antes.
 3. **Renovación automática:** el certificado dura 90 días. Una tarea programada del servidor (`crontab -l`) lo renueva sola los lunes.
 
-Este sitio no aparece en la pantalla de Nginx Proxy Manager, porque no se cargó desde ahí. Para sacarlo: borrar ese `http.conf` y recargar el proxy.
+Este sitio no aparece en la pantalla de Nginx Proxy Manager, porque no se cargó desde ahí. Para sacarlo: borrar sus bloques de ese `http.conf` (no el de control-aula) y recargar el proxy. Las renovaciones están en `crontab -l` del usuario del servidor.
 
 ## Las contraseñas
 
 - Las contraseñas iniciales se leen en el servidor: `cat server/grupo5/CLAVES-INICIALES.txt`. No se mandan por chat ni van al repo.
-- El token del ESP32 está en `server/grupo5/.env` (`ESP32_TOKEN`). Va igual en `config.h` del ESP32, con `API_URL` = `https://grupo5.40-160-138-65.sslip.io/api/esp32.php`.
+- El token del ESP32 está en `server/grupo5/.env` (`ESP32_TOKEN`). Va igual en `config.h` del ESP32, con `API_URL` = `https://40.160.138.65/api/esp32.php`.
 
 ## Comandos útiles (en el servidor, dentro de `server/grupo5/`)
 

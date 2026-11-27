@@ -20,7 +20,8 @@
  * Vacía (''): el login del APK muestra "Falta configurar el servidor del aula".
  */
 // eslint-disable-next-line no-unused-vars
-const SERVIDOR_AULA = 'https://grupo5.40-160-138-65.sslip.io/api';
+// La IP con HTTPS (certificado de Let's Encrypt para la IP): algunas redes no resuelven sslip.io
+const SERVIDOR_AULA = 'https://40.160.138.65/api';
 
 // eslint-disable-next-line no-unused-vars
 const Plataforma = {
