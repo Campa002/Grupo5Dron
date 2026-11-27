@@ -22,7 +22,7 @@
                     </div>
                 </div>
                 <div id="seg-aviso" class="caja-video__aviso">Tocá Seguir persona o Seguir objeto para prender la cámara.</div>
-                <div id="seg-cartel" class="cartel-ensayo"></div>
+                <div id="seg-cartel" class="cartel-seguimiento"></div>
             </div>
             <p id="seg-estado" class="small text-body-secondary mt-2"></p>
 
@@ -56,5 +56,5 @@
     </div>
 
     <!-- La foto de prueba del diagnóstico (dominio público: NASA) -->
-    <img id="seg-foto-prueba" src="/img/prueba-persona.jpg" alt="" hidden>
+    <img id="seg-foto-prueba" src="img/prueba-persona.jpg" alt="" hidden>
 </div>

@@ -1,6 +1,9 @@
 /**
  * Configuración de la app del aula — Grupo 5: Control de Sistemas y Dron
  *
+ * La ÚNICA diferencia entre la web y el APK del aula vive en este archivo (SERVIDOR_AULA y Plataforma).
+ * Ningún otro archivo pregunta por Capacitor.
+ *
  * SERVIDOR_AULA: dirección de la API del aula que usa el APK.
  *
  * - Desde la web (hosting o XAMPP) NO se usa: la app le habla a la API del mismo servidor
@@ -17,4 +20,19 @@
  * Vacía (''): el login del APK muestra "Falta configurar el servidor del aula".
  */
 // eslint-disable-next-line no-unused-vars
-const SERVIDOR_AULA = '';
+// La IP con HTTPS (certificado de Let's Encrypt para la IP): algunas redes no resuelven sslip.io
+const SERVIDOR_AULA = 'https://40.160.138.65/api';
+
+// eslint-disable-next-line no-unused-vars
+const Plataforma = {
+    /** true en la app instalada (APK). */
+    get esApk() {
+        return !!(window.Capacitor?.isNativePlatform?.());
+    },
+
+    /** Dirección de la API, sin barra al final. Vacía = APK sin SERVIDOR_AULA. */
+    urlApi() {
+        const url = this.esApk ? String(SERVIDOR_AULA || '').trim() : new URL('../api', window.location.href).href;
+        return url.replace(/\/+$/, '');
+    },
+};

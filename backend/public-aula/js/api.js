@@ -13,24 +13,10 @@ const API = (() => {
     // URL base de la API (no se le pide al usuario)
     // ============================================================
     //
-    // Desde la web (hosting o XAMPP): la API del mismo servidor de donde se cargó la app,
-    //   en la carpeta api/ al lado de aula/ (https://dominio/aula/ → https://dominio/api).
-    // En el APK (la página es https://localhost): la constante SERVIDOR_AULA de js/config-aula.js.
-    //   Vacía → no hay servidor: el login muestra "Falta configurar el servidor del aula".
+    // La decide js/config-aula.js (Plataforma.urlApi): en la web, la carpeta api/ del mismo servidor;
+    // en el APK, la constante SERVIDOR_AULA. Vacía → el login muestra "Falta configurar el servidor del aula".
     //
-    function esNativo() {
-        return !!(window.Capacitor?.isNativePlatform?.());
-    }
-
-    function _resolverBaseUrl() {
-        if (esNativo()) {
-            const fija = typeof SERVIDOR_AULA === 'string' ? SERVIDOR_AULA : '';
-            return fija.trim().replace(/\/+$/, '');
-        }
-        return new URL('../api', window.location.href).href.replace(/\/+$/, '');
-    }
-
-    const _baseUrl = _resolverBaseUrl();
+    const _baseUrl = Plataforma.urlApi();
 
     /** true si la app sabe a qué servidor hablarle (en el APK, si SERVIDOR_AULA está completa). */
     function servidorConfigurado() {

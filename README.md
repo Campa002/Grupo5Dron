@@ -10,7 +10,7 @@ Dos apps para Android hechas con HTML, CSS y JavaScript y empaquetadas con Capac
 
 | App | Para qué | Cómo se conecta |
 | :--- | :--- | :--- |
-| **Grupo 5 — Dron** | Volar un DJI Ryze Tello desde el celular: video, botones de mando, inclinación del celular, pasos, misiones y **seguimiento** de una persona u objeto (estilo RAC: recuadro en la cara, con el cuerpo de respaldo). | Directo al WiFi del Tello, sin internet y sin cuenta. |
+| **Grupo 5 — Dron** | Volar un DJI Ryze Tello desde el celular: video, botones de mando de mantener apretado, inclinación del celular y **seguimiento** de una persona u objeto (estilo RAC: recuadro en la cara, con el cuerpo de respaldo). En el piso solo marca el objetivo; el dron lo sigue cuando se toca Seguir ya en el aire. | Directo al WiFi del Tello, sin internet y sin cuenta. |
 | **Grupo 5 Aula** | Manejar las **luces** (relé), el **proyector** y el **aire acondicionado** (infrarrojo) de un aula, y **aprender** los códigos de sus controles remotos. | Con internet, contra un servidor PHP + MySQL; el ESP32 del aula consulta ese servidor. |
 
 ```
@@ -34,7 +34,8 @@ App del AULA ── HTTPS + sesión ──> Servidor PHP + MySQL <── consult
 | [Seguimiento: diagnóstico y modelos](docs/seguimiento-diagnostico-y-modelos.md) | IA del Tello, YOLO o COCO-SSD, por qué el A06 quedaba "buscando" |
 | [Limitaciones y mejoras futuras](docs/limitaciones-y-mejoras.md) | Lo que falta o se puede mejorar |
 | [Correcciones del informe](docs/correcciones-informe.md) | Lo que el informe dice distinto a lo que se hizo |
-| [Despliegue en el hosting](docs/despliegue-hosting.md) | Subir el servidor (cPanel) |
+| [Despliegue en el hosting](docs/despliegue-hosting.md) | Subir el servidor paso a paso (portada, dos webs, API y los APK) |
+| [Estado del proyecto](docs/estado-del-proyecto.md) | Qué está hecho, qué falta probar y qué falta |
 | [Firmware del ESP32](posibles-implementaciones/aula-esp32/firmware/README.md) | Circuito, alimentación y primer arranque |
 | [Carcasa del equipo del aula](posibles-implementaciones/aula-esp32/carcasa/README.md) | Piezas impresas, armado y lista de compras |
 
@@ -58,7 +59,7 @@ docs/            documentación
 
 ## Cómo compilar
 
-Los APK se compilan solos en **GitHub Actions** en cada push a `main` y en cada pull request. Al terminar, en la corrida del workflow (pestaña Actions, o Checks del PR) quedan dos artefactos:
+Los APK se compilan solos en **GitHub Actions** en cada push a `main` y en cada pull request hacia `main` o `prueba-en-clase`. Al terminar, en la corrida del workflow (pestaña Actions, o Checks del PR) quedan dos artefactos:
 
 - `Grupo5Dron-app-debug` → APK del dron;
 - `Grupo5Aula-app-debug` → APK del aula.
@@ -95,7 +96,7 @@ node --test tests/seguimiento.test.js tests/rac.test.js tests/control-real.test.
 php -S 127.0.0.1:8088 -t backend/public
 ```
 
-(La segunda sirve la app del dron en `http://127.0.0.1:8088`; sin el plugin nativo se puede usar el perfil "Simulador".)
+(La segunda sirve la app del dron en `http://127.0.0.1:8088`; en el navegador usa sola el Simulador y avisa que es la versión web.)
 
 ## Usuarios iniciales (seed)
 
@@ -103,5 +104,5 @@ php -S 127.0.0.1:8088 -t backend/public
 
 ## Seguridad
 
-- Dron: botón de EMERGENCIA siempre visible, confirmación antes de despegar, aterrizaje automático si se corta la conexión y seguimiento en ensayo por defecto (el control real es experimental y pide confirmación). Volar con protectores y espacio libre.
+- Dron: botón de EMERGENCIA siempre visible, confirmación antes de despegar, aterrizaje automático si se corta la conexión y seguimiento que solo mueve el dron si se toca Seguir en el aire y se cumplen las condiciones (altura, batería, datos del dron y detección rápida); si pierde el objetivo, queda quieto. Volar con supervisión, protectores y 3 × 3 m libres de personas.
 - Aula: el relé de 220 V se habilita solo desde la administración y el armado se hace con supervisión docente.

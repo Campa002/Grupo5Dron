@@ -46,6 +46,19 @@
 .form-check-input { width: 1.25em; height: 1.25em; }
 .form-switch { display: flex; align-items: center; gap: 0.75rem; min-height: 2.75rem; padding-left: 0; }
 .form-switch .form-check-input { width: 2.5em; margin: 0; float: none; flex-shrink: 0; }
+/* Botón de segundo nivel en azul institucional (el principal de cada pantalla es .btn-primary) */
+.btn-outline-primary {
+    --bs-btn-color: #93c5fd;
+    --bs-btn-border-color: #2563eb;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #1d4ed8;
+    --bs-btn-hover-border-color: #1d4ed8;
+    --bs-btn-active-color: #fff;
+    --bs-btn-active-bg: #1e40af;
+    --bs-btn-active-border-color: #1e40af;
+    --bs-btn-disabled-color: #64748b;
+    --bs-btn-disabled-border-color: #334155;
+}
 /* Botones secundarios legibles sobre el fondo oscuro (el gris de Bootstrap parece deshabilitado) */
 .btn-outline-secondary {
     --bs-btn-color: #cbd5e1;
@@ -79,6 +92,8 @@
 
 /* Modo técnico: lo que sirve para probar y diagnosticar (se prende con 5 toques en el título) */
 body:not(.modo-tecnico) .solo-tecnico { display: none !important; }
+/* Versión web (navegador) o app instalada: la clase es-web la pone app.js según Plataforma */
+body:not(.es-web) .solo-web, body.es-web .solo-apk { display: none !important; }
 
 /* ---------- Menú lateral (lo abre y lo cierra app.js con la clase "abierto") ---------- */
 .menu-lateral .offcanvas { visibility: hidden; transform: translateX(-100%); transition: transform 0.2s ease; }
@@ -178,7 +193,7 @@ body:not(.modo-tecnico) .solo-tecnico { display: none !important; }
 .sobre-imagen__grupo { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; min-width: 0; }
 .sobre-imagen__grupo--der { align-items: flex-end; }
 .sobre-imagen .badge { max-width: 100%; overflow: hidden; text-overflow: ellipsis; background: rgba(0, 0, 0, 0.75); }
-.cartel-ensayo {
+.cartel-seguimiento {
     position: absolute;
     left: 0.5rem;
     right: 0.5rem;
@@ -192,7 +207,7 @@ body:not(.modo-tecnico) .solo-tecnico { display: none !important; }
     text-align: center;
     pointer-events: none;
 }
-.cartel-ensayo:empty { display: none; }
+.cartel-seguimiento:empty { display: none; }
 
 /* ---------- Seguimiento estilo RAC: colores de estado ---------- */
 .rac-estado { border-left: 4px solid var(--bs-border-color) !important; }
@@ -249,7 +264,10 @@ body:not(.modo-tecnico) .solo-tecnico { display: none !important; }
 /* ============================================================
    Cabina (#/dron). dron.js pone "en-cabina" en el body mientras está abierta.
    ============================================================ */
-body.en-cabina main { max-width: 64rem; padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)) !important; }
+/* Medidas de la cabina: margen a los costados, espacio claro entre las dos cruces y entre los botones de una cruz */
+body.en-cabina { --cab-pad: 0.5rem; --cab-sep: 1rem; --cab-hueco: 0.25rem; }
+/* Abajo no hace falta más margen: el espacio para EMERGENCIA lo agrega .cab-reserva (lo mide dron.js) */
+body.en-cabina main { --bs-gutter-x: calc(2 * var(--cab-pad)); max-width: 64rem; padding-bottom: 0.5rem !important; }
 body.en-cabina .toast-contenedor { top: 4rem; bottom: auto; }
 body.en-cabina .toast-contenedor .toast { pointer-events: none; }
 .cab-btn-menu { display: none; }
@@ -272,19 +290,44 @@ body.en-cabina .toast-contenedor .toast { pointer-events: none; }
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas: "video video" "vel vel" "izq der";
-    gap: 0.5rem;
+    gap: 0.5rem var(--cab-sep);
 }
 .cab-video { grid-area: video; width: 100%; aspect-ratio: 4 / 3; max-height: 30vh; }
 .cab-lado--izq { grid-area: izq; }
 .cab-lado--der { grid-area: der; }
 .cab-lado { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
 .cab-velocidad { grid-area: vel; text-align: center; }
+/* Fila de arriba, dos columnas iguales: Despegar | Inclinación y Aterrizar | Seguir persona, Seguir objeto.
+   Todos miden 44 px de alto: la letra se achica con el ancho y, si no entra, usa dos líneas dentro del botón. */
+.cab-acciones { display: grid; grid-template-rows: repeat(2, 2.75rem); gap: 0.5rem; }
+.cab-acciones .btn {
+    height: 2.75rem;
+    min-height: 0;
+    padding: 0 0.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    overflow: hidden;
+    font-size: clamp(0.8125rem, 3.6vw, 1rem);
+    line-height: 1.1;
+}
+/* Seguir persona | Seguir objeto: dos mitades; mientras sigue queda uno solo (Detener seguimiento) */
+.cab-seguir { display: flex; gap: 0.375rem; min-width: 0; }
+.cab-seguir .btn { flex: 1 1 0; min-width: 0; font-size: clamp(0.75rem, 3.3vw, 0.9375rem); }
 .cab-mando, .cab-joystick { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; min-width: 0; }
 
 /* Cruz de botones: 3 × 3 */
 .cab-cruz { display: grid; grid-template-columns: repeat(3, 3rem); grid-auto-rows: 3rem; gap: 0.375rem; }
 .cab-cruz .btn { min-height: 0; padding: 0; font-size: 1.25rem; }
-.cab-cruz--mantener { grid-template-columns: repeat(3, 3.5rem); grid-auto-rows: 3.5rem; }
+/* Las dos cruces lado a lado: cada una llena su columna (lado = (ancho de la columna − 2 huecos) / 3),
+   de 44 px a 56 px. A 360 px de ancho mide 52 px y entre las cruces quedan 16 px libres. */
+.cab-cruz--mantener {
+    --lado: clamp(2.75rem, calc((100vw - 2 * var(--cab-pad) - var(--cab-sep)) / 6 - var(--cab-hueco) * 2 / 3), 3.5rem);
+    grid-template-columns: repeat(3, var(--lado));
+    grid-auto-rows: var(--lado);
+    gap: var(--cab-hueco);
+}
 
 /* Botones de mantener apretado: grandes para el pulgar, sin selección de texto, sin zoom ni menú */
 .cab-mantener {
@@ -298,11 +341,17 @@ body.en-cabina .toast-contenedor .toast { pointer-events: none; }
 .cabina .btn.cab-mantener--activo { background: #2563eb; border-color: #93c5fd; color: #fff; }
 .cabina .btn.cab-activo { border-color: var(--bs-primary); color: var(--bs-primary-text-emphasis); }
 .cabina .btn.cab-vel[aria-pressed="true"] { background: #2563eb; border-color: #2563eb; color: #fff; }
+/* Apagados (sin conexión o en tierra): se ven, pero apagados; el motivo lo dice el mensaje sobre el video */
+.cabina .btn-outline-secondary, .cabina .btn-outline-primary {
+    --bs-btn-disabled-opacity: 1;
+    --bs-btn-disabled-color: #8391a7;
+    --bs-btn-disabled-border-color: #3e4c63;
+}
 
 /* Horizontal (celular acostado): mando | video | mando, sin la barra de la app */
 @media (orientation: landscape) and (max-height: 500px) {
     body.en-cabina > .navbar { display: none !important; }
-    body.en-cabina main { max-width: none; min-height: 100vh; padding: 0.25rem 0.5rem 1rem !important; }
+    body.en-cabina main { max-width: none; min-height: 100vh; padding: 0.25rem var(--cab-pad) 0.5rem !important; }
     body.en-cabina .toast-contenedor { top: auto; bottom: 0.5rem; width: 44%; }
     body.en-cabina .cab-btn-menu { display: inline-flex; align-items: center; justify-content: center; min-width: 2.75rem; }
     .cab-barra { position: sticky; top: 0; z-index: 900; min-height: 3.25rem; padding-right: 12.5rem; background: var(--bs-body-bg); }
@@ -311,12 +360,19 @@ body.en-cabina .toast-contenedor .toast { pointer-events: none; }
         grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr) minmax(0, 1fr);
         grid-template-rows: minmax(0, 1fr) auto;
         grid-template-areas: "izq video der" "izq vel der";
-        height: calc(100vh - 4.25rem);
-        height: calc(100dvh - 4.25rem);
+        /* barra (3,25rem) + márgenes: 4,5rem */
+        height: calc(100vh - 4.5rem);
+        height: calc(100dvh - 4.5rem);
     }
     .cab-video { max-height: none; height: 100%; aspect-ratio: auto; }
     .cab-lado { justify-content: space-between; }
-    /* Lado de cada botón: 3,25rem, o menos si la pantalla es baja (nunca menos de 44 px) */
-    .cab-cruz--mantener { --lado: max(2.75rem, min(3.25rem, calc((100dvh - 13.25rem) / 3))); grid-template-columns: repeat(3, var(--lado)); grid-auto-rows: var(--lado); }
+    /* Sin los rótulos de las cruces (los botones tienen su nombre para el lector de pantalla), para que entren */
+    .cab-mando > span { display: none; }
+    /* Lado de cada botón: lo que entre a lo alto (pantalla − 4,5rem − fila de arriba − huecos) y a lo ancho
+       de la columna del costado, de 44 px a 56 px */
+    .cab-cruz--mantener {
+        --lado: clamp(2.75rem, min(calc((100dvh - 11.5rem) / 3),
+                calc((100vw - 2 * var(--cab-pad) - 2 * var(--cab-sep)) / 11.1 - var(--cab-hueco) * 2 / 3)), 3.5rem);
+    }
     .cab-velocidad p { display: none; }
 }

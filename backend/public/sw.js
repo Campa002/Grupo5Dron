@@ -4,66 +4,71 @@
  * Solo se usa en el navegador (en el APK los archivos ya son locales y no se registra).
  * Estrategia: PRIMERO LA RED para la app del dron (así nunca se ven versiones viejas estando online)
  * y la copia en caché si no hay conexión o la red tarda más de 3 s.
- * Solo atiende los archivos del dron: la API (/api/) y la web del aula (otra carpeta del mismo hosting,
- * por ejemplo /aula/) quedan fuera y van siempre directo a la red.
+ * Solo atiende los archivos de su carpeta (la raíz o una subcarpeta como /dron/): la API (/api/) y la web
+ * del aula quedan fuera y van siempre directo a la red.
  */
 
 // Subir este número cuando cambie la lista de recursos precacheados
-const CACHE_NAME = 'grupo5dron-v14';
+const CACHE_NAME = 'grupo5dron-v15';
 
 // Si la red tarda más que esto y hay copia en caché, se usa la copia (la red sigue actualizando en segundo plano)
 const ESPERA_RED_MS = 3000;
 
 // Recursos estáticos confirmados para precaché inicial
 const RECURSOS_ESTATICOS = [
-    '/',
-    '/manifest.json',
-    '/favicon.ico',
-    '/libs/bootstrap/bootstrap.min.css',
-    '/libs/bootstrap/bootstrap-icons.min.css',
-    '/libs/bootstrap/fonts/bootstrap-icons.woff2',
-    '/css/app.css',
-    '/js/app.js',
-    '/js/dron-adaptadores.js',
-    '/js/dron-joystick.js',
-    '/js/dron-giroscopio.js',
-    '/libs/tfjs/tf.min.js',
-    '/libs/coco-ssd/coco-ssd.min.js',
-    '/libs/coco-ssd/model.json',
-    '/libs/coco-ssd/group1-shard1of3.bin',
-    '/libs/coco-ssd/group1-shard2of3.bin',
-    '/libs/coco-ssd/group1-shard3of3.bin',
-    '/libs/blazeface/model.json',
-    '/libs/blazeface/group1-shard1of1.bin',
-    '/js/dron-caras.js',
-    '/js/dron-seguimiento.js',
-    '/js/dron-seguimiento-ui.js',
-    '/js/dron-objetos.js',
-    '/libs/mobilenet/model.json',
-    '/libs/mobilenet/group1-shard1of1.bin',
-    '/js/dron-video.js',
-    '/js/config-dron.js',
-    '/js/sensores.js',
-    '/js/dron.js',
-    '/img/icon-192.png',
-    '/img/icon-512.png',
-    '/img/prueba-persona.jpg',
-    '/pages/inicio.php',
-    '/pages/dron.php',
-    '/pages/seguimiento.php',
-    '/pages/sensores.php',
-    '/pages/objetos.php',
-    '/pages/prueba-tello.php',
-    '/pages/config-dron.php',
+    './',
+    'manifest.json',
+    'favicon.ico',
+    'libs/bootstrap/bootstrap.min.css',
+    'libs/bootstrap/bootstrap-icons.min.css',
+    'libs/bootstrap/fonts/bootstrap-icons.woff2',
+    'css/app.css',
+    'js/app.js',
+    'js/plataforma.js',
+    'js/dron-adaptadores.js',
+    'js/dron-joystick.js',
+    'js/dron-giroscopio.js',
+    'libs/tfjs/tf.min.js',
+    'libs/coco-ssd/coco-ssd.min.js',
+    'libs/coco-ssd/model.json',
+    'libs/coco-ssd/group1-shard1of3.bin',
+    'libs/coco-ssd/group1-shard2of3.bin',
+    'libs/coco-ssd/group1-shard3of3.bin',
+    'libs/blazeface/model.json',
+    'libs/blazeface/group1-shard1of1.bin',
+    'js/dron-caras.js',
+    'js/dron-seguimiento.js',
+    'js/dron-seguimiento-ui.js',
+    'js/dron-objetos.js',
+    'libs/mobilenet/model.json',
+    'libs/mobilenet/group1-shard1of1.bin',
+    'js/dron-video.js',
+    'js/config-dron.js',
+    'js/sensores.js',
+    'js/dron.js',
+    'img/icon-192.png',
+    'img/icon-512.png',
+    'img/prueba-persona.jpg',
+    'pages/inicio.php',
+    'pages/dron.php',
+    'pages/seguimiento.php',
+    'pages/sensores.php',
+    'pages/objetos.php',
+    'pages/prueba-tello.php',
+    'pages/config-dron.php',
 ];
 
-/** true si el pedido es de la app del dron: la raíz o sus carpetas de archivos. */
+// Carpeta donde está la app (la raíz del dominio o una subcarpeta como /dron/): todo es relativo a ella.
+const BASE = new URL('./', self.location).pathname;
+
+/** true si el pedido es de la app del dron: su carpeta o sus archivos. La API y la web del aula quedan afuera. */
 function esDeLaAppDelDron(pathname) {
-    return pathname === '/' || pathname === '/index.php' || RECURSOS_ESTATICOS.includes(pathname)
-        || /^\/(js|css|pages|libs|img)\//.test(pathname);
+    if (!pathname.startsWith(BASE)) return false;
+    const rel = pathname.slice(BASE.length);
+    return rel === '' || rel === 'index.php' || RECURSOS_ESTATICOS.includes(rel)
+        || /^(js|css|pages|libs|img)\//.test(rel);
 }
 
-// Instalación: cachear recursos de a uno para que un fallo no frene a los demás
 self.addEventListener('install', (evento) => {
     evento.waitUntil(
         caches.open(CACHE_NAME).then((cache) => Promise.allSettled(
@@ -112,7 +117,7 @@ async function primeroLaRed(evento) {
     });
 
     const copia = await cache.match(request, { ignoreSearch: true })
-        || (request.mode === 'navigate' ? await cache.match('/') : undefined);
+        || (request.mode === 'navigate' ? await cache.match('./') : undefined);
 
     if (!copia) {
         // Sin copia: solo queda la red (si falla, el navegador muestra el error)

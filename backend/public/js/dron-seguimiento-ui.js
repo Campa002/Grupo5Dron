@@ -4,7 +4,7 @@
  *
  * Las tarjetas de la pantalla de seguimiento, iguales para las dos fuentes:
  *  - "Cámara del celular" (#/seguimiento): para probar sin dron; nunca se manda nada al dron.
- *  - "Video del dron" (cabina): con el interruptor "Control real (experimental)".
+ *  - "Video del dron" (cabina): en el piso solo marca el objetivo; en vuelo, la cabina mueve el dron.
  * Tiene: Seguir persona / Seguir objeto (con la lista de objetos y "Agregar objeto propio") / Detener,
  * tarjeta de Estado, Análisis de confianza e Historial de detección (últimos 20, con Limpiar).
  * El comando calculado y el Diagnóstico de la detección son del modo técnico.
@@ -48,13 +48,11 @@ const DronPantallaSeguimiento = (() => {
          * @param {Function} o.onDetener () => void
          * @param {Function} o.onTocar (x, y) => {ok:boolean, nombre?:string}
          * @param {Function} o.onDiagnosticar () => Promise<{items:Array, conclusion:string}>
-         * @param {Function} [o.onControlReal] (activar) => Promise<boolean>: solo con el dron
          * @param {Function} [o.fuenteTamano] () => [ancho, alto] de la imagen
          */
         constructor(o) {
             this.o = o;
             this.activo = false;
-            this.controlReal = false;
             this.historial = [];
             this._ultimo = 0;
             this._diagnostico = null;
@@ -70,42 +68,33 @@ const DronPantallaSeguimiento = (() => {
             const dron = this.o.fuente === 'dron';
             this.o.contenedor.innerHTML = `
                 <div class="rac d-grid gap-3">
-                    ${dron ? '' : '<p class="small text-body-secondary mb-0">Fuente: cámara del celular. Con esta fuente nunca se manda nada al dron.</p>'}
+                    ${dron ? '' : `<p class="small text-body-secondary mb-0">Fuente: cámara del celular. Con esta fuente nunca se manda nada al dron.</p>
                     <div class="row g-2">
-                        <div class="col-6"><button class="btn btn-primary btn-lg w-100 h-100" data-rac="seguir-persona" aria-pressed="false">Seguir persona</button></div>
-                        <div class="col-6"><button class="btn btn-primary btn-lg w-100 h-100" data-rac="seguir-objeto" aria-expanded="false">Seguir objeto</button></div>
-                    </div>
+                        <div class="col-6"><button class="btn btn-outline-primary btn-lg w-100 h-100" data-rac="seguir-persona" aria-pressed="false">Seguir persona</button></div>
+                        <div class="col-6"><button class="btn btn-outline-primary btn-lg w-100 h-100" data-rac="seguir-objeto" aria-expanded="false">Seguir objeto</button></div>
+                    </div>`}
                     <div class="border rounded p-3" data-rac="panel-objeto" hidden>
                         <label class="form-label small text-body-secondary mb-1" for="rac-objeto-${dron ? 'dron' : 'camara'}">¿Qué objeto?</label>
                         <select class="form-select" id="rac-objeto-${dron ? 'dron' : 'camara'}" data-rac="objeto"></select>
                         <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
-                            <button class="btn btn-primary flex-fill" data-rac="seguir-este">Seguir este objeto</button>
+                            <button class="btn btn-outline-primary flex-fill" data-rac="seguir-este">Seguir este objeto</button>
                             <a href="#/objetos" class="btn btn-sm btn-link" data-rac="agregar-objeto">Agregar objeto propio</a>
                         </div>
                     </div>
-                    <button class="btn btn-outline-secondary" data-rac="detener" disabled>Detener</button>
-                    <p class="form-text mt-0">También podés tocar un recuadro del video para elegir qué seguir.</p>
-                    ${dron ? `
-                    <div class="border border-warning-subtle rounded p-3 rac-real">
-                        <div class="form-check form-switch m-0">
-                            <input class="form-check-input" type="checkbox" role="switch" id="rac-control-real" data-rac="control-real">
-                            <label class="form-check-label fw-semibold" for="rac-control-real">Control real (experimental)</label>
-                        </div>
-                        <div class="form-text">Apagado, solo muestra lo que haría (ensayo). Prendido, el dron sigue de verdad, despacio.
-                            Cualquier botón de movimiento, Frenar o EMERGENCIA lo apagan.</div>
-                    </div>` : ''}
+                    ${dron ? '' : '<button class="btn btn-outline-secondary" data-rac="detener" disabled>Detener</button>'}
+                    <p class="form-text mt-0" data-rac="ayuda-tocar" hidden>También podés tocar un recuadro del video para elegir qué seguir.</p>
                     <div class="border rounded p-3 rac-estado" data-color="">
                         <p class="etiqueta">Estado</p>
                         <h2 class="h5 fw-bold text-uppercase mb-1 rac-estado__titulo" data-rac="estado-titulo">Seguimiento detenido</h2>
                         <p class="small text-body-secondary mb-2" data-rac="estado-texto">Tocá Seguir persona o Seguir objeto.</p>
-                        <p class="small fw-semibold text-primary-emphasis mb-1" data-rac="modo">${dron ? 'Modo ensayo: no se manda nada al dron.' : 'Cámara del celular: no se manda nada al dron.'}</p>
+                        <p class="small fw-semibold text-primary-emphasis mb-1" data-rac="modo" hidden></p>
                         <p class="small font-monospace mb-0 solo-tecnico" data-rac="comando">Comando: rc 0 0 0 0</p>
                     </div>
-                    <div class="border rounded p-3">
+                    <div class="border rounded p-3" data-rac="tarjeta-confianza" hidden>
                         <p class="etiqueta">Análisis de confianza</p>
                         <div class="d-grid gap-2" data-rac="barras"><p class="small text-body-secondary mb-0">Sin detecciones todavía.</p></div>
                     </div>
-                    <div class="border rounded p-3">
+                    <div class="border rounded p-3" data-rac="tarjeta-historial" hidden>
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <p class="etiqueta mb-0">Historial de detección</p>
                             <button class="btn btn-sm btn-outline-secondary" data-rac="limpiar">Limpiar</button>
@@ -127,31 +116,21 @@ const DronPantallaSeguimiento = (() => {
         }
 
         _eventos() {
-            this._q('[data-rac="seguir-persona"]').addEventListener('click', () => this._pedir({ tipo: 'persona' }));
-            this._q('[data-rac="seguir-objeto"]').addEventListener('click', () => this._mostrarPanelObjeto(this._q('[data-rac="panel-objeto"]').hidden));
+            // Con el dron, Seguir persona / Seguir objeto / Detener son los botones de arriba de la cabina
+            this._q('[data-rac="seguir-persona"]')?.addEventListener('click', () => this._pedir({ tipo: 'persona' }));
+            this._q('[data-rac="seguir-objeto"]')?.addEventListener('click', () => this._mostrarPanelObjeto(this._q('[data-rac="panel-objeto"]').hidden));
             this._q('[data-rac="seguir-este"]').addEventListener('click', () => {
                 const v = this._q('[data-rac="objeto"]').value || '';
                 const [tipo, ...resto] = v.split(':');
                 const valor = resto.join(':');
                 if (!valor) return;
+                this._mostrarPanelObjeto(false);
                 this._pedir(tipo === 'mio' ? { tipo: 'mio', id: valor } : { tipo: 'clase', clase: valor });
             });
-            this._q('[data-rac="detener"]').addEventListener('click', () => this.o.onDetener());
+            this._q('[data-rac="detener"]')?.addEventListener('click', () => this.o.onDetener());
             this._q('[data-rac="limpiar"]').addEventListener('click', () => this.limpiarHistorial());
             this._q('[data-rac="diagnosticar"]').addEventListener('click', () => this._diagnosticar());
             this._q('[data-rac="copiar-diagnostico"]').addEventListener('click', () => this._copiarDiagnostico());
-            const sw = this._q('[data-rac="control-real"]');
-            sw?.addEventListener('change', async () => {
-                sw.disabled = true;
-                let quedo = false;
-                try {
-                    quedo = !!(await this.o.onControlReal?.(sw.checked));
-                } finally {
-                    sw.disabled = false;
-                }
-                // Si no se pudo activar (o se canceló la confirmación), vuelve a apagado
-                this.setControlReal(sw.checked && quedo);
-            });
             this._onToque = (e) => {
                 if (!this.activo) return;
                 const [w, h] = this.o.fuenteTamano?.() || [0, 0];
@@ -174,7 +153,12 @@ const DronPantallaSeguimiento = (() => {
 
         _mostrarPanelObjeto(visible) {
             this._q('[data-rac="panel-objeto"]').hidden = !visible;
-            this._q('[data-rac="seguir-objeto"]').setAttribute('aria-expanded', visible ? 'true' : 'false');
+            this._q('[data-rac="seguir-objeto"]')?.setAttribute('aria-expanded', visible ? 'true' : 'false');
+        }
+
+        /** "Seguir objeto" de la cabina: muestra la lista de objetos. */
+        abrirPanelObjeto() {
+            this._mostrarPanelObjeto(true);
         }
 
         /**
@@ -208,40 +192,45 @@ const DronPantallaSeguimiento = (() => {
             const meta = this.activo ? this._metaPedida : null;
             const persona = this._q('[data-rac="seguir-persona"]');
             const objeto = this._q('[data-rac="seguir-objeto"]');
-            persona.setAttribute('aria-pressed', meta?.tipo === 'persona' ? 'true' : 'false');
-            persona.classList.toggle('active', meta?.tipo === 'persona');
-            objeto.classList.toggle('active', !!meta && meta.tipo !== 'persona');
+            persona?.setAttribute('aria-pressed', meta?.tipo === 'persona' ? 'true' : 'false');
+            persona?.classList.toggle('active', meta?.tipo === 'persona');
+            objeto?.classList.toggle('active', !!meta && meta.tipo !== 'persona');
         }
 
-        /** Iniciado o detenido: habilita los botones. */
+        /** Iniciado o detenido: habilita los botones; confianza e historial solo mientras sigue. */
         setActivo(activo) {
             this.activo = activo;
-            this._q('[data-rac="detener"]').disabled = !activo;
+            const detener = this._q('[data-rac="detener"]');
+            if (detener) detener.disabled = !activo;
+            for (const r of ['tarjeta-confianza', 'tarjeta-historial', 'ayuda-tocar']) this._q(`[data-rac="${r}"]`).hidden = !activo;
             if (this.o.chipFps) this.o.chipFps.hidden = !activo;
             this._marcarBotones();
             if (!activo) {
                 this._pintarEstado({ titulo: 'Seguimiento detenido', texto: 'Tocá Seguir persona o Seguir objeto.', color: '' });
                 this._q('[data-rac="barras"]').innerHTML = '<p class="small text-body-secondary mb-0">Sin detecciones todavía.</p>';
                 this._q('[data-rac="comando"]').textContent = 'Comando: rc 0 0 0 0';
+                this.setModo('', false);
+            } else if (this.o.fuente !== 'dron') {
+                this.setModo('Cámara del celular: no se manda nada al dron.', false);
             }
         }
 
         /** Mientras carga el modelo: los botones de seguir quedan apagados y el estado dice que está preparando. */
         setCargando(cargando) {
-            for (const r of ['seguir-persona', 'seguir-objeto', 'seguir-este']) this._q(`[data-rac="${r}"]`).disabled = cargando;
+            for (const r of ['seguir-persona', 'seguir-objeto', 'seguir-este']) {
+                const b = this._q(`[data-rac="${r}"]`);
+                if (b) b.disabled = cargando;
+            }
             if (cargando) this._pintarEstado({ titulo: 'Preparando...', texto: 'Cargando el detector (la primera vez tarda unos segundos).', color: '' });
             else if (!this.activo) this.setActivo(false);
         }
 
-        /** Sincroniza el interruptor (por ejemplo, si la cabina volvió a ensayo sola). */
-        setControlReal(activo) {
-            this.controlReal = !!activo;
-            const sw = this._q('[data-rac="control-real"]');
-            if (sw) sw.checked = this.controlReal;
+        /** Línea de la tarjeta de estado: qué hace el dron (vacía: oculta). mueve: resaltada, el dron se está moviendo. */
+        setModo(texto, mueve) {
             const modo = this._q('[data-rac="modo"]');
-            modo.textContent = this.controlReal ? 'CONTROL REAL: el dron sigue de verdad (despacio).'
-                : (this.o.fuente === 'dron' ? 'Modo ensayo: no se manda nada al dron.' : 'Cámara del celular: no se manda nada al dron.');
-            modo.classList.toggle('rac-modo--real', this.controlReal);
+            if (modo.textContent !== texto) modo.textContent = texto;
+            modo.hidden = !texto;
+            modo.classList.toggle('rac-modo--real', !!mueve);
         }
 
         _pintarEstado(e) {

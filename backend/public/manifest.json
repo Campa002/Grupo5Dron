@@ -2,21 +2,21 @@
     "name": "Grupo 5 — Dron",
     "short_name": "Grupo5Dron",
     "description": "Control del dron Tello desde el celular — EEST N° 1 de Vicente López",
-    "start_url": "/",
+    "start_url": "./",
     "display": "standalone",
-    "orientation": "portrait",
-    "theme_color": "#0a1628",
-    "background_color": "#0a1628",
+    "orientation": "any",
+    "theme_color": "#0b1220",
+    "background_color": "#0b1220",
     "lang": "es-AR",
     "icons": [
         {
-            "src": "/img/icon-192.png",
+            "src": "img/icon-192.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "any maskable"
         },
         {
-            "src": "/img/icon-512.png",
+            "src": "img/icon-512.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any maskable"

@@ -29,7 +29,7 @@ const App = (() => {
     const RUTAS_VALIDAS = ['inicio', ...RUTAS_DRON];
 
     // Pantallas de prueba y diagnóstico: solo con el modo técnico (sin él, van al inicio)
-    const RUTAS_TECNICAS = ['prueba-tello', 'sensores', 'seguimiento'];
+    const RUTAS_TECNICAS = ['prueba-tello', 'sensores', 'seguimiento', 'config-dron'];
 
     // Modo técnico: muestra lo que sirve para probar y diagnosticar (elementos .solo-tecnico y RUTAS_TECNICAS).
     // Arranca apagado. Se prende y se apaga tocando 5 veces seguidas el título de la app ([data-titulo-app]).
@@ -93,6 +93,7 @@ const App = (() => {
         alerta: 'bi-exclamation-triangle',
         info: 'bi-info-circle',
         borrar: 'bi-trash',
+        recargar: 'bi-arrow-repeat',
     });
 
     /**
@@ -193,7 +194,7 @@ const App = (() => {
 
         try {
             // Sin parámetros en la URL (no llena la caché) y revalidando con el servidor: siempre la versión actual
-            const respuesta = await fetch(`/pages/${nombre}.php`, { cache: 'no-cache' });
+            const respuesta = await fetch(`pages/${nombre}.php`, { cache: 'no-cache' });
             if (!respuesta.ok) {
                 throw new Error(`No se pudo cargar la vista "${nombre}" (HTTP ${respuesta.status})`);
             }
@@ -260,6 +261,7 @@ const App = (() => {
         const html = await cargarPlantilla(destino);
         if (miNavegacion !== navegacionActual) return;
         contenedor.innerHTML = html;
+        contenedor.querySelectorAll('[data-aviso-web]').forEach(el => { el.textContent = Plataforma.AVISO_WEB; });
         paginaActual = destino;
 
         // 4. Actualizar enlaces activos en menú lateral
@@ -593,7 +595,7 @@ const App = (() => {
         });
 
         seg.onComando = (cmd, info) => {
-            cartel.textContent = DronSeguimiento.textoEnsayo(cmd, info);
+            cartel.textContent = DronSeguimiento.textoCamara(cmd, info);
             pantalla.actualizar(info, `Comando que calcularía: ${DronSeguimiento.textoRc({ lr: 0, ...cmd })} (no se manda)`);
             panelTecnico?.actualizar(info);
             const e = DronSeguimiento.estadoCorto(info);
@@ -1271,6 +1273,7 @@ const App = (() => {
      */
     async function iniciar() {
         document.body.classList.toggle('modo-tecnico', modoTecnico());
+        document.body.classList.toggle('es-web', !Plataforma.esApk);
 
         // Enlazar eventos del menú lateral
         const btnMenu = document.getElementById('btn-menu');

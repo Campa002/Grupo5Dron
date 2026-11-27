@@ -5,10 +5,10 @@
 **Dron**
 - El Tello común no sabe dónde está (no tiene GPS ni los "mission pads" del Tello EDU): "ir a un lugar" es una lista de movimientos relativos.
 - La app del dron necesita el APK: el navegador solo no puede mandar UDP.
-- El seguimiento corre en el celular: en uno de gama baja analiza pocas imágenes por segundo, y por eso el control real exige 4 o más.
-- El control real es experimental: velocidades bajas fijas, sin esquivar obstáculos y sin moverse de costado. Hay que ajustar ganancias con el dron real.
+- El seguimiento corre en el celular: en uno de gama baja analiza pocas imágenes por segundo, y por eso el seguimiento en vuelo exige 4 o más.
+- El seguimiento en vuelo es simple: velocidades bajas fijas, sin esquivar obstáculos y sin moverse de costado. Hay que ajustar ganancias con el dron real.
 - La unidad de las velocidades que manda el Tello (`vgx`, `vgy`) no está documentada.
-- Sin probar todavía con el dron: todo lo nuevo del 13/11 (seguimiento con cara, control real).
+- Sin probar todavía con el dron: todo lo nuevo del 13/11 (seguimiento con cara, seguimiento en vuelo).
 
 **Aula**
 - Una instalación = un aula: la base y la cola de órdenes son de un solo ESP32. Para varias aulas habría que agregar una tabla de aulas (ver mejoras).

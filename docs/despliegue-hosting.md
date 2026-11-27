@@ -1,104 +1,202 @@
-# Despliegue en el hosting (cPanel)
+# Subir el proyecto al servidor, paso a paso
 
-Pasos genéricos para un hosting con cPanel, PHP 8 y MySQL. El proveedor todavía no está elegido: los nombres de menú pueden cambiar un poco.
+El proyecto está en **nuestro servidor con Docker** (el mismo donde está RAC). Hay dos formas de entrar:
 
-**Requisitos del hosting:** PHP 8.0 o más nuevo (con PDO MySQL), MySQL o MariaDB, y **HTTPS** (certificado SSL; la mayoría lo da gratis con "AutoSSL" o "Let's Encrypt"). Sin HTTPS, el APK del aula no puede conectarse.
+| Dirección | Para qué |
+| :--- | :--- |
+| **https://40.160.138.65/** | La principal: la IP con candado (HTTPS). La usan el APK del aula, el ESP32 y la cámara del celular en el navegador. Anda en cualquier red, porque no necesita ningún DNS. |
+| https://grupo5.40-160-138-65.sslip.io/ | La misma, escrita como nombre. Algunas redes (sus DNS) bloquean sslip.io y dicen "No se puede acceder a este sitio web" (DNS_PROBE_FINISHED_NXDOMAIN): ahí usá la IP. |
+| http://40.160.138.65:8086/ | Por la IP, sin candado. Sirve para mirar la portada y las webs; el APK del aula y la cámara no funcionan sin HTTPS. |
 
-## 1. Cómo queda en el servidor
+No hay ningún dominio comprado. El certificado de la IP es de Let's Encrypt (perfil "shortlived": dura unos 6 días y se renueva solo cada 3). `grupo5.40-160-138-65.sslip.io` es la misma IP escrita como nombre (el servicio gratis sslip.io la traduce sola), con su propio certificado.
+
+- **Parte A:** cómo se instala y se actualiza en ese servidor. Es un solo comando.
+- **Parte B:** cómo subirlo a un hosting común (cPanel), por si algún día hace falta.
+
+En los dos casos hace falta PHP 8 y MySQL (o MariaDB).
+
+# Parte A: nuestro servidor con Docker
+
+## Qué hay en el servidor
+
+En la carpeta `server/grupo5/` del servidor:
+
+| Archivo o carpeta | Qué es |
+| :--- | :--- |
+| `sitio/` | La portada, las dos webs, la API y los APK (lo que arma `scripts/armar-paquete-servidor.py`). |
+| `docker-compose.yml`, `Dockerfile` | Dos contenedores: `grupo5-web` (PHP 8.2 + Apache) y `grupo5-db` (MariaDB). |
+| `.env` | Las claves (base de datos, JWT y token del ESP32). Se crean solas, al azar, la primera vez. **Solo están ahí.** |
+| `CLAVES-INICIALES.txt` | La contraseña inicial de cada cuenta, al azar. La app obliga a cambiarla al entrar. |
+
+El contenedor web publica el puerto 8086 del servidor. La base de datos no abre ningún puerto.
+
+## Instalar o actualizar
+
+Hace falta tener acceso por SSH al servidor (pedíselo a quien lo administra). En la carpeta del proyecto:
+
+```bash
+bash docker/desplegar.sh usuario@servidor grupo5.40-160-138-65.sslip.io
+```
+
+El comando arma el paquete, lo sube, prende los contenedores y prueba que todo responda. Al final muestra una línea como esta:
 
 ```
-public_html/
-  api/        ← backend/api/
-  config/     ← backend/config/      (con config.php; ver el paso 4)
-  includes/   ← backend/includes/
-  aula/       ← backend/public-aula/ (la web del aula)
-  (opcional) la app del dron: el contenido de backend/public/ en la raíz
+portada 200 | aula 200 | dron 200 | api sin sesión 401 | config cerrada 403
 ```
 
-La API busca `../config/` y `../includes/` desde `api/`, por eso van al lado.
+Para que la portada ofrezca los APK, antes copiá los dos archivos a la carpeta `apk/` (ver el paso 1 de la Parte B).
 
-## 2. Subir los archivos
+## Cómo está hecho el HTTPS (ya está activado)
 
-1. En cPanel → **Administrador de archivos** → `public_html`.
-2. Subí un `.zip` con las carpetas `api`, `config`, `includes` y `aula` (renombrando `public-aula` a `aula`) y usá **Extraer**.
-3. **No** subas `config.php` de tu PC, ni `sql/`, ni `scripts/`.
+Se hizo una sola vez, a mano, en el proxy del servidor (Nginx Proxy Manager), igual que con control-aula:
 
-Para que no se pueda leer la configuración desde el navegador, en `public_html/config/` y `public_html/includes/` creá un `.htaccess` con:
+1. **Certificado gratis de Let's Encrypt**, pedido dentro del contenedor del proxy:
+   ```bash
+   docker exec proxy-app-1 certbot certonly --non-interactive --webroot -w /data/letsencrypt-acme-challenge -d grupo5.40-160-138-65.sslip.io --cert-name grupo5-sslip --key-type ecdsa
+   ```
+   Para la IP: `docker exec proxy-app-1 certbot certonly --non-interactive --webroot -w /data/letsencrypt-acme-challenge --ip-address 40.160.138.65 --required-profile shortlived --cert-name grupo5-ip` y, en `proxy/letsencrypt/renewal/grupo5-ip.conf`, la línea `renew_before_expiry = 3 days` (si no, intentaría renovarlo todos los días y Let's Encrypt lo frenaría).
+2. **Configuración del sitio en el proxy:** los bloques de `docker/proxy-https.conf` del repo van adentro de `proxy/data/nginx/custom/http.conf` en el servidor. **Ese archivo tiene también el bloque de otro proyecto (control-aula): editá solo los bloques de Grupo 5, nunca lo reemplaces entero** (guardá una copia antes). Después: `docker exec proxy-app-1 nginx -t` y, si dice que está bien, `docker exec proxy-app-1 nginx -s reload`.
+   El bloque de la IP es el `default_server` del puerto 443: por la IP el navegador no manda nombre (SNI) y, sin eso, el proxy cortaría la conexión. Solo atiende pedidos a la IP; cualquier otro nombre desconocido recibe 444, como antes.
+3. **Renovación automática:** el certificado dura 90 días. Una tarea programada del servidor (`crontab -l`) lo renueva sola los lunes.
+
+Este sitio no aparece en la pantalla de Nginx Proxy Manager, porque no se cargó desde ahí. Para sacarlo: borrar sus bloques de ese `http.conf` (no el de control-aula) y recargar el proxy. Las renovaciones están en `crontab -l` del usuario del servidor.
+
+## Las contraseñas
+
+- Las contraseñas iniciales se leen en el servidor: `cat server/grupo5/CLAVES-INICIALES.txt`. No se mandan por chat ni van al repo.
+- El token del ESP32 está en `server/grupo5/.env` (`ESP32_TOKEN`). Va igual en `config.h` del ESP32, con `API_URL` = `https://40.160.138.65/api/esp32.php`.
+
+## Comandos útiles (en el servidor, dentro de `server/grupo5/`)
+
+| Para | Comando |
+| :--- | :--- |
+| Ver si está prendido | `docker compose ps` |
+| Ver los errores de PHP | `docker compose logs -f web` |
+| Reiniciar | `docker compose restart` |
+| Copia de la base | `docker exec grupo5-db sh -c 'mariadb-dump -ugrupo5 -p"$MARIADB_PASSWORD" grupo5dron_db' > copia.sql` |
+| Apagar (los datos se conservan) | `docker compose down` |
+
+# Parte B: un hosting común (cPanel)
+
+Guía para alguien que nunca subió nada. Los nombres de los menús pueden cambiar un poco según el proveedor.
+
+## Cómo queda en el servidor
 
 ```
-Require all denied
+(carpeta web del hosting: public_html, htdocs o www)
+  index.php    la portada, con los accesos y las descargas
+  aula/        la web del aula
+  dron/        la web del dron (con el simulador)
+  api/         lo que usan la web del aula, el APK del aula y el ESP32
+  includes/    interna (cerrada)
+  config/      interna (cerrada); acá va config.php
+  apk/         grupo5-aula.apk y grupo5-dron.apk
 ```
 
-## 3. Crear la base de datos
+Todo usa rutas relativas: funciona igual en la raíz del dominio (`https://dominio.com/`) o dentro de una carpeta (`https://dominio.com/grupo5/`).
 
-1. cPanel → **Bases de datos MySQL**:
-   - creá la base (por ejemplo `usuario_grupo5`);
+## 1. Bajar los dos APK
+
+1. En GitHub, entrá al repo → pestaña **Actions** → la última corrida en verde.
+2. Abajo, en **Artifacts**, bajá `Grupo5Dron-app-debug` y `Grupo5Aula-app-debug` (son dos `.zip`).
+3. Descomprimilos. Adentro de cada uno hay un `app-debug.apk`.
+4. En la carpeta del proyecto, creá una carpeta `apk` y copiá los dos archivos con estos nombres exactos:
+   - `apk/grupo5-dron.apk`
+   - `apk/grupo5-aula.apk`
+
+Si te salteás este paso, todo funciona igual pero la portada dice "El APK todavía no está subido".
+
+## 2. Armar el paquete
+
+En la carpeta del proyecto, abrí una terminal y corré:
+
+```bash
+python scripts/armar-paquete-servidor.py
+```
+
+Te deja, en la carpeta `dist`:
+
+- `paquete-servidor.zip`: lo que se sube.
+- `base-de-datos.sql`: la base de datos (se importa en el paso 4; **no** se sube a la carpeta web).
+
+El paquete no trae contraseñas, pruebas, documentación ni firmware.
+
+## 3. Subir y descomprimir
+
+1. Entrá al panel del hosting → **Administrador de archivos** → la carpeta web (`public_html` o `htdocs`).
+2. Si hay un archivo de bienvenida del hosting (por ejemplo `index2.html` o `default.php`), borralo.
+3. **Subir** → elegí `paquete-servidor.zip`.
+4. Clic derecho sobre el zip → **Extraer**. Después borrá el zip.
+
+Si el hosting no deja extraer, descomprimí el zip en tu PC y subí las carpetas con un programa de FTP (FileZilla), con los datos de FTP que da el panel.
+
+## 4. Crear la base de datos
+
+1. Panel → **Bases de datos MySQL**:
+   - creá una base;
    - creá un usuario con una contraseña larga;
    - agregá el usuario a la base con **todos los privilegios**.
-2. cPanel → **phpMyAdmin** → elegí la base → **Importar** → `backend/sql/schema.sql`.
-3. Revisá que estén las tablas (`usuarios`, `dispositivos`, `botones`, `codigos_ir`, `cola_comandos`, `historial`, `estado_esp32`, `configuracion`…).
+   Anotá los cuatro datos: servidor, nombre de la base, usuario y contraseña (el hosting suele agregarles un prefijo).
+2. Panel → **phpMyAdmin** → elegí la base → **Importar** → `dist/base-de-datos.sql` → **Continuar**.
+3. Tienen que aparecer las tablas (`usuarios`, `dispositivos`, `botones`, `codigos_ir`, `cola_comandos`, `historial`, `estado_esp32`, `configuracion`…).
 
-## 4. Crear `config.php`
+## 5. Crear `config.php`
 
-En `public_html/config/`, copiá `config.example.php` como `config.php` y completá:
+En el Administrador de archivos, entrá a `config/`, copiá `config.example.php` con el nombre `config.php` y editalo:
 
 | Clave | Qué poner |
 | :--- | :--- |
-| `db.host` | `localhost` (casi siempre) |
-| `db.nombre`, `db.usuario`, `db.password` | los del paso 3 (cPanel les agrega un prefijo, por ejemplo `usuario_grupo5`) |
-| `seguridad.jwt_secreto` | una clave larga al azar (por ejemplo, 64 caracteres) |
+| `db.host` | el servidor del paso 4 (`localhost` casi siempre) |
+| `db.nombre`, `db.usuario`, `db.password` | los del paso 4 |
+| `seguridad.jwt_secreto` | una clave larga inventada, de 64 letras y números al azar |
 | `seguridad.esp32_token` | otra clave larga al azar: la misma que `ESP32_TOKEN` en `config.h` del ESP32 |
-| `seguridad.cors_origenes` | `['https://tu-dominio.com', 'https://localhost']` (`https://localhost` es el APK) |
-| `app.url_base` | `https://tu-dominio.com` |
+| `seguridad.cors_origenes` | `['https://tu-dominio.com', 'https://localhost']` (`https://localhost` es el APK: no lo saques) |
 | `app.debug` | `false` |
 
-## 5. Cambiar las contraseñas del seed
+Este archivo tiene contraseñas: **nunca** va al repo ni se manda por chat.
 
-Las cuentas iniciales tienen la contraseña `password`. La app obliga a cambiarla en el primer ingreso, pero conviene cambiarlas antes desde la base:
+## 6. Activar HTTPS
 
-1. En tu PC, generá el hash de cada contraseña nueva:
+En el panel, buscá **SSL/TLS**, **Let's Encrypt** o **AutoSSL** y activá el certificado gratis para el dominio. Puede tardar unos minutos. La portada ya manda sola de `http` a `https`.
 
-   ```bash
-   php scripts/generar_hash.php "UnaClaveLarga2026!"
-   ```
+## 7. Probar
 
-   (En Windows con XAMPP: `C:\xampp\php\php.exe scripts\generar_hash.php "UnaClaveLarga2026!"`.) Copiá el hash que empieza con `$2y$`.
-2. En phpMyAdmin → SQL, por cada cuenta:
+| Abrir | Tiene que pasar |
+| :--- | :--- |
+| `https://tu-dominio.com/` | La portada, con el candado. |
+| "Abrir web del aula" | El ingreso. Entrá con `admin@grupo5dron.local` y la contraseña `password`: te obliga a cambiarla. |
+| "Abrir web del dron (simulador)" | La cabina con el aviso de versión web. Despegar funciona con el simulador. |
+| Los dos botones de descarga | Bajan los APK. |
+| `https://tu-dominio.com/config/config.php` | "Prohibido" (403). Si muestra algo, avisá antes de seguir. |
+| `https://tu-dominio.com/api/esp32.php?action=estado` | Un error de "no autorizado": eso confirma que la API anda. |
 
-   ```sql
-   UPDATE usuarios SET password_hash = 'PEGAR_EL_HASH', debe_cambiar_password = 0 WHERE email = 'admin@grupo5dron.local';
-   ```
+Cambiá la contraseña de **todas** las cuentas iniciales (admin, docente y usuarios) el mismo día: `password` es pública. Las que no se usen, desactivalas desde Administración.
 
-3. Si no van a usar alguna cuenta del seed, desactivala: `UPDATE usuarios SET activo = 0 WHERE email = '...';`
+## 8. Conectar el APK del aula y el ESP32
 
-## 6. Probar
-
-1. `https://tu-dominio.com/aula/` → tiene que aparecer el login. Entrá con el admin.
-2. `https://tu-dominio.com/api/esp32.php?action=estado` sin sesión → tiene que responder un error de autenticación (eso confirma que la API anda).
-3. `https://tu-dominio.com/config/config.php` → tiene que dar "Prohibido" (403).
-
-## 7. Configurar la URL en las dos apps
-
-- **Web del aula:** no hace falta nada: usa la API del mismo servidor de donde se cargó (la carpeta `api/` al lado de `aula/`).
-- **App del aula (APK):** la dirección del servidor va fija dentro del APK; el usuario no la escribe nunca. Mientras esté vacía, el login del APK muestra "Falta configurar el servidor del aula". Para completarla:
-  1. En `backend/public-aula/js/config-aula.js`, cambiá la constante por la dirección de la API, con `https` y sin barra al final:
+- **Web del aula y web del dron:** no hay que hacer nada.
+- **APK del aula:** la dirección del servidor va fija adentro del APK.
+  1. En `backend/public-aula/js/config-aula.js` poné la dirección de la API, con `https` y sin barra al final:
      ```js
      const SERVIDOR_AULA = 'https://tu-dominio.com/api';
      ```
-  2. Commiteá y subí el cambio. El CI recompila el APK: bajá el artefacto `Grupo5Aula-app-debug` de esa corrida.
-  3. Instalá el APK nuevo en los celulares (encima del anterior; si Android se queja de la firma, desinstalá el viejo primero).
-  4. Abrí la app: el aviso ya no aparece y se puede iniciar sesión.
+  2. Subí el cambio a GitHub. El CI arma el APK nuevo.
+  3. Repetí los pasos 1 a 3 de esta guía para que la portada ofrezca ese APK.
+  4. Instalalo: entra directo al ingreso, sin pedir ninguna dirección.
+- **ESP32:** en `config.h`, `API_URL` = `https://tu-dominio.com/api/esp32.php` y `ESP32_TOKEN` igual al de `config.php`.
+- **APK del dron:** no usa el servidor.
 
-  Si algún día cambia el dominio, se repiten estos pasos (el APK viejo deja de conectarse).
-- **ESP32:** en `config.h`, `API_URL` = `https://tu-dominio.com/api/esp32.php` y `ESP32_TOKEN` igual al de `config.php`. Con `CLIENT_INSECURE_MODE true` se conecta sin verificar el certificado (para empezar); para dejarlo seguro, `false` y el certificado raíz del hosting en `ROOT_CA_CERT`.
-- **App del dron:** no usa el servidor.
+## 9. Actualizar más adelante
 
-## 8. Si algo no anda
+Repetí los pasos 1, 2 y 3. Al extraer, aceptá reemplazar los archivos. `config.php` no se pisa porque el paquete no lo trae.
+
+## Si algo no anda
 
 | Problema | Revisar |
 | :--- | :--- |
-| Error 500 en la API | Datos de la base en `config.php`; versión de PHP (8.0 o más) en "Seleccionar versión de PHP" |
-| El APK dice "Falta configurar el servidor del aula" | Falta completar `SERVIDOR_AULA` en `js/config-aula.js` y recompilar (paso 7), o se instaló un APK viejo |
-| El APK dice que no puede conectarse | Que `SERVIDOR_AULA` sea `https://…/api` (con `https`) y que `https://localhost` esté en `cors_origenes` |
-| "Equipo del aula desconectado" | `API_URL` y `ESP32_TOKEN` del ESP32; que el ESP32 tenga WiFi con internet |
-| El login falla siempre | Que se haya importado `schema.sql`; que la cuenta no esté bloqueada (5 intentos: esperar 15 min) |
+| Error 500 en la API | Los datos de la base en `config.php`; que el hosting use PHP 8 ("Seleccionar versión de PHP"). |
+| El APK dice "Falta configurar el servidor del aula" | Falta el paso 8, o se instaló un APK viejo. |
+| El APK no se conecta | Que `SERVIDOR_AULA` empiece con `https` y que `https://localhost` esté en `cors_origenes`. |
+| "Equipo del aula sin conexión" | `API_URL` y `ESP32_TOKEN` del ESP32; que tenga WiFi con internet; que el hosting no bloquee al ESP32 (algunos gratis lo hacen). |
+| El ingreso falla siempre | Que se haya importado la base; que la cuenta no esté bloqueada (5 intentos: esperar 15 minutos). |
+| El celular no deja instalar el APK | Activar "Instalar apps desconocidas" para el navegador. Si se queja de la firma, desinstalar la versión anterior. |
