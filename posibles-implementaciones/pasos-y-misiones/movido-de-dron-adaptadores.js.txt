@@ -1,0 +1,61 @@
+// Código sacado de backend/public/js/dron-adaptadores.js el 26/11/2026 (cabina simple): movimientos por paso
+// (forward/back/left/right/up/down/cw/ccw, esperando el "ok" del Tello) y la rama del simulador que los imitaba.
+
+        /** Envía un comando y lanza un Error si la respuesta no es "ok". */
+        async comandoOk(cmd, timeoutMs) {
+            const resp = await this.enviarComando(cmd, timeoutMs);
+            if (!esOk(resp)) {
+                throw new Error(`El dron no pudo hacerlo (respondió "${resp}" a "${cmd}")`);
+            }
+            return resp;
+        }
+
+
+// ----------------------------------------------------------------
+
+        // ---- Movimientos por paso (el dron responde "ok" al terminar el movimiento) ----
+
+        async moverPaso(direccion, cm = 30) {
+            cm = limitar(parseInt(cm, 10) || 30, 20, 500);
+            const mapa = { adelante: 'forward', atras: 'back', izquierda: 'left', derecha: 'right',
+                           forward: 'forward', back: 'back', left: 'left', right: 'right' };
+            const dir = mapa[direccion];
+            if (!dir) throw new Error(`Dirección desconocida: ${direccion}`);
+            return this.comandoOk(`${dir} ${cm}`, 15000);
+        }
+
+        async girarPaso(grados = 90) {
+            grados = parseInt(grados, 10) || 90;
+            const sentido = grados >= 0 ? 'cw' : 'ccw';
+            return this.comandoOk(`${sentido} ${limitar(Math.abs(grados), 1, 360)}`, 15000);
+        }
+
+        async subirPaso(cm = 30) {
+            return this.comandoOk(`up ${limitar(parseInt(cm, 10) || 30, 20, 500)}`, 15000);
+        }
+
+        async bajarPaso(cm = 30) {
+            return this.comandoOk(`down ${limitar(parseInt(cm, 10) || 30, 20, 500)}`, 15000);
+        }
+
+
+// ----------------------------------------------------------------
+
+        reanudarRC() {
+            this.detenerRC();
+            this.rcPausado = false;
+        }
+
+
+// ----------------------------------------------------------------
+
+            const movimientos = ['forward', 'back', 'left', 'right', 'up', 'down', 'cw', 'ccw'];
+            if (movimientos.includes(accion)) {
+                if (!this.enVuelo) return 'error Not flying';
+                // Duración aproximada del movimiento real
+                await esperar(accion === 'cw' || accion === 'ccw' ? 300 + valor * 8 : 300 + valor * 10);
+                if (accion === 'up') this.telemetria.altura = Math.min(1000, (this.telemetria.altura || 0) + valor);
+                if (accion === 'down') this.telemetria.altura = Math.max(30, (this.telemetria.altura || 0) - valor);
+                this.notificarTelemetria();
+                return 'ok';
+            }

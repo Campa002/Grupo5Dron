@@ -50,7 +50,7 @@ date_default_timezone_set('America/Argentina/Buenos_Aires');
                 <div class="list-group list-group-flush">
                     <a href="#/inicio" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="inicio">Inicio</a>
                     <a href="#/dron" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="dron">Cabina</a>
-                    <a href="#/config-dron" class="list-group-item list-group-item-action py-3 menu-lateral__enlace" data-pagina="config-dron">Configuración</a>
+                    <a href="#/config-dron" class="list-group-item list-group-item-action py-3 menu-lateral__enlace solo-tecnico" data-pagina="config-dron">Configuración</a>
                     <!-- Modo técnico: pantallas de prueba y diagnóstico -->
                     <a href="#/prueba-tello" class="list-group-item list-group-item-action py-3 menu-lateral__enlace solo-tecnico" data-pagina="prueba-tello">Prueba Tello</a>
                     <a href="#/sensores" class="list-group-item list-group-item-action py-3 menu-lateral__enlace solo-tecnico" data-pagina="sensores">Sensores</a>

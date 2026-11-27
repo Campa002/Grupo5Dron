@@ -29,7 +29,7 @@ const App = (() => {
     const RUTAS_VALIDAS = ['inicio', ...RUTAS_DRON];
 
     // Pantallas de prueba y diagnóstico: solo con el modo técnico (sin él, van al inicio)
-    const RUTAS_TECNICAS = ['prueba-tello', 'sensores', 'seguimiento'];
+    const RUTAS_TECNICAS = ['prueba-tello', 'sensores', 'seguimiento', 'config-dron'];
 
     // Modo técnico: muestra lo que sirve para probar y diagnosticar (elementos .solo-tecnico y RUTAS_TECNICAS).
     // Arranca apagado. Se prende y se apaga tocando 5 veces seguidas el título de la app ([data-titulo-app]).
@@ -595,7 +595,7 @@ const App = (() => {
         });
 
         seg.onComando = (cmd, info) => {
-            cartel.textContent = DronSeguimiento.textoEnsayo(cmd, info);
+            cartel.textContent = DronSeguimiento.textoCamara(cmd, info);
             pantalla.actualizar(info, `Comando que calcularía: ${DronSeguimiento.textoRc({ lr: 0, ...cmd })} (no se manda)`);
             panelTecnico?.actualizar(info);
             const e = DronSeguimiento.estadoCorto(info);

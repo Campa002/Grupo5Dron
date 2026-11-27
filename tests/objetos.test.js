@@ -151,14 +151,14 @@ test('"No encuentro": sin nada parecido durante 3 s', () => {
     s.actualizar([], 3100);
     assert.equal(s.noEncuentra, true);
     const info = { estado: s.estado, objeto: 'taza', noEncuentra: s.noEncuentra };
-    assert.equal(Seguimiento.textoEnsayo({ yaw: 0, ud: 0, fb: 0 }, info), 'No encuentro «taza». Probá con más fotos o más luz.');
+    assert.equal(Seguimiento.textoCamara({ yaw: 0, ud: 0, fb: 0 }, info), 'No encuentro «taza». Probá con más fotos o más luz.');
     assert.equal(Seguimiento.estadoCorto(info).texto, 'No encuentro «taza»');
     // Aparece algo parecido: se va el aviso
     s.actualizar([cand(0.5, 0.5, 0.3, 0.9)], 3300);
     assert.equal(s.noEncuentra, false);
 });
 
-test('con un objeto, el seguidor calcula el mismo control que con una persona (en ensayo)', () => {
+test('con un objeto, el seguidor calcula el mismo control que con una persona', () => {
     const seg = new Seguimiento.Seguidor(A, new Seguimiento.Selector(A, { tipo: 'mio', nombre: 'taza' }));
     // Detecciones cada ~200 ms y control a 15 Hz. Se compara lo que pide el selector, como en la app
     let comparados = 0;

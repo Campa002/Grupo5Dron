@@ -84,7 +84,7 @@ const ConfigDron = (() => {
             <header class="mb-4">
                 <p class="etiqueta">Configuración</p>
                 <h1 class="h3 fw-bold text-uppercase">Configuración</h1>
-                <p class="text-body-secondary mb-0">El dron que usa la cabina y, en el modo técnico, los ajustes avanzados. Se guarda en el teléfono.</p>
+                <p class="text-body-secondary mb-0">El dron que usa la cabina y los ajustes avanzados. Se guarda en el teléfono.</p>
             </header>
 
             <!-- 01 — Perfil -->
@@ -182,7 +182,7 @@ const ConfigDron = (() => {
         'Control': 'Cuánto y qué tan rápido se movería el dron para seguir lo elegido.',
         'Reglas (como RAC)': 'Qué confianza tiene que tener una detección para contar, cuántas seguidas confirman el objetivo y cuántas fallas lo dan por perdido (en "Mis objetos", la confianza es el parecido con tus fotos).',
         'Pérdida': 'Cuánto espera sin detecciones antes de darlo por perdido y dejar de moverse.',
-        'Control real': 'Condiciones para poder activar el control real (el dron sigue de verdad). Los límites de velocidad del control real son fijos, en el código.',
+        'Seguir en vuelo': 'Condiciones para que, en vuelo, el dron siga al objetivo. Los límites de velocidad son fijos, en el código (LIMITES_CONTROL_REAL).',
     };
 
     function _renderizarAjustesSeguimiento(contenedor) {
@@ -199,7 +199,7 @@ const ConfigDron = (() => {
             <h2 class="h5 fw-bold text-uppercase">Ajustes del seguimiento</h2>
             <p class="small text-body-secondary">
                 Se guardan en este teléfono y se aplican la próxima vez que inicies el seguimiento.
-                El seguimiento arranca en ensayo; el control real se activa en la cabina, con confirmación.
+                En el piso, el seguimiento solo marca el objetivo; en vuelo, Seguir persona o Seguir objeto mueven el dron.
             </p>
             ${Object.entries(grupos).map(([grupo, campos]) => `
                 <fieldset class="border rounded p-3 mb-3">

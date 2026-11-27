@@ -208,7 +208,7 @@ test('detección atrasada (inferencia trabada): el comando decae aunque el objet
     assert.deepEqual(r.comando, { yaw: 0, ud: 0, fb: 0 });
 });
 
-test('condiciones del control real', () => {
+test('condiciones para seguir en vuelo', () => {
     const ok = { enVuelo: true, alturaCm: 120, bateria: 80, telemetriaOk: true, backend: 'webgl', fps: 8 };
     assert.deepEqual(Seguimiento.condicionesControlReal(ok, A), { ok: true, motivos: [] });
     const casos = [
@@ -380,7 +380,7 @@ test('reglas de RAC editables, con los valores acordados (75 %, 8 detecciones, 3
     assert.equal(A.reverificarMs, 1000);
 });
 
-test('cartel del ensayo en palabras: qué haría el dron', () => {
+test('cartel de la cámara del celular en palabras: qué haría el dron', () => {
     assert.equal(Seguimiento.describirComando({ yaw: 0, ud: 0, fb: 0 }), 'se quedaría quieto');
     assert.equal(Seguimiento.describirComando({ yaw: 0.2, ud: 0, fb: 0.1 }), 'avanzaría, giraría a la derecha');
     assert.equal(Seguimiento.describirComando({ yaw: -0.2, ud: -0.1, fb: -0.1 }), 'retrocedería, giraría a la izquierda, bajaría');

@@ -180,15 +180,6 @@ const DronAdaptadores = (() => {
             this.notificarTelemetria();
         }
 
-        /** Envía un comando y lanza un Error si la respuesta no es "ok". */
-        async comandoOk(cmd, timeoutMs) {
-            const resp = await this.enviarComando(cmd, timeoutMs);
-            if (!esOk(resp)) {
-                throw new Error(`El dron no pudo hacerlo (respondió "${resp}" a "${cmd}")`);
-            }
-            return resp;
-        }
-
         async detenerEmergencia() {
             this.generacionEmergencia++;
             this.detenerRC();
@@ -196,31 +187,6 @@ const DronAdaptadores = (() => {
             this.enviosSuspendidos = false;
             this.telemetria.estado = 'motores apagados';
             this.notificarTelemetria();
-        }
-
-        // ---- Movimientos por paso (el dron responde "ok" al terminar el movimiento) ----
-
-        async moverPaso(direccion, cm = 30) {
-            cm = limitar(parseInt(cm, 10) || 30, 20, 500);
-            const mapa = { adelante: 'forward', atras: 'back', izquierda: 'left', derecha: 'right',
-                           forward: 'forward', back: 'back', left: 'left', right: 'right' };
-            const dir = mapa[direccion];
-            if (!dir) throw new Error(`Dirección desconocida: ${direccion}`);
-            return this.comandoOk(`${dir} ${cm}`, 15000);
-        }
-
-        async girarPaso(grados = 90) {
-            grados = parseInt(grados, 10) || 90;
-            const sentido = grados >= 0 ? 'cw' : 'ccw';
-            return this.comandoOk(`${sentido} ${limitar(Math.abs(grados), 1, 360)}`, 15000);
-        }
-
-        async subirPaso(cm = 30) {
-            return this.comandoOk(`up ${limitar(parseInt(cm, 10) || 30, 20, 500)}`, 15000);
-        }
-
-        async bajarPaso(cm = 30) {
-            return this.comandoOk(`down ${limitar(parseInt(cm, 10) || 30, 20, 500)}`, 15000);
         }
 
         // ---- Control continuo (rc) ----
@@ -256,15 +222,10 @@ const DronAdaptadores = (() => {
             this.detenerRC();
         }
 
-        /** Pausa el envío continuo de rc (mientras corre un paso o una misión). */
+        /** Pausa el envío continuo de rc (mientras corre "land", para no interferir). */
         pausarRC() {
             this.detenerRC();
             this.rcPausado = true;
-        }
-
-        reanudarRC() {
-            this.detenerRC();
-            this.rcPausado = false;
         }
 
         /**
@@ -332,16 +293,6 @@ const DronAdaptadores = (() => {
             cmd = String(cmd || '').trim().toLowerCase();
             const [accion, valorTxt] = cmd.split(/\s+/);
             const valor = parseInt(valorTxt, 10) || 0;
-            const movimientos = ['forward', 'back', 'left', 'right', 'up', 'down', 'cw', 'ccw'];
-            if (movimientos.includes(accion)) {
-                if (!this.enVuelo) return 'error Not flying';
-                // Duración aproximada del movimiento real
-                await esperar(accion === 'cw' || accion === 'ccw' ? 300 + valor * 8 : 300 + valor * 10);
-                if (accion === 'up') this.telemetria.altura = Math.min(1000, (this.telemetria.altura || 0) + valor);
-                if (accion === 'down') this.telemetria.altura = Math.max(30, (this.telemetria.altura || 0) - valor);
-                this.notificarTelemetria();
-                return 'ok';
-            }
             await esperar(100);
             if (accion === 'battery?') return String(Math.round(this.telemetria.bateria ?? 0));
             return 'ok';
@@ -508,7 +459,7 @@ const DronAdaptadores = (() => {
 
         async conectar() {
             if (!DronNativo.disponible()) {
-                throw new Error('Para usar el dron real hace falta la app instalada en el celular. En la computadora elegí el perfil Simulador.');
+                throw new Error('Para manejar el dron hace falta la app instalada en el celular.');
             }
             await this._liberarRecursos();
 
@@ -535,9 +486,11 @@ const DronAdaptadores = (() => {
             this.ultimaRespuestaCommand = resp;
             if (!esOk(resp)) {
                 await this._liberarRecursos();
-                const motivoRed = this.redVinculada ? '' : ` La red WiFi no se pudo vincular (${red?.motivo || 'sin motivo'}).`;
-                const ayudaDatos = this.red === 'wifi' ? '' : ' Apagá los datos móviles y volvé a probar.';
-                throw new Error(`El dron no respondió. ¿Está prendido y el celular conectado a su WiFi TELLO-XXXXXX? (respuesta: "${resp}")${motivoRed}${ayudaDatos}`);
+                // Para el usuario, qué hacer; el detalle técnico (lo muestra el modo técnico) en .detalle
+                const ayudaDatos = this.red === 'datos' ? ' Si no anda, apagá los datos móviles.' : '';
+                const err = new Error(`No se encuentra el dron. Prendelo y conectá el celular a su WiFi (TELLO-…).${ayudaDatos}`);
+                err.detalle = `respuesta: "${resp}"${this.redVinculada ? '' : `; la red WiFi no se pudo vincular: ${red?.motivo || 'sin motivo'}`}`;
+                throw err;
             }
 
             this.conectado = true;
@@ -671,7 +624,7 @@ const DronAdaptadores = (() => {
                     this.notificarTelemetria();
                     return true;
                 }
-                throw new Error(`El dron no avisó que despegó (respuesta: "${resp}").`);
+                throw Object.assign(new Error('el dron no confirmó el despegue.'), { detalle: `respuesta: "${resp}"` });
             }
             this.enVuelo = true;
             this.telemetria.estado = 'en vuelo';
@@ -697,7 +650,7 @@ const DronAdaptadores = (() => {
                     this.notificarTelemetria();
                     return true;
                 }
-                throw new Error(`El dron no avisó que aterrizó (respuesta: "${resp}").`);
+                throw Object.assign(new Error('el dron no confirmó el aterrizaje.'), { detalle: `respuesta: "${resp}"` });
             }
             this.enVuelo = false;
             this.enviosSuspendidos = false;

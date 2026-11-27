@@ -12,8 +12,8 @@
  *   → bucle de control a 15 Hz: último comando vigente, que vence y decae a 0 si la detección se atrasa,
  *     con aceleración gradual.
  *
- * Modo ensayo (por defecto): calcula y muestra el comando, no lo manda.
- * Control real (S3, experimental): lo activa la cabina, con confirmación; el comando pasa por
+ * En el piso (y con la cámara del celular) calcula y muestra el comando, no lo manda.
+ * En vuelo (lo decide la cabina con decidirSeguimiento): el comando pasa por
  * comandoControlReal (límites bajos, nunca roll, zona muerta) y, sin objetivo, es "rc 0 0 0 0".
  *
  * Las partes puras (Selector, Seguidor, Controlador, combinarPersonas, comandoControlReal,
@@ -113,15 +113,15 @@ const DronSeguimiento = (() => {
         zonaMuertaX:          { grupo: 'Control', etiqueta: 'Zona muerta horizontal', unidad: '%', escala: 100, min: 0, max: 0.2, paso: 0.01 },
         zonaMuertaY:          { grupo: 'Control', etiqueta: 'Zona muerta vertical', unidad: '%', escala: 100, min: 0, max: 0.2, paso: 0.01 },
         zonaMuertaTamano:     { grupo: 'Control', etiqueta: 'Zona muerta de distancia', unidad: '%', escala: 100, min: 0, max: 0.2, paso: 0.01 },
-        velMaxYaw:            { grupo: 'Control', etiqueta: 'Velocidad máxima de giro (ensayo)', unidad: '%', escala: 100, min: 0.05, max: 0.5, paso: 0.05 },
-        velMaxAltura:         { grupo: 'Control', etiqueta: 'Velocidad máxima de altura (ensayo)', unidad: '%', escala: 100, min: 0.05, max: 0.5, paso: 0.05 },
-        velMaxAvance:         { grupo: 'Control', etiqueta: 'Velocidad máxima de avance (ensayo)', unidad: '%', escala: 100, min: 0.05, max: 0.5, paso: 0.05 },
+        velMaxYaw:            { grupo: 'Control', etiqueta: 'Velocidad máxima de giro (antes de los límites de vuelo)', unidad: '%', escala: 100, min: 0.05, max: 0.5, paso: 0.05 },
+        velMaxAltura:         { grupo: 'Control', etiqueta: 'Velocidad máxima de altura (antes de los límites de vuelo)', unidad: '%', escala: 100, min: 0.05, max: 0.5, paso: 0.05 },
+        velMaxAvance:         { grupo: 'Control', etiqueta: 'Velocidad máxima de avance (antes de los límites de vuelo)', unidad: '%', escala: 100, min: 0.05, max: 0.5, paso: 0.05 },
         aceleracionMax:       { grupo: 'Control', etiqueta: 'Aceleración máxima', unidad: '%/s', escala: 100, min: 0.1, max: 2, paso: 0.1 },
         toleranciaPerdidaMs:  { grupo: 'Pérdida', etiqueta: 'Tiempo sin detecciones antes de darlo por perdido', unidad: 'ms', min: 500, max: 5000, paso: 100 },
         vencimientoComandoMs: { grupo: 'Pérdida', etiqueta: 'Vencimiento del comando (detección atrasada)', unidad: 'ms', min: 100, max: 2000, paso: 50 },
-        alturaMinCm:          { grupo: 'Control real', etiqueta: 'Altura mínima', unidad: 'cm', min: 30, max: 500, paso: 10 },
-        alturaMaxCm:          { grupo: 'Control real', etiqueta: 'Altura máxima', unidad: 'cm', min: 50, max: 1000, paso: 10 },
-        bateriaMin:           { grupo: 'Control real', etiqueta: 'Batería mínima', unidad: '%', min: 10, max: 90, paso: 5 },
+        alturaMinCm:          { grupo: 'Seguir en vuelo', etiqueta: 'Altura mínima', unidad: 'cm', min: 30, max: 500, paso: 10 },
+        alturaMaxCm:          { grupo: 'Seguir en vuelo', etiqueta: 'Altura máxima', unidad: 'cm', min: 50, max: 1000, paso: 10 },
+        bateriaMin:           { grupo: 'Seguir en vuelo', etiqueta: 'Batería mínima', unidad: '%', min: 10, max: 90, paso: 5 },
     });
 
     /**
@@ -732,9 +732,29 @@ const DronSeguimiento = (() => {
         else if (e.alturaCm > a.alturaMaxCm) motivos.push(`altura mayor a ${a.alturaMaxCm} cm`);
         if (e.bateria === null || e.bateria === undefined || e.bateria < a.bateriaMin) motivos.push(`batería menor a ${a.bateriaMin} %`);
         if (!e.telemetriaOk) motivos.push('no llegan datos del dron');
-        if (e.backend !== 'webgl') motivos.push(`la detección no usa la placa de video (usa ${e.backend || 'nada'})`);
-        if (!(e.fps >= a.fpsMinReal)) motivos.push(`menos de ${a.fpsMinReal} detecciones por segundo`);
+        if (e.backend !== 'webgl') motivos.push(`el celular no puede usar la placa de video para analizar la imagen (usa ${e.backend || 'nada'})`);
+        if (!(e.fps >= a.fpsMinReal)) motivos.push(`la imagen se analiza muy lento (menos de ${a.fpsMinReal} detecciones por segundo)`);
         return { ok: motivos.length === 0, motivos };
+    }
+
+    /**
+     * Qué hace el seguimiento de la cabina en cada paso de control (pura, se prueba en Node).
+     * - En el piso: 'piso' (solo marca el objetivo, no manda nada).
+     * - En vuelo, con conexión, sin despegue ni aterrizaje en curso y con las condiciones: 'mandar'.
+     * - Si falta algo: 'esperar' si todavía no movía el dron; 'detener' si ya lo movía (freno y fin del
+     *   seguimiento: hay que volver a pedirlo, como hacía falta reactivar el control real).
+     * @param {{enVuelo:boolean, conexionOk:boolean, maniobra:boolean, condiciones:{ok:boolean, motivos:string[]}, mandando:boolean}} e
+     * @returns {{accion:'piso'|'esperar'|'mandar'|'detener', motivo:string}}
+     */
+    function decidirSeguimiento({ enVuelo, conexionOk, maniobra, condiciones, mandando }) {
+        let motivo = '';
+        if (!enVuelo) motivo = mandando ? 'el dron ya no está en vuelo' : '';
+        else if (!conexionOk) motivo = 'se cortó la conexión con el dron';
+        else if (maniobra) motivo = 'el dron está despegando o aterrizando';
+        else if (!condiciones?.ok) motivo = condiciones?.motivos?.[0] || 'no se cumplen las condiciones';
+        if (!enVuelo && !mandando) return { accion: 'piso', motivo };
+        if (!motivo) return { accion: 'mandar', motivo };
+        return { accion: mandando ? 'detener' : 'esperar', motivo };
     }
 
     // ================================================================
@@ -787,7 +807,7 @@ const DronSeguimiento = (() => {
         else if (!modeloOk) conclusion = 'El detector no reconoce ni la foto de prueba: el modelo no cargó bien.';
         else if (!(Math.max(d.personaCuadro || 0, d.caraCuadro || 0) > 0)) conclusion = 'El detector anda (reconoce la foto de prueba), pero no ve a nadie en la imagen: apuntá a una persona de frente, con buena luz.';
         else if (Math.max(d.personaCuadro || 0, d.caraCuadro || 0) < a.confirmacionUmbral) conclusion = `Ve una persona, pero con poca confianza (hace falta ${pc(a.confirmacionUmbral)}): acercate, mirá a la cámara o mejorá la luz.`;
-        else if (d.ms && 1000 / d.ms < a.fpsMinReal) conclusion = 'Todo anda, pero lento: el control real no se va a poder activar.';
+        else if (d.ms && 1000 / d.ms < a.fpsMinReal) conclusion = 'Todo anda, pero lento: en vuelo, el dron no va a poder seguir al objetivo.';
         else conclusion = 'Todo anda: si igual queda buscando, quedate quieto unos segundos de frente a la cámara (necesita 8 detecciones seguidas).';
         return { items, conclusion };
     }
@@ -1081,14 +1101,14 @@ const DronSeguimiento = (() => {
 
         async inicializar() {
             if (this.modeloCargado) return { ok: true, backend: this.vision.backend };
-            if (this.cargando) return { ok: false, error: 'El modelo se está cargando.' };
+            if (this.cargando) return { ok: false, error: 'Todavía se está preparando el seguimiento.' };
             this.cargando = true;
             try {
                 const { backend, conCaras } = await this.vision.cargar();
                 this.modeloCargado = true;
                 const avisos = [];
-                if (backend !== 'webgl') avisos.push(`La detección usa "${backend}" en vez de la placa de video: va a ser muy lenta y el control real no se va a poder activar.`);
-                if (!conCaras) avisos.push('No se pudo cargar el detector de caras: se usa solo el recuadro del cuerpo.');
+                if (backend !== 'webgl') avisos.push(`El seguimiento va a andar lento en este celular: en vuelo, el dron no va a poder seguir al objetivo (detección en "${backend}").`);
+                if (!conCaras) avisos.push('Va a seguir el cuerpo de la persona, no la cara.');
                 return { ok: true, backend, aviso: avisos.join(' ') || null };
             } catch (e) {
                 return { ok: false, error: e.message };
@@ -1526,19 +1546,19 @@ const DronSeguimiento = (() => {
         return `giro ${pct(cmd.yaw)} · altura ${pct(cmd.ud)} · avance ${pct(cmd.fb)}`;
     }
 
-    /** Cartel del ensayo (abajo de la imagen): qué haría el dron, sin moverlo. */
-    function textoEnsayo(cmd, info) {
+    /** Cartel de la pantalla con la cámara del celular (modo técnico): qué haría el dron. Nunca manda nada. */
+    function textoCamara(cmd, info) {
         const que = info.objeto ? `«${info.objeto}»` : (info.nombre || 'la persona');
         switch (info.estado) {
             case 'buscando':
                 if (info.objeto && info.noEncuentra) return `No encuentro «${info.objeto}». Probá con más fotos o más luz.`;
-                return `Ensayo: buscando ${info.objeto ? que : 'objetivo'}...`;
-            case 'confirmando': return `Ensayo: confirmando ${que} (${info.confirmaciones}/${info.confirmacionVentana})`;
-            case 'siguiendo': return `Ensayo (no mueve el dron): ${describirComando(cmd)}`;
-            case 'perdiendo': return `Ensayo: se está perdiendo ${que}; el dron frenaría de a poco`;
+                return `Buscando ${info.objeto ? que : 'objetivo'}...`;
+            case 'confirmando': return `Confirmando ${que} (${info.confirmaciones}/${info.confirmacionVentana})`;
+            case 'siguiendo': return `Siguiendo: el dron ${describirComando(cmd)}`;
+            case 'perdiendo': return `Se está perdiendo ${que}: el dron frenaría de a poco`;
             case 'perdido':
                 if (info.objeto && info.noEncuentra) return `No encuentro «${info.objeto}». Probá con más fotos o más luz.`;
-                return 'Ensayo: objetivo perdido; el dron se quedaría quieto';
+                return 'Objetivo perdido: el dron se quedaría quieto';
             default: return '';
         }
     }
@@ -1549,14 +1569,14 @@ const DronSeguimiento = (() => {
      * @returns {{titulo:string, texto:string, color:string}}
      */
     function estadoTarjeta(info) {
-        if (info.imagenNegra) return { titulo: 'Sin imagen', texto: 'Al detector le llega una imagen negra.', color: 'error' };
+        if (info.imagenNegra) return { titulo: 'Sin imagen', texto: 'No llega imagen de la cámara.', color: 'error' };
         const n = info.nombre || 'Persona';
         switch (info.estado) {
             case 'buscando':
                 if (info.objeto && info.noEncuentra) return { titulo: `No encuentro «${info.objeto}»`, texto: 'Probá con más fotos o más luz.', color: 'error' };
                 return { titulo: 'Buscando objetivo...', texto: 'Apuntá a una persona u objeto, o tocá un recuadro para elegirlo.', color: 'advertencia' };
             case 'confirmando':
-                return { titulo: `Confirmando: ${n} (${info.confirmaciones}/${info.confirmacionVentana})`, texto: `Necesita ${info.confirmacionVentana} detecciones seguidas de 75 % o más.`, color: 'advertencia' };
+                return { titulo: `Confirmando: ${n} (${info.confirmaciones}/${info.confirmacionVentana})`, texto: 'Mantenelo en cuadro un momento.', color: 'advertencia' };
             case 'siguiendo':
             case 'perdiendo':
                 return { titulo: `Siguiendo: ${n}`, texto: info.objetivo?.tipo === 'cara' ? 'Sigue la cara.' : info.objetivo?.tipo === 'cuerpo' ? 'No ve la cara: sigue el cuerpo.' : 'Sigue el objeto.', color: 'exito' };
@@ -1602,8 +1622,8 @@ const DronSeguimiento = (() => {
             this._ultimo = ahora;
             const backend = info.backend === 'webgl' ? 'WebGL (placa de video)' : `${String(info.backend || '?').toUpperCase()} (lento)`;
             const cond = info.condiciones;
-            const lineaReal = !cond ? '' : cond.ok ? 'Control real: se cumplen las condiciones'
-                : `Control real: todavía no se puede (${cond.motivos[0]}${cond.motivos.length > 1 ? ` y ${cond.motivos.length - 1} más` : ''})`;
+            const lineaReal = !cond ? '' : cond.ok ? 'Seguir en vuelo: se cumplen las condiciones'
+                : `Seguir en vuelo: todavía no (${cond.motivos[0]}${cond.motivos.length > 1 ? ` y ${cond.motivos.length - 1} más` : ''})`;
             const demora = info.edadMs !== null ? ` · hace ${info.edadMs} ms` : '';
             const img = info.imagen;
             const gpu = info.gpu ? ` · WebGL ${info.gpu.version}, float32 ${info.gpu.float32 ? 'sí' : 'no'}${info.gpu.empaquetado === false ? ', empaquetado apagado' : ''}` : '';
@@ -1683,7 +1703,8 @@ const DronSeguimiento = (() => {
     Seguimiento.validarAjustes = validarAjustes;
     Seguimiento.guardarAjustes = guardarAjustes;
     Seguimiento.restaurarAjustes = restaurarAjustes;
-    Seguimiento.textoEnsayo = textoEnsayo;
+    Seguimiento.textoCamara = textoCamara;
+    Seguimiento.decidirSeguimiento = decidirSeguimiento;
     Seguimiento.describirComando = describirComando;
     Seguimiento.cargarDetector = cargarDetector;
     Seguimiento.estadoCorto = estadoCorto;

@@ -1,6 +1,6 @@
 /**
- * Pruebas del control real del seguimiento (S3): límites bajos, nunca roll, zona muerta,
- * y "objetivo perdido = quieto" (rc 0 0 0 0). Sin navegador ni dron.
+ * Pruebas del seguimiento en vuelo: límites bajos, nunca roll, zona muerta, "objetivo perdido = quieto"
+ * (rc 0 0 0 0) y la decisión de cada paso (en el piso no manda; si deja de poder, se detiene). Sin navegador ni dron.
  *
  * Ejecutar: node --test tests/
  */
@@ -75,4 +75,32 @@ test('recorrido completo: sigue a una persona a la derecha dentro de los límite
     assert.ok(perdidos.length > 0, 'se pierde');
     assert.ok(perdidos.every(e => e.rc.yaw === 0 && e.rc.ud === 0 && e.rc.fb === 0), 'perdido: rc 0 0 0 0');
     assert.equal(enviados[enviados.length - 1].estado, 'perdido', 'no vuelve a moverse solo');
+});
+
+test('decidirSeguimiento: en el piso solo marca; en vuelo manda; si deja de poder, se detiene', () => {
+    const decidir = Seguimiento.decidirSeguimiento;
+    const bien = { enVuelo: true, conexionOk: true, maniobra: false, condiciones: { ok: true, motivos: [] }, mandando: false };
+    // En el piso nunca manda, aunque se cumpla todo lo demás
+    assert.equal(decidir({ ...bien, enVuelo: false }).accion, 'piso');
+    assert.equal(decidir({ ...bien, enVuelo: false, condiciones: { ok: false, motivos: ['x'] } }).accion, 'piso');
+    // En vuelo y con todo bien: manda (estando quieto o ya mandando)
+    assert.deepEqual(decidir(bien), { accion: 'mandar', motivo: '' });
+    assert.deepEqual(decidir({ ...bien, mandando: true }), { accion: 'mandar', motivo: '' });
+    // Falta algo antes de empezar a mover el dron: espera (no manda nada) y dice por qué
+    const casos = [
+        [{ conexionOk: false }, 'conexión'],
+        [{ maniobra: true }, 'despegando o aterrizando'],
+        [{ condiciones: { ok: false, motivos: ['altura menor a 80 cm'] } }, 'altura menor a 80 cm'],
+    ];
+    for (const [cambio, texto] of casos) {
+        const espera = decidir({ ...bien, ...cambio });
+        assert.equal(espera.accion, 'esperar', JSON.stringify(cambio));
+        assert.ok(espera.motivo.includes(texto), espera.motivo);
+        // Lo mismo mientras ya movía el dron: se detiene (freno y hay que volver a pedirlo)
+        const corte = decidir({ ...bien, ...cambio, mandando: true });
+        assert.equal(corte.accion, 'detener', JSON.stringify(cambio));
+        assert.ok(corte.motivo.includes(texto), corte.motivo);
+    }
+    // Aterrizó (o se apagó) mientras lo movía: se detiene, no queda "en el piso" mandando
+    assert.equal(decidir({ ...bien, enVuelo: false, mandando: true }).accion, 'detener');
 });

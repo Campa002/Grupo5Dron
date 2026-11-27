@@ -7,22 +7,21 @@
  *  - DronBotonesMovimiento y DronJoystick (dron-joystick.js): botones de mantener apretado
  *    (mando por defecto) y joysticks (solo en el modo técnico)
  *  - DronGiroscopio   (dron-giroscopio.js)
- *  - DronSeguimiento  (dron-seguimiento.js)  [EXPERIMENTAL]
+ *  - DronSeguimiento  (dron-seguimiento.js)
  *  - DronVideoDecoder (dron-video.js)
  *  - ConfigDron       (config-dron.js)
  *
  * Reglas de seguridad:
  *  - Giroscopio y seguimiento DESACTIVADOS al iniciar; al apagar el giroscopio, sus ejes vuelven a cero.
- *  - El seguimiento arranca en ENSAYO: calcula y muestra el comando, no lo envía.
- *  - Control real del seguimiento (S3, experimental): apagado por defecto; se activa con un interruptor y una
- *    confirmación cada vez, solo en vuelo y con las condiciones cumplidas. Límites bajos (DronSeguimiento.
- *    LIMITES_CONTROL_REAL), nunca roll; sin objetivo, rc 0 0 0 0. Vuelve a ensayo al tocar un botón de
- *    movimiento, al perder la conexión, si deja de cumplir las condiciones, al pasar a segundo plano o al salir.
+ *  - Seguimiento: en el piso solo marca el objetivo (no manda nada). En vuelo, "Seguir persona" o "Seguir objeto"
+ *    mueven el dron con límites bajos (DronSeguimiento.LIMITES_CONTROL_REAL), nunca roll; sin objetivo, rc 0 0 0 0.
+ *    Solo manda con las condiciones cumplidas (DronSeguimiento.decidirSeguimiento). Se detiene con Detener, un botón
+ *    de movimiento, la inclinación, Despegar, Aterrizar, EMERGENCIA, el failsafe, si dejan de cumplirse las
+ *    condiciones, al pasar a segundo plano o al salir de la cabina.
  *  - Botón de EMERGENCIA fijo y siempre visible (vertical y horizontal).
  *  - Confirmación explícita antes de despegar; no se despega si no llega telemetría.
  *  - Failsafe: sin telemetría en vuelo por más del tiempo configurado → freno (rc 0 0 0 0) y aterrizaje.
  *    Si el aterrizaje no se confirma, se reintenta una vez y se avisa (no se cortan motores solos).
- *  - Durante un paso o una misión se pausa el rc continuo para no interrumpirlos.
  *  - Botones de mantener apretado: al soltar, salir del botón, perder el toque o pasar a segundo plano,
  *    su eje vuelve a 0 (frena). Arrancan en velocidad Lenta y solo se pueden apretar en vuelo.
  *  - Salir de la cabina en vuelo aterriza el dron (app.js pide confirmación antes).
@@ -33,40 +32,7 @@ const Dron = (() => {
     'use strict';
 
     const FAILSAFE_POR_DEFECTO_MS = 3500;
-    const ACCIONES_MISION = ['adelante', 'atras', 'izquierda', 'derecha', 'subir', 'bajar', 'girar', 'esperar'];
-
-    const MISIONES_DEFAULT = [
-        {
-            id: 'cuadrado',
-            nombre: 'Cuadrado 50 cm',
-            descripcion: 'Vuela en patrón cuadrado de 50 cm por lado',
-            pasos: [
-                { accion: 'adelante', valor: 50 }, { accion: 'girar', valor: 90 },
-                { accion: 'adelante', valor: 50 }, { accion: 'girar', valor: 90 },
-                { accion: 'adelante', valor: 50 }, { accion: 'girar', valor: 90 },
-                { accion: 'adelante', valor: 50 }, { accion: 'girar', valor: 90 },
-            ],
-        },
-        {
-            id: 'rotar_360',
-            nombre: 'Subir y giro 360°',
-            descripcion: 'Sube 50 cm, gira 360° para inspección y baja',
-            pasos: [
-                { accion: 'subir', valor: 50 }, { accion: 'girar', valor: 180 },
-                { accion: 'girar', valor: 180 }, { accion: 'bajar', valor: 50 },
-            ],
-        },
-        {
-            id: 'ida_vuelta',
-            nombre: 'Ida y vuelta 1 m',
-            descripcion: 'Avanza 1 metro, gira 180° y vuelve',
-            pasos: [
-                { accion: 'adelante', valor: 100 }, { accion: 'girar', valor: 180 },
-                { accion: 'adelante', valor: 100 }, { accion: 'girar', valor: 180 },
-            ],
-        },
-    ];
-
+    const TEXTO_EN_EL_PISO = 'En el piso solo marca el objetivo. Despegá y tocá Seguir para que el dron lo siga.';
     // ----------------------------------------------------------------
     // Estado interno
     // ----------------------------------------------------------------
@@ -83,11 +49,8 @@ const Dron = (() => {
 
     let _modoGiro = false;
     let _modoSeguimiento = false;
-    let _controlReal = false;      // S3: el seguimiento manda el comando al dron (apagado por defecto)
+    let _controlReal = false;      // el seguimiento ya está moviendo el dron (en vuelo, con las condiciones)
     let _onVisibilidad = null;
-    let _misionEnEjecucion = false;
-    let _cancelarMisionFlag = false;
-    let _pasoEnEjecucion = false;
     let _accionVuelo = false;      // despegue o aterrizaje en curso
     let _estadoUI = 'desconectado';
 
@@ -103,29 +66,6 @@ const Dron = (() => {
     let _tamanoJoystick = 0;
     let _avisoManiobraTs = 0;      // para no repetir el aviso de "esperá a que termine el movimiento"
     let _objetosGuardados = [];    // "Mis objetos" (para "¿Qué seguir?")
-
-    // ----------------------------------------------------------------
-    // Misiones guardadas
-    // ----------------------------------------------------------------
-    function _misionValida(m) {
-        return m && typeof m.id === 'string' && typeof m.nombre === 'string' && Array.isArray(m.pasos) && m.pasos.length > 0 &&
-            m.pasos.every(p => ACCIONES_MISION.includes(p.accion) && Number.isFinite(Number(p.valor)));
-    }
-
-    function _obtenerMisiones() {
-        try {
-            const lista = JSON.parse(localStorage.getItem('grupo5dron_misiones') || 'null');
-            if (Array.isArray(lista)) {
-                const validas = lista.filter(_misionValida);
-                if (validas.length) return validas;
-            }
-        } catch (_) { /* JSON inválido: usar las de fábrica */ }
-        return MISIONES_DEFAULT;
-    }
-
-    function _guardarMisiones(lista) {
-        try { localStorage.setItem('grupo5dron_misiones', JSON.stringify(lista)); } catch (_) { /* almacenamiento lleno */ }
-    }
 
     // ----------------------------------------------------------------
     // Inicialización
@@ -147,7 +87,7 @@ const Dron = (() => {
         try {
             _adaptador = DronAdaptadores.crearAdaptador(perfil);
         } catch (err) {
-            _mostrarError(contenedor, `Error al crear el adaptador: ${err.message}`);
+            _mostrarError(contenedor, App.modoTecnico() ? `No se pudo abrir la cabina: ${err.message}` : 'No se pudo abrir la cabina.');
             return;
         }
 
@@ -163,6 +103,7 @@ const Dron = (() => {
         _onResize = () => {
             clearTimeout(_timerResize);
             _timerResize = setTimeout(() => {
+                _reservarLugarEmergencia();
                 if (_usarJoysticks && Math.abs(_calcularTamanoJoystick() - _tamanoJoystick) > 8) _inicializarJoysticks();
             }, 250);
         };
@@ -195,15 +136,14 @@ const Dron = (() => {
                 onDetener: () => { _apagarSeguimiento(); App.mostrarToast('Seguimiento detenido.', 'info'); },
                 onTocar: (x, y) => _seguimiento?.elegirEnPunto(x, y) || { ok: false },
                 onDiagnosticar: () => _seguimiento.diagnosticar(_q('#cab-foto-prueba')),
-                onControlReal: _cambiarControlReal,
             });
         }
-        // Al pasar a segundo plano, el control real vuelve a ensayo
-        _onVisibilidad = () => { if (document.hidden) _volverAEnsayo('La app pasó a segundo plano: el seguimiento volvió a ensayo.'); };
+        // Al pasar a segundo plano se detiene el seguimiento (con freno)
+        _onVisibilidad = () => { if (document.hidden) _detenerSeguimiento('La app pasó a segundo plano'); };
         document.addEventListener('visibilitychange', _onVisibilidad);
 
         _agregarEventosCabina();
-        _actualizarSelectMisiones();
+        _reservarLugarEmergencia();
         if (typeof DronObjetos !== 'undefined' && _pantallaSeg) {
             App.objetosGuardados().then(lista => {
                 if (gen !== _generacion) return;
@@ -232,8 +172,8 @@ const Dron = (() => {
         } catch (err) {
             if (a !== _adaptador) return;
             _actualizarEstadoUI('desconectado');
-            _textoVideo('Sin conexión: ' + err.message);
-            App.mostrarToast(err.message, 'error', 9000);
+            _textoVideo(_textoError(err));
+            if (App.modoTecnico()) App.mostrarToast(_textoError(err), 'error', 9000);
             return;
         }
         if (a !== _adaptador) { a.desconectar(); return; }
@@ -266,7 +206,7 @@ const Dron = (() => {
             const ok = await a.iniciarVideo(d => _video?.procesarChunk(d?.data, { perdida: !!d?.perdida }));
             if (a === _adaptador && !ok && !_video?.frameCount) _textoVideo('El dron no prendió la cámara');
         } catch (err) {
-            if (a === _adaptador) _textoVideo('No se pudo abrir el video: ' + err.message);
+            if (a === _adaptador) _textoVideo(App.modoTecnico() ? `No se pudo abrir el video: ${err.message}` : 'No se pudo abrir el video del dron');
         }
     }
 
@@ -333,7 +273,6 @@ const Dron = (() => {
 
         // 1. Freno: un "rc 0 0 0 0" inmediato
         a.frenar();
-        if (_misionEnEjecucion) _cancelarMision(false);
         _apagarModosAutomaticos();
         _soltarMandos();
         // 2. Desde acá no sale ningún comando automático (ni rc continuo ni keep-alive).
@@ -402,10 +341,9 @@ const Dron = (() => {
         on('#btn-emergencia', () => _emergencia('Parada de emergencia manual'));
         on('#btn-toggle-giro', _toggleGiroscopio);
         on('#btn-toggle-seguimiento', _toggleSeguimiento);
-        // Atajo: abre la lista de objetos de la sección Seguimiento y la trae a la vista
+        // "Seguir objeto": abre la lista de objetos de la sección Seguimiento y la trae a la vista
         on('#btn-atajo-objeto', () => {
-            const lista = _q('[data-rac="panel-objeto"]');
-            if (lista?.hidden) _q('[data-rac="seguir-objeto"]')?.click();
+            _pantallaSeg?.abrirPanelObjeto();
             _q('#cab-seguimiento')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
         on('#btn-copiar-registro-seg', _copiarRegistroSeguimiento);
@@ -416,32 +354,10 @@ const Dron = (() => {
         on('#btn-ir-config-dron', () => { window.location.hash = '#/config-dron'; });
         on('#btn-cab-menu', () => App.abrirMenu());
         on('#btn-cerrar-aviso-fijo', _ocultarAvisoFijo);
-        on('#btn-calibrar-giro', () => {
-            _giroscopio?.calibrar();
-            App.mostrarToast('Listo: esta posición del celular ahora es "quieto".', 'info');
-        });
-
-        // Movimientos por paso
-        const distancia = () => parseInt(_q('#sel-paso-distancia')?.value, 10) || 30;
-        const angulo = () => parseInt(_q('#sel-paso-angulo')?.value, 10) || 90;
-        on('#btn-paso-adelante', () => _ejecutarPaso('adelante', distancia()));
-        on('#btn-paso-atras', () => _ejecutarPaso('atras', distancia()));
-        on('#btn-paso-izquierda', () => _ejecutarPaso('izquierda', distancia()));
-        on('#btn-paso-derecha', () => _ejecutarPaso('derecha', distancia()));
-        on('#btn-paso-subir', () => _ejecutarPaso('subir', distancia()));
-        on('#btn-paso-bajar', () => _ejecutarPaso('bajar', distancia()));
-        on('#btn-paso-girar-der', () => _ejecutarPaso('girar', angulo()));
-        on('#btn-paso-girar-izq', () => _ejecutarPaso('girar', -angulo()));
-        on('#btn-paso-frenar', _frenar);
-
-        // Misiones
-        on('#btn-ejecutar-mision', _ejecutarMision);
-        on('#btn-cancelar-mision', () => _cancelarMision(true));
-        on('#btn-nueva-mision', _crearMision);
     }
 
     // ----------------------------------------------------------------
-    // Despegue, aterrizaje, emergencia y freno
+    // Despegue, aterrizaje y emergencia
     // ----------------------------------------------------------------
 
     async function _confirmarDespegue() {
@@ -449,7 +365,7 @@ const Dron = (() => {
         if (!a || !a.conectado) { App.mostrarToast('El dron no está conectado.', 'advertencia'); return; }
         if (a.enVuelo || _accionVuelo) return;
         if (!_hayTelemetria()) {
-            App.mostrarToast('No llegan datos del dron, así que no puede despegar (aterrizaría enseguida por seguridad). Revisá la conexión en "Prueba Tello".', 'error', 9000);
+            App.mostrarToast('No llegan datos del dron, así que no puede despegar. Acercá el celular al dron o tocá Reconectar.', 'error', 9000);
             return;
         }
         if (!confirm(
@@ -458,6 +374,11 @@ const Dron = (() => {
             '• El dron despegará al confirmar.\n' +
             '• Usá el botón EMERGENCIA si algo sale mal.'
         )) return;
+        // Al despegar se detiene el seguimiento: para que el dron siga a alguien hay que pedirlo ya en el aire
+        if (_modoSeguimiento) {
+            _apagarSeguimiento(false);
+            App.mostrarToast('Seguimiento detenido para despegar. En el aire, tocá Seguir para que el dron siga al objetivo.', 'info', 7000);
+        }
 
         _accionVuelo = true;
         _actualizarEstadoUI('despegando');
@@ -471,7 +392,7 @@ const Dron = (() => {
             _iniciarWatchdog();
         } catch (err) {
             final = a.enVuelo ? 'en_vuelo' : 'conectado';
-            App.mostrarToast('No se pudo despegar: ' + err.message, 'error', 8000);
+            App.mostrarToast(`No se pudo despegar: ${_textoError(err)}`, 'error', 8000);
         }
         if (a !== _adaptador) return;
         _accionVuelo = false;
@@ -482,7 +403,6 @@ const Dron = (() => {
         const a = _adaptador;
         if (!a || !a.enVuelo) { App.mostrarToast('El dron no está en vuelo.', 'info'); return; }
         if (_accionVuelo) return;
-        if (_misionEnEjecucion) _cancelarMision(false);
         _apagarModosAutomaticos();
 
         _accionVuelo = true;
@@ -495,7 +415,7 @@ const Dron = (() => {
             App.mostrarToast('Aterrizaje completado.', 'exito');
         } catch (err) {
             final = !a.enVuelo ? 'conectado' : (a.enviosSuspendidos ? 'failsafe' : 'en_vuelo');
-            App.mostrarToast('No se pudo confirmar el aterrizaje: ' + err.message, 'error', 8000);
+            App.mostrarToast(`No se pudo confirmar el aterrizaje: ${_textoError(err)}`, 'error', 8000);
         }
         if (a !== _adaptador) return;
         _accionVuelo = false;
@@ -505,7 +425,6 @@ const Dron = (() => {
     function _emergencia(motivo) {
         const a = _adaptador;
         if (!a) return;
-        if (_misionEnEjecucion) _cancelarMision(false);
         _apagarModosAutomaticos();
         _soltarMandos();
         a.detenerEmergencia()
@@ -519,182 +438,15 @@ const Dron = (() => {
             });
     }
 
-    /** Freno: rc 0 0 0 0 sin esperar respuesta. Funciona aunque haya un paso en curso. */
-    function _frenar() {
-        const a = _adaptador;
-        if (!a || !a.enVuelo) { App.mostrarToast('El dron no está en vuelo.', 'info'); return; }
-        if (_misionEnEjecucion) _cancelarMision(false);
-        _apagarModosAutomaticos();
-        _soltarMandos();
-        a.frenar();
-        const txt = _q('#estado-paso-texto');
-        if (txt) txt.textContent = 'Freno enviado: el dron se queda quieto.';
+    /** Mensaje de error para el usuario; con el modo técnico, más el detalle (por ejemplo, la respuesta del dron). */
+    function _textoError(err) {
+        const msg = err?.message || String(err);
+        return App.modoTecnico() && err?.detalle ? `${msg} (${err.detalle})` : msg;
     }
 
-    // ----------------------------------------------------------------
-    // Pasos y misiones
-    // ----------------------------------------------------------------
-
-    function _ejecutarAccion(a, accion, valor) {
-        switch (accion) {
-            case 'adelante':
-            case 'atras':
-            case 'izquierda':
-            case 'derecha': return a.moverPaso(accion, valor);
-            case 'subir': return a.subirPaso(valor);
-            case 'bajar': return a.bajarPaso(valor);
-            case 'girar': return a.girarPaso(valor);
-            case 'esperar': return _esperarCancelable(Math.min(10, Math.max(0, Number(valor) || 0)) * 1000).then(() => 'ok');
-            default: return Promise.reject(new Error(`Acción desconocida: ${accion}`));
-        }
-    }
-
-    async function _esperarCancelable(ms) {
-        const fin = Date.now() + ms;
-        while (Date.now() < fin && !_cancelarMisionFlag) {
-            await new Promise(r => setTimeout(r, 100));
-        }
-    }
-
+    /** true mientras despega o aterriza (incluido el aterrizaje del failsafe). */
     function _maniobraEnCurso() {
-        return _pasoEnEjecucion || _misionEnEjecucion || _accionVuelo;
-    }
-
-    async function _ejecutarPaso(accion, valor) {
-        const a = _adaptador;
-        if (!a || !a.enVuelo) { App.mostrarToast('El dron tiene que estar en vuelo para moverse.', 'advertencia'); return; }
-        if (_failsafeBloquea()) return;
-        if (_maniobraEnCurso()) { App.mostrarToast('El dron todavía está haciendo otro movimiento. Esperá o tocá el botón rojo para frenarlo.', 'advertencia'); return; }
-
-        _apagarModosAutomaticos();
-        _mando?.soltarTodo();
-        _pasoEnEjecucion = true;
-        const txt = _q('#estado-paso-texto');
-        const nombre = accion === 'girar' ? `girar ${valor > 0 ? 'derecha' : 'izquierda'} ${Math.abs(valor)}°` : `${accion} ${valor} cm`;
-        if (txt) txt.textContent = `Ejecutando: ${nombre}...`;
-
-        a.pausarRC();
-        try {
-            await _ejecutarAccion(a, accion, valor);
-            App.textoConIcono(txt, 'check', `Listo: ${nombre}`);
-        } catch (err) {
-            App.textoConIcono(txt, 'cruz', err.message);
-            App.mostrarToast(`El paso "${nombre}" falló: ${err.message}`, 'error', 7000);
-        } finally {
-            a.reanudarRC();
-            _pasoEnEjecucion = false;
-        }
-    }
-
-    function _actualizarSelectMisiones() {
-        const sel = _q('#sel-mision-activa');
-        const info = _q('#info-mision-pasos');
-        if (!sel) return;
-        const misiones = _obtenerMisiones();
-        const previo = sel.value;
-        sel.innerHTML = misiones.map(m => `<option value="${_esc(m.id)}">${_esc(m.nombre)}</option>`).join('');
-        if (misiones.some(m => m.id === previo)) sel.value = previo;
-
-        const mostrarDetalle = () => {
-            const m = misiones.find(x => x.id === sel.value) || misiones[0];
-            if (m && info) {
-                const pasos = m.pasos.map((p, i) => `${i + 1}. ${p.accion} ${p.valor}`).join(' → ');
-                info.innerHTML = `<strong>${_esc(m.nombre)}:</strong> ${_esc(m.descripcion || '')}<br><span>${_esc(pasos)}</span>`;
-            }
-        };
-        sel.onchange = mostrarDetalle;
-        mostrarDetalle();
-    }
-
-    async function _ejecutarMision() {
-        const a = _adaptador;
-        if (!a || !a.enVuelo) { App.mostrarToast('El dron tiene que estar en vuelo para iniciar la misión.', 'advertencia'); return; }
-        if (_failsafeBloquea()) return;
-        if (_maniobraEnCurso()) { App.mostrarToast('El dron todavía está haciendo otro movimiento.', 'advertencia'); return; }
-
-        const mision = _obtenerMisiones().find(m => m.id === _q('#sel-mision-activa')?.value);
-        if (!mision) { App.mostrarToast('Elegí una misión válida.', 'advertencia'); return; }
-        if (!confirm(`¿Iniciar la misión "${mision.nombre}"?\n\nVerificá que haya espacio libre suficiente.`)) return;
-
-        _apagarModosAutomaticos();
-        _mando?.soltarTodo();
-        _misionEnEjecucion = true;
-        _cancelarMisionFlag = false;
-        const btnEjecutar = _q('#btn-ejecutar-mision');
-        const btnCancelar = _q('#btn-cancelar-mision');
-        const info = _q('#info-mision-pasos');
-        if (btnEjecutar) btnEjecutar.hidden = true;
-        if (btnCancelar) btnCancelar.hidden = false;
-
-        a.pausarRC();
-        let resultado = 'completada';
-        let detalleError = '';
-        try {
-            for (let i = 0; i < mision.pasos.length; i++) {
-                if (_cancelarMisionFlag || a !== _adaptador) { resultado = 'cancelada'; break; }
-                const p = mision.pasos[i];
-                if (info) info.innerHTML = `<strong>Paso ${i + 1} de ${mision.pasos.length}:</strong> ${_esc(p.accion)} ${_esc(String(p.valor))} (esperando que el dron termine)...`;
-                try {
-                    await _ejecutarAccion(a, p.accion, p.valor);
-                } catch (err) {
-                    resultado = _cancelarMisionFlag ? 'cancelada' : 'fallida';
-                    detalleError = `paso ${i + 1}: ${err.message}`;
-                    break;
-                }
-                await _esperarCancelable(500); // estabilización entre pasos
-            }
-            if (_cancelarMisionFlag && resultado === 'completada') resultado = 'cancelada';
-        } finally {
-            a.reanudarRC();
-            _misionEnEjecucion = false;
-            _cancelarMisionFlag = false;
-        }
-        if (a !== _adaptador) return;
-        if (btnEjecutar) btnEjecutar.hidden = false;
-        if (btnCancelar) btnCancelar.hidden = true;
-        _actualizarSelectMisiones();
-
-        if (resultado === 'completada') App.mostrarToast(`Misión "${mision.nombre}" completada.`, 'exito');
-        else if (resultado === 'cancelada') App.mostrarToast(`Misión "${mision.nombre}" cancelada.`, 'advertencia');
-        else App.mostrarToast(`Misión "${mision.nombre}" interrumpida (${detalleError}).`, 'error', 8000);
-    }
-
-    /** @param {boolean} frenar si true, además manda rc 0 0 0 0 */
-    function _cancelarMision(frenar) {
-        if (!_misionEnEjecucion) return;
-        _cancelarMisionFlag = true;
-        if (frenar) _adaptador?.frenar();
-        App.mostrarToast('Cancelando la misión: termina el paso en curso y se detiene.', 'advertencia');
-    }
-
-    function _crearMision() {
-        const nombre = (prompt('Nombre de la nueva misión:', 'Patrulla del aula') || '').trim();
-        if (!nombre) return;
-        const texto = prompt(
-            'Escribí los pasos separados por coma.\nPodés usar: ' + ACCIONES_MISION.join(', ') +
-            '\n(distancias en cm; giros en grados, positivo a la derecha; esperar en segundos)\nEjemplo: adelante 50, girar 90, subir 30',
-            'adelante 50, girar 90, adelante 50');
-        if (!texto) return;
-
-        const pasos = [];
-        const invalidos = [];
-        texto.split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
-            const [accion, valorTxt] = t.toLowerCase().split(/\s+/);
-            const valor = parseInt(valorTxt, 10);
-            if (ACCIONES_MISION.includes(accion) && Number.isFinite(valor)) pasos.push({ accion, valor });
-            else invalidos.push(t);
-        });
-        if (invalidos.length || !pasos.length) {
-            App.mostrarToast(`No se guardó la misión. Pasos no válidos: ${invalidos.join(' | ') || '(ninguno)'}`, 'error', 8000);
-            return;
-        }
-        const lista = _obtenerMisiones().slice();
-        lista.push({ id: 'm_' + Date.now(), nombre, descripcion: 'Misión personalizada', pasos });
-        _guardarMisiones(lista);
-        _actualizarSelectMisiones();
-        _q('#sel-mision-activa').value = lista[lista.length - 1].id;
-        _q('#sel-mision-activa').onchange();
-        App.mostrarToast('Misión guardada.', 'exito');
+        return _accionVuelo;
     }
 
     // ----------------------------------------------------------------
@@ -712,23 +464,30 @@ const Dron = (() => {
     }
 
     /**
-     * Apaga el seguimiento (y el control real, si estaba).
-     * @param {boolean} [mandarFreno] true: si el control real estaba activo, manda ya "rc 0 0 0 0".
-     *   Los que llaman desde emergencia, freno, failsafe, aterrizaje o pasos pasan false: ellos ya se ocupan
-     *   de lo que se manda (así no cambia nada de lo que sale en esos casos).
+     * Apaga el seguimiento (si estaba moviendo el dron, sus ejes vuelven a 0).
+     * @param {boolean} [mandarFreno] true: si estaba moviendo el dron, manda ya "rc 0 0 0 0".
+     *   Los que llaman desde emergencia, failsafe, aterrizaje, despegue o un botón de movimiento pasan false:
+     *   ellos ya se ocupan de lo que se manda.
      */
     function _apagarSeguimiento(mandarFreno = true) {
-        _volverAEnsayo(null, mandarFreno);
+        _dejarDeMandar(mandarFreno);
         if (!_modoSeguimiento) return;
         _modoSeguimiento = false;
         _seguimiento?.desactivar();
         _panelSeguimiento?.destruir();
         _panelSeguimiento = null;
-        _mostrarEnsayo('');
+        _mostrarCartel('');
         const chip = _q('#cab-chip-seguimiento');
         if (chip) chip.hidden = true;
         _pantallaSeg?.setActivo(false);
         _actualizarBotonSeguimiento();
+    }
+
+    /** Apaga el seguimiento con freno y avisa por qué (solo si estaba andando). */
+    function _detenerSeguimiento(motivo) {
+        if (!_modoSeguimiento) return;
+        _apagarSeguimiento();
+        App.mostrarToast(`${motivo}: el seguimiento se detuvo.`, 'advertencia', 6000);
     }
 
     function _apagarModosAutomaticos() {
@@ -740,11 +499,9 @@ const Dron = (() => {
         if (!_giroscopio) return;
         if (_modoGiro) {
             _apagarGiro();
-            App.mostrarToast('Giroscopio desactivado.', 'info');
+            App.mostrarToast('Inclinación apagada.', 'info');
             return;
         }
-        // La inclinación y el control real del seguimiento usan los mismos ejes: el control real vuelve a ensayo
-        _volverAEnsayo('Activaste la inclinación: el seguimiento volvió a ensayo.');
         if (_failsafeBloquea()) return;
         if (_maniobraEnCurso()) { App.mostrarToast('Esperá a que termine la maniobra en curso.', 'advertencia'); return; }
         const resultado = await _giroscopio.activar();
@@ -754,7 +511,10 @@ const Dron = (() => {
             _joystickDer?.centrar();
             // Avance y costados los maneja la inclinación: esos botones quedan bloqueados (los de altura y giro siguen)
             _mando?.setBloqueados(['adelante', 'atras', 'izquierda', 'derecha']);
-            App.mostrarToast('Inclinación activada: inclinate el celular para avanzar y moverte de costado.', 'exito');
+            // La inclinación y el seguimiento mueven los mismos ejes: no andan juntos
+            _detenerSeguimiento('Prendiste la inclinación');
+            // activar() ya tomó la posición de ahora como "quieto" (calibración automática)
+            App.mostrarToast('Inclinación prendida: esta posición es quieto.', 'exito');
         } else {
             let msg = 'No se pudo activar el control por inclinación.';
             if (resultado.motivo === 'permiso_denegado') msg = 'Permiso de los sensores denegado. Habilitalo en los ajustes.';
@@ -772,15 +532,14 @@ const Dron = (() => {
         if (!_modoGiro) return;
         _apagarGiro();
         App.mostrarToast('Cambió la orientación de la pantalla: se apagó el control por inclinación. ' +
-            'Sostené el celular como vas a volar y volvé a activarlo para recalibrar.', 'advertencia', 8000);
+            'Sostené el celular como vas a volar y volvé a prenderla: esa posición va a ser quieto.', 'advertencia', 8000);
     }
 
     /** El lector decidió de qué sensor sale la inclinación. Con giroscopio no se avisa nada (es lo de siempre). */
     function _onFuenteInclinacion(fuente) {
         if (!_modoGiro) return;
         if (fuente === 'acelerometro') {
-            App.mostrarToast('Este celular no tiene giroscopio: la inclinación se mide con el acelerómetro. ' +
-                'El giro no se puede medir: para girar, usá los botones de girar.', 'advertencia', 8000);
+            App.mostrarToast('En este celular la inclinación no mide el giro: para girar, usá los botones.', 'advertencia', 8000);
         } else if (fuente === 'ninguno') {
             _apagarGiro(); // sus ejes vuelven a cero
             App.mostrarToast('No llegan datos de inclinación: este dispositivo no los da. Usá los botones.', 'advertencia', 7000);
@@ -805,13 +564,13 @@ const Dron = (() => {
     }
 
     // ----------------------------------------------------------------
-    // Seguimiento estilo RAC: ensayo por defecto y control real (S3, experimental)
-    // En ensayo calcula el comando y lo muestra, pero NUNCA escribe los ejes del rc: se puede usar en tierra
-    // y no interfiere con los mandos ni con la inclinación. Con el control real activo, cada paso de control
-    // (15 Hz) escribe los ejes con los límites de DronSeguimiento.LIMITES_CONTROL_REAL; sin objetivo, en 0.
+    // Seguimiento estilo RAC
+    // En el piso solo marca el objetivo: NUNCA escribe los ejes del rc. En vuelo, cada paso de control (15 Hz)
+    // escribe los ejes con los límites de DronSeguimiento.LIMITES_CONTROL_REAL; sin objetivo, en 0.
+    // Qué hacer en cada paso lo decide DronSeguimiento.decidirSeguimiento (función pura, con pruebas).
     // ----------------------------------------------------------------
 
-    /** Botón del costado (a mano con el celular acostado): sigue a una persona, o detiene el seguimiento. */
+    /** Botón "Seguir persona" de arriba: sigue a una persona, o (mientras sigue) detiene el seguimiento. */
     async function _toggleSeguimiento() {
         if (_modoSeguimiento) {
             _apagarSeguimiento();
@@ -823,8 +582,8 @@ const Dron = (() => {
     }
 
     /**
-     * "Seguir persona" / "Seguir objeto": elige qué seguir y arranca el seguimiento (en ensayo).
-     * Si ya estaba andando, cambia el objetivo y vuelve a ensayo.
+     * "Seguir persona" / "Seguir objeto": elige qué seguir y arranca el seguimiento.
+     * Si ya estaba andando, cambia el objetivo (deja de mover el dron hasta confirmar el nuevo).
      * @param {{tipo:'persona'}|{tipo:'clase', clase:string}|{tipo:'mio', id:string}} meta
      */
     async function _seguirObjetivo(meta) {
@@ -833,11 +592,12 @@ const Dron = (() => {
         if (!_seguimiento) return; // salió de la cabina mientras cargaba
         if (!res.ok) { App.mostrarToast(res.error, 'advertencia', 7000); return; }
         if (_modoSeguimiento) {
-            _volverAEnsayo('Cambiaste qué seguir: el seguimiento volvió a ensayo.');
+            // Antes de reactivar: activar() pone los FPS en 0 y, si siguiera mandando, se cortaría por las condiciones
+            _dejarDeMandar(true);
             _seguimiento.desactivar();
             _seguimiento.activar();
             _pantallaSeg?.setActivo(true);
-            App.mostrarToast('Ahora sigue lo que elegiste (en ensayo).', 'info');
+            App.mostrarToast('Ahora sigue lo que elegiste.', 'info');
             return;
         }
         await _activarSeguimiento();
@@ -857,7 +617,13 @@ const Dron = (() => {
             if (!res.ok) { App.mostrarToast(`No se pudo preparar el seguimiento: ${res.error}`, 'advertencia', 7000); return; }
             if (res.aviso) App.mostrarToast(res.aviso, 'advertencia', 8000);
         }
+        // La inclinación y el seguimiento mueven los mismos ejes: no andan juntos
+        if (_modoGiro) {
+            _apagarGiro();
+            App.mostrarToast('Se apagó la inclinación para seguir al objetivo.', 'info');
+        }
         _modoSeguimiento = true;
+        _controlReal = false;
         _seguimiento.controlReal = false;
         _seguimiento.onComando = _onSeguimientoComando;
         _panelSeguimiento?.destruir();
@@ -865,94 +631,66 @@ const Dron = (() => {
         _seguimiento.onEstado = (nuevo, anterior, info) => {
             _pantallaSeg?.cambioDeEstado(nuevo, anterior, info);
             if (_modoSeguimiento && nuevo === 'perdido') {
-                App.mostrarToast(_controlReal ? 'Objetivo perdido: el dron queda quieto.' : 'Objetivo perdido: el dron se quedaría quieto.', 'advertencia', 5000);
+                App.mostrarToast(_controlReal ? 'Objetivo perdido: el dron queda quieto.' : 'Objetivo perdido.', 'advertencia', 5000);
             }
         };
         _seguimiento.activar();
         _pantallaSeg?.setActivo(true);
-        _mostrarEnsayo('ENSAYO · buscando objetivo...');
+        const enVuelo = !!_adaptador?.enVuelo;
+        _mostrarCartel(enVuelo ? 'Buscando objetivo...' : TEXTO_EN_EL_PISO);
         const btnRegistro = _q('#btn-copiar-registro-seg');
         if (btnRegistro) btnRegistro.hidden = false;
-        App.mostrarToast('Seguimiento en ensayo: la app muestra lo que haría el dron, pero no lo mueve.', 'info', 6000);
+        App.mostrarToast(enVuelo ? 'Cuando confirme el objetivo, el dron lo sigue despacio. Tené el dedo listo en EMERGENCIA.' : TEXTO_EN_EL_PISO, 'info', 7000);
         _actualizarBotonSeguimiento();
     }
 
     /**
-     * Interruptor "Control real (experimental)". Activarlo pide confirmación cada vez.
-     * @returns {Promise<boolean>} si quedó activo
-     */
-    async function _cambiarControlReal(activar) {
-        if (!activar) {
-            _volverAEnsayo('Control real apagado: el seguimiento volvió a ensayo.');
-            return false;
-        }
-        if (!_modoSeguimiento) { App.mostrarToast('Primero tocá Seguir persona o Seguir objeto.', 'advertencia'); return false; }
-        if (_failsafeBloquea()) return false;
-        if (_maniobraEnCurso()) { App.mostrarToast('Esperá a que termine la maniobra en curso.', 'advertencia'); return false; }
-        if (_modoGiro) { App.mostrarToast('Apagá la inclinación antes de activar el control real.', 'advertencia'); return false; }
-        const cond = _seguimiento.condiciones();
-        if (!cond.ok) {
-            App.mostrarToast(`Todavía no se puede activar el control real: ${cond.motivos.join('; ')}.`, 'advertencia', 9000);
-            return false;
-        }
-        const L = DronSeguimiento.LIMITES_CONTROL_REAL;
-        if (!confirm(
-            '¿Activar el control real del seguimiento (experimental)?\n\n' +
-            `• El dron va a seguir al objetivo de verdad, despacio (giro hasta ${Math.round(L.yaw * 100)}, altura y avance hasta ${Math.round(L.fb * 100)} de 100; nunca de costado).\n` +
-            '• Si pierde el objetivo, queda quieto (no aterriza ni se mueve solo).\n' +
-            '• Cualquier botón de movimiento, Frenar o EMERGENCIA lo apagan.\n' +
-            '• Que alguien tenga el dedo listo en EMERGENCIA.'
-        )) return false;
-        // Puede haber cambiado algo mientras se mostraba la confirmación
-        if (!_modoSeguimiento || !_adaptador?.enVuelo || !_hayTelemetria()) {
-            App.mostrarToast('El dron ya no está listo: el control real no se activó.', 'advertencia');
-            return false;
-        }
-        _soltarMandos();
-        _controlReal = true;
-        _seguimiento.controlReal = true;
-        App.mostrarToast('Control real activado: el dron sigue al objetivo.', 'advertencia', 6000);
-        return true;
-    }
-
-    /**
-     * Vuelve el seguimiento a ensayo: los ejes del seguimiento a 0.
-     * @param {string|null} motivo aviso para mostrar (null: sin aviso)
+     * Deja de mover el dron: los ejes del seguimiento a 0 (el seguimiento puede seguir marcando el objetivo).
      * @param {boolean} [mandarFreno] mandar ya "rc 0 0 0 0" (si no, sale en el próximo ciclo del rc)
      */
-    function _volverAEnsayo(motivo, mandarFreno = true) {
+    function _dejarDeMandar(mandarFreno = true) {
         if (!_controlReal) return;
         _controlReal = false;
         if (_seguimiento) _seguimiento.controlReal = false;
         _adaptador?.actualizarEjes({ lr: 0, fb: 0, ud: 0, yaw: 0 });
         if (mandarFreno) _adaptador?.enviarEjesYa();
-        _pantallaSeg?.setControlReal(false);
-        if (motivo) App.mostrarToast(motivo, 'advertencia', 6000);
     }
 
-    /** Cada paso de control (15 Hz): en ensayo solo muestra; con el control real, escribe los ejes. */
+    /** Cada paso de control (15 Hz): en el piso solo muestra; en vuelo y con las condiciones, mueve el dron. */
     function _onSeguimientoComando(cmd, info) {
         if (!_modoSeguimiento) return;
-        let textoComando;
-        if (_controlReal) {
-            // Salidas de seguridad: conexión, maniobras o condiciones
-            const a = _adaptador;
-            let motivo = null;
-            if (!a || !a.enVuelo || a.enviosSuspendidos || !_hayTelemetria()) motivo = 'Se perdió la conexión con el dron (o ya no está en vuelo): el seguimiento volvió a ensayo.';
-            else if (_maniobraEnCurso()) motivo = 'Empezó otra maniobra: el seguimiento volvió a ensayo.';
-            else if (!info.condiciones.ok) motivo = `El seguimiento volvió a ensayo: ${info.condiciones.motivos[0]}.`;
-            if (motivo) {
-                _volverAEnsayo(motivo);
-            } else {
-                const ejes = DronSeguimiento.comandoControlReal(cmd, info.estado);
-                a.actualizarEjes(ejes);
-                textoComando = `Mandando al dron: ${DronSeguimiento.textoRc(ejes)}`;
-                _mostrarEnsayo(`CONTROL REAL · ${DronSeguimiento.estadoCorto(info).texto}${App.modoTecnico() ? ` · ${DronSeguimiento.textoRc(ejes)}` : ''}`);
-            }
+        const a = _adaptador;
+        const decision = DronSeguimiento.decidirSeguimiento({
+            enVuelo: !!a?.enVuelo,
+            conexionOk: !!a && !a.enviosSuspendidos && _hayTelemetria(),
+            maniobra: _maniobraEnCurso(),
+            condiciones: info.condiciones,
+            mandando: _controlReal,
+        });
+        if (decision.accion === 'detener') {
+            // Estaba moviendo el dron y dejó de poder: freno y fin del seguimiento (hay que volver a pedirlo)
+            _apagarSeguimiento();
+            App.mostrarToast(`El seguimiento se detuvo: ${decision.motivo}.`, 'advertencia', 7000);
+            return;
         }
-        if (!_controlReal) {
-            textoComando = `Ensayo: no se manda nada (calcularía ${DronSeguimiento.textoRc({ lr: 0, ...cmd })}).`;
-            _mostrarEnsayo(DronSeguimiento.textoEnsayo(cmd, info));
+        let textoComando;
+        if (decision.accion === 'mandar') {
+            _controlReal = true;
+            _seguimiento.controlReal = true;
+            const ejes = DronSeguimiento.comandoControlReal(cmd, info.estado);
+            a.actualizarEjes(ejes);
+            textoComando = `Mandando al dron: ${DronSeguimiento.textoRc(ejes)}`;
+            _pantallaSeg?.setModo('El dron sigue al objetivo, despacio.', true);
+            // El estado ya está en la etiqueta de arriba del video: el cartel solo hace falta en el modo técnico (con el rc)
+            _mostrarCartel(App.modoTecnico() ? `${DronSeguimiento.estadoCorto(info).texto} · ${DronSeguimiento.textoRc(ejes)}` : '');
+        } else if (decision.accion === 'esperar') {
+            textoComando = `Todavía no sigue: ${decision.motivo}.`;
+            _pantallaSeg?.setModo(`Todavía no sigue: ${decision.motivo}.`, false);
+            _mostrarCartel(`Todavía no sigue: ${decision.motivo}`);
+        } else {
+            textoComando = 'En el piso: no se manda nada.';
+            _pantallaSeg?.setModo(TEXTO_EN_EL_PISO, false);
+            _mostrarCartel(TEXTO_EN_EL_PISO);
         }
         _pantallaSeg?.actualizar(info, textoComando);
         _panelSeguimiento?.actualizar(info);
@@ -967,7 +705,7 @@ const Dron = (() => {
         }
     }
 
-    /** Modo técnico: el mismo cuadro con WebGL y con CPU (pausa el ensayo unos segundos). */
+    /** Modo técnico: el mismo cuadro con WebGL y con CPU (pausa la detección unos segundos). */
     async function _probarCuadroEnCpu() {
         const btn = _q('#btn-probar-cpu');
         const salida = _q('#cab-resultado-cpu');
@@ -991,16 +729,17 @@ const Dron = (() => {
         App.mostrarToast(ok ? `Registro copiado (${a.registro.length} líneas).` : 'No se pudo copiar el registro.', ok ? 'exito' : 'advertencia');
     }
 
-    /** Copia el registro por cuadro del último ensayo (CSV separado por ";"). */
+    /** Copia el registro por cuadro del último seguimiento (CSV separado por ";"). */
     async function _copiarRegistroSeguimiento() {
         const filas = _seguimiento?.registro.length || 0;
-        if (!filas) { App.mostrarToast('Todavía no hay registro: activá el ensayo un rato.', 'info'); return; }
+        if (!filas) { App.mostrarToast('Todavía no hay registro: usá el seguimiento un rato.', 'info'); return; }
         const ok = await DronSeguimiento.copiarTexto(_seguimiento.registroCSV());
         App.mostrarToast(ok ? `Registro copiado (${filas} cuadros).` : 'No se pudo copiar el registro.', ok ? 'exito' : 'advertencia');
     }
 
-    function _mostrarEnsayo(texto) {
-        const caja = _q('#cab-ensayo');
+    /** Cartel sobre el video: qué está haciendo el seguimiento. */
+    function _mostrarCartel(texto) {
+        const caja = _q('#cab-cartel');
         if (!caja) return;
         caja.textContent = texto;
         caja.hidden = !texto;
@@ -1038,13 +777,16 @@ const Dron = (() => {
     function _onMandoBotones(ejes, acciones) {
         const a = _adaptador;
         if (!a) return;
-        // Tocar un botón de movimiento apaga el control real del seguimiento (vuelve a ensayo)
-        if (acciones.length) _volverAEnsayo('Tocaste un botón de movimiento: el seguimiento volvió a ensayo.', false);
+        // Tocar un botón de movimiento detiene el seguimiento (sus ejes a 0; los del botón salen enseguida)
+        if (acciones.length && _modoSeguimiento) {
+            _apagarSeguimiento(false);
+            App.mostrarToast('Tocaste un botón de movimiento: el seguimiento se detuvo.', 'advertencia');
+        }
         if (acciones.length && _maniobraEnCurso()) {
             _mando.soltarTodo(); // vuelve a llamar con los ejes en 0
             if (Date.now() - _avisoManiobraTs > 3000) {
                 _avisoManiobraTs = Date.now();
-                App.mostrarToast('El dron todavía está haciendo otro movimiento. Esperá o tocá el botón rojo para frenarlo.', 'advertencia');
+                App.mostrarToast('Esperá a que el dron termine de despegar o de aterrizar.', 'advertencia');
             }
             return;
         }
@@ -1116,7 +858,7 @@ const Dron = (() => {
 
         // Cada joystick actualiza SOLO sus dos ejes
         _joystickIzq.onChange = ({ x, y }) => {
-            _volverAEnsayo('Tocaste un joystick: el seguimiento volvió a ensayo.', false);
+            if (_modoSeguimiento) _detenerSeguimiento('Tocaste un joystick');
             _adaptador?.actualizarEjes({ ud: y, yaw: x });
         };
         _joystickIzq.onRelease = () => {
@@ -1124,7 +866,7 @@ const Dron = (() => {
         };
         _joystickDer.onChange = ({ x, y }) => {
             if (_modoGiro) return; // en ese modo lo maneja el giroscopio
-            _volverAEnsayo('Tocaste un joystick: el seguimiento volvió a ensayo.', false);
+            if (_modoSeguimiento) _detenerSeguimiento('Tocaste un joystick');
             _adaptador?.actualizarEjes({ lr: x, fb: y });
         };
         _joystickDer.onRelease = () => {
@@ -1212,6 +954,18 @@ const Dron = (() => {
         }
     }
 
+    /**
+     * Espacio al final de la página igual a lo que tapa EMERGENCIA (fija abajo en vertical) más un margen:
+     * así se puede leer todo con scroll, aunque el celular agrande la letra. Acostado va arriba: sin espacio.
+     */
+    function _reservarLugarEmergencia() {
+        const em = _q('#btn-emergencia');
+        const fin = _q('.cab-reserva');
+        if (!em || !fin) return;
+        const r = em.getBoundingClientRect();
+        fin.style.height = r.top > window.innerHeight / 2 ? `${Math.ceil(window.innerHeight - r.top) + 16}px` : '0px';
+    }
+
     function _mostrarAvisoFijo(texto) {
         const caja = _q('#cab-aviso-fijo');
         if (!caja) return;
@@ -1234,7 +988,7 @@ const Dron = (() => {
             <p class="etiqueta">Cabina</p>
             <h1 class="h3 fw-bold text-uppercase">Error</h1>
             <div class="alert alert-danger">${_esc(mensaje)}</div>
-            <a href="#/config-dron" class="btn btn-primary">Ir a Configuración</a>
+            <a href="#/inicio" class="btn btn-primary">Volver al inicio</a>
         </div>`;
     }
 
@@ -1272,7 +1026,7 @@ const Dron = (() => {
             <!-- Zona principal: mando izquierdo | video | mando derecho (botones de mantener apretado o joysticks) -->
             <div class="cab-principal">
                 <div class="cab-lado cab-lado--izq">
-                    <div class="d-grid gap-2">
+                    <div class="cab-acciones">
                         <button id="btn-despegar" class="btn btn-primary" disabled>${App.icono('despegar')} Despegar</button>
                         <button id="btn-aterrizar" class="btn btn-outline-secondary" disabled>${App.icono('aterrizar')} Aterrizar</button>
                     </div>
@@ -1307,7 +1061,7 @@ const Dron = (() => {
                             <span id="cab-chip-fps" class="badge solo-tecnico" hidden></span>
                         </div>
                     </div>
-                    <div id="cab-ensayo" class="cartel-ensayo" hidden></div>
+                    <div id="cab-cartel" class="cartel-seguimiento" hidden></div>
                 </div>
 
                 <!-- Velocidad de los botones (arranca siempre en Lenta) -->
@@ -1321,7 +1075,7 @@ const Dron = (() => {
                 </div>
 
                 <div class="cab-lado cab-lado--der">
-                    <div class="d-grid gap-2">
+                    <div class="cab-acciones">
                         <button id="btn-toggle-giro" class="btn btn-outline-secondary">Inclinación: apagada</button>
                         <div class="cab-seguir">
                             <button id="btn-toggle-seguimiento" class="btn btn-outline-primary">Seguir persona</button>
@@ -1350,8 +1104,8 @@ const Dron = (() => {
 
             <!-- Seguimiento estilo RAC (las tarjetas las arma dron-seguimiento-ui.js) -->
             <section class="border-top pt-4 mt-3">
-                <p class="etiqueta">01 — Seguimiento</p>
-                <p class="small text-body-secondary">Elegí qué seguir: una persona (la cara o, si no se ve, el cuerpo) o un objeto. Arranca en ensayo: muestra qué haría el dron, pero no lo mueve.</p>
+                <p class="etiqueta">Seguimiento</p>
+                <p class="small text-body-secondary">Tocá Seguir persona (la cara o, si no se ve, el cuerpo) o Seguir objeto. Con el dron en el aire, lo sigue despacio.</p>
                 <div id="cab-seguimiento"></div>
                 <img id="cab-foto-prueba" src="img/prueba-persona.jpg" alt="" hidden>
             </section>
@@ -1392,74 +1146,11 @@ const Dron = (() => {
                 <button id="btn-copiar-registro-udp" class="btn btn-outline-secondary">Copiar registro de comandos</button>
             </section>
 
-            <!-- Inclinación -->
-            <section class="border-top pt-4 mt-3">
-                <p class="etiqueta">02 — Inclinación</p>
-                <p class="small text-body-secondary">Movés el dron inclinando el celular. Sostené el celular como lo vas a usar y tocá Calibrar: esa posición será "quieto".</p>
-                <button id="btn-calibrar-giro" class="btn btn-outline-secondary">Calibrar</button>
-            </section>
-
-            <!-- Movimientos por paso -->
-            <section class="border-top pt-4 mt-3">
-                <p class="etiqueta">03 — Por pasos</p>
-                <p class="small text-body-secondary">Cada botón mueve el dron la distancia elegida y lo deja quieto. El botón rojo lo frena.</p>
-                <div class="row g-2 mb-3">
-                    <div class="col">
-                        <label class="form-label small text-body-secondary mb-1" for="sel-paso-distancia">Distancia</label>
-                        <select id="sel-paso-distancia" class="form-select">
-                            <option value="20">20 cm</option>
-                            <option value="30" selected>30 cm</option>
-                            <option value="50">50 cm</option>
-                            <option value="100">100 cm</option>
-                        </select>
-                    </div>
-                    <div class="col">
-                        <label class="form-label small text-body-secondary mb-1" for="sel-paso-angulo">Giro</label>
-                        <select id="sel-paso-angulo" class="form-select">
-                            <option value="45">45°</option>
-                            <option value="90" selected>90°</option>
-                            <option value="180">180°</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="d-flex flex-wrap align-items-center justify-content-center gap-3">
-                    <div class="cab-cruz">
-                        <span></span>
-                        <button id="btn-paso-adelante" class="btn btn-outline-secondary" aria-label="Adelante">${App.icono('tri-arriba')}</button>
-                        <span></span>
-                        <button id="btn-paso-izquierda" class="btn btn-outline-secondary" aria-label="Izquierda">${App.icono('tri-izq')}</button>
-                        <button id="btn-paso-frenar" class="btn btn-danger" aria-label="Frenar">${App.icono('detener')}</button>
-                        <button id="btn-paso-derecha" class="btn btn-outline-secondary" aria-label="Derecha">${App.icono('tri-der')}</button>
-                        <span></span>
-                        <button id="btn-paso-atras" class="btn btn-outline-secondary" aria-label="Atrás">${App.icono('tri-abajo')}</button>
-                        <span></span>
-                    </div>
-                    <div class="row row-cols-2 g-2 flex-grow-1">
-                        <div class="col"><button id="btn-paso-subir" class="btn btn-outline-secondary w-100">Subir</button></div>
-                        <div class="col"><button id="btn-paso-bajar" class="btn btn-outline-secondary w-100">Bajar</button></div>
-                        <div class="col"><button id="btn-paso-girar-izq" class="btn btn-outline-secondary w-100">Girar izq.</button></div>
-                        <div class="col"><button id="btn-paso-girar-der" class="btn btn-outline-secondary w-100">Girar der.</button></div>
-                    </div>
-                </div>
-                <p id="estado-paso-texto" class="small text-body-secondary mt-3 mb-0">Listo. El botón rojo del centro frena.</p>
-            </section>
-
-            <!-- Misiones -->
-            <section class="border-top pt-4 mt-3">
-                <p class="etiqueta">04 — Automático</p>
-                <p class="small text-body-secondary">Una lista de pasos que el dron hace solo. Elegí una y tocá Iniciar; Cancelar la frena.</p>
-                <div class="d-flex flex-wrap gap-2">
-                    <select id="sel-mision-activa" class="form-select flex-grow-1 w-auto" aria-label="Misión"></select>
-                    <button id="btn-ejecutar-mision" class="btn btn-outline-primary">Iniciar</button>
-                    <button id="btn-cancelar-mision" class="btn btn-danger" hidden>Cancelar misión</button>
-                    <button id="btn-nueva-mision" class="btn btn-outline-secondary solo-tecnico">Nueva</button>
-                </div>
-                <div id="info-mision-pasos" class="small text-body-secondary mt-2"></div>
-            </section>
-
             <p class="small text-body-secondary text-center border-top pt-3 mt-3">
-                Vuelo supervisado, con 3×3 m libres de personas. El seguimiento arranca en ensayo; el control real es experimental y pide confirmación.
+                Volá con supervisión y con 3 × 3 m libres de personas.
             </p>
+            <!-- Espacio para que EMERGENCIA no tape lo último (lo mide _reservarLugarEmergencia) -->
+            <div class="cab-reserva" aria-hidden="true"></div>
         </div>`;
     }
 
@@ -1474,8 +1165,7 @@ const Dron = (() => {
 
         _modoGiro = false;
         _modoSeguimiento = false;
-        _controlReal = false; // al salir de la cabina, el seguimiento vuelve a ensayo (y se apaga)
-        _cancelarMisionFlag = true;
+        _controlReal = false; // al salir de la cabina, el seguimiento se apaga
         if (_onVisibilidad) { document.removeEventListener('visibilitychange', _onVisibilidad); _onVisibilidad = null; }
         if (_giroscopio) { _giroscopio.desactivar(); _giroscopio = null; }
         if (_seguimiento) { _seguimiento.desactivar(); _seguimiento = null; }
@@ -1489,8 +1179,6 @@ const Dron = (() => {
 
         const a = _adaptador;
         _adaptador = null;
-        _misionEnEjecucion = false;
-        _pasoEnEjecucion = false;
         _accionVuelo = false;
         _nivelAvisoBateria = 0;
         _esperandoVueltaTelemetria = false;
@@ -1501,7 +1189,7 @@ const Dron = (() => {
                     await a.aterrizar();
                     App.mostrarToast('Saliste de la cabina: dron aterrizado.', 'info');
                 } catch (err) {
-                    App.mostrarToast('Al salir de la cabina no se pudo confirmar el aterrizaje: ' + err.message, 'error', 9000);
+                    App.mostrarToast(`Al salir de la cabina no se pudo confirmar el aterrizaje: ${_textoError(err)}`, 'error', 9000);
                 }
             }
             try { await a.desconectar(); } catch (_) { /* nada */ }
